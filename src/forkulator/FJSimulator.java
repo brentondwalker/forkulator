@@ -55,6 +55,8 @@ public class FJSimulator {
 	public void addEvent(QEvent e) {
 		if (event_queue.isEmpty()) {
 			event_queue.add(e);
+		} else if (e.time > this.event_queue.getLast().time) {
+			event_queue.add(e);
 		} else {
 			int i = 0;
 			for (QEvent le : this.event_queue) {

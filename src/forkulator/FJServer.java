@@ -33,15 +33,7 @@ public class FJServer {
 			
 			if (workers[i].current_task == null) {
 				// service the next task
-				workers[i].current_task = current_job.nextTask();
-				workers[i].current_task.worker = i;
-				workers[i].current_task.start_time = time;
-				workers[i].current_task.processing = true;
-				
-				// schedule the task's completion
-				QTaskCompletionEvent e = new QTaskCompletionEvent(workers[i].current_task,
-						time + workers[i].current_task.service_time);
-				simulator.addEvent(e);
+				serviceTask(i, current_job.nextTask(), time);
 				
 				// if the current job is exhausted, grab a new one (or null)
 				if (current_job.complete) {
@@ -55,10 +47,24 @@ public class FJServer {
 		System.out.println("enqueJob() "+job.arrival_time);
 		if (current_job == null) {
 			current_job = job;
+			System.out.println("  current job was null");
+			feedWorkers(job.arrival_time);
 		} else {
 			job_queue.add(job);
-			feedWorkers(job.arrival_time);
+			System.out.println("  current job was full, so I queued this one");
 		}
+	}
+	
+	public void serviceTask(int workerId, FJTask task, double time) {
+		System.out.println("serviceTask() "+task.ID);
+		workers[workerId].current_task = task;
+		task.worker = workerId;
+		task.start_time = time;
+		task.processing = true;
+		
+		// schedule the task's completion
+		QTaskCompletionEvent e = new QTaskCompletionEvent(task, time + task.service_time);
+		simulator.addEvent(e);
 	}
 	
 	public void taskCompleted(int workerId, double time) {
@@ -68,24 +74,19 @@ public class FJServer {
 		
 		// if there is no current job, just clear the worker
 		if (current_job == null) {
+			System.out.println("  no current_job");
 			workers[workerId].current_task = null;
 			return;
 		}
 		
 		// put a new task on the worker
-		workers[workerId].current_task = current_job.nextTask();
-		workers[workerId].current_task.worker = workerId;
-		workers[workerId].current_task.start_time = time;
-		workers[workerId].current_task.processing = true;
-		
-		// schedule the task's completion
-		QTaskCompletionEvent e = new QTaskCompletionEvent(workers[workerId].current_task,
-				time + workers[workerId].current_task.service_time);
-		simulator.addEvent(e);
+		serviceTask(workerId, current_job.nextTask(), time);
 		
 		// if the current job is exhausted, grab a new one (or null)
 		if (current_job.complete) {
 			current_job = job_queue.poll();
+			System.out.println("  set current_job to "+current_job);
+			feedWorkers(time);  // this should not do anything
 		}
 	}
 	
