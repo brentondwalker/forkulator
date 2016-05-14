@@ -1,5 +1,6 @@
 package forkulator;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
 
@@ -11,6 +12,7 @@ public class FJServer {
 	public FJWorker[] workers = null;
 	public Queue<FJJob> job_queue = new LinkedList<FJJob>();
 	public FJJob current_job = null;
+	public ArrayList<FJJob> all_jobs = new ArrayList<FJJob>();
 	
 	public FJServer(int num_workers) {
 		this.num_workers = num_workers;
@@ -44,19 +46,20 @@ public class FJServer {
 	}
 	
 	public void enqueJob(FJJob job) {
-		System.out.println("enqueJob() "+job.arrival_time);
+		if (FJSimulator.DEBUG) System.out.println("enqueJob() "+job.arrival_time);
+		all_jobs.add(job);
 		if (current_job == null) {
 			current_job = job;
-			System.out.println("  current job was null");
+			if (FJSimulator.DEBUG) System.out.println("  current job was null");
 			feedWorkers(job.arrival_time);
 		} else {
 			job_queue.add(job);
-			System.out.println("  current job was full, so I queued this one");
+			if (FJSimulator.DEBUG) System.out.println("  current job was full, so I queued this one");
 		}
 	}
 	
 	public void serviceTask(int workerId, FJTask task, double time) {
-		System.out.println("serviceTask() "+task.ID);
+		if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task.ID);
 		workers[workerId].current_task = task;
 		task.worker = workerId;
 		task.start_time = time;
@@ -68,13 +71,13 @@ public class FJServer {
 	}
 	
 	public void taskCompleted(int workerId, double time) {
-		System.out.println("task "+workers[workerId].current_task.ID+" completed "+time);
+		if (FJSimulator.DEBUG) System.out.println("task "+workers[workerId].current_task.ID+" completed "+time);
 		workers[workerId].current_task.completion_time = time;
 		workers[workerId].current_task.completed = true;
 		
 		// if there is no current job, just clear the worker
 		if (current_job == null) {
-			System.out.println("  no current_job");
+			if (FJSimulator.DEBUG) System.out.println("  no current_job");
 			workers[workerId].current_task = null;
 			return;
 		}
@@ -85,7 +88,7 @@ public class FJServer {
 		// if the current job is exhausted, grab a new one (or null)
 		if (current_job.complete) {
 			current_job = job_queue.poll();
-			System.out.println("  set current_job to "+current_job);
+			if (FJSimulator.DEBUG) System.out.println("  set current_job to "+current_job);
 			feedWorkers(time);  // this should not do anything
 		}
 	}
