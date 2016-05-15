@@ -3,6 +3,7 @@ package forkulator;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Random;
 
@@ -76,10 +77,41 @@ public class FJSimulator {
 		}
 	}
 	
-	public void printExperimentPath(String outfile_base) {
+	public ArrayList<Double> experimentMeans(int warmup_period) {
+		double sojourn_sum = 0.0;
+		double waiting_sum = 0.0;
+		double service_sum = 0.0;
+		int total = 0;
+		int warmup_count = 0;
+		for (FJJob job : server.all_jobs) {
+			if (warmup_count < warmup_period) {
+				warmup_count++;
+				continue;
+			}
+			total++;
+			double job_start_time = job.tasks[0].start_time;
+			double job_completion_time = job.tasks[0].completion_time;
+			for (FJTask task : job.tasks) {
+				job_start_time = Math.min(job_start_time, task.start_time);
+				job_completion_time = Math.max(job_completion_time, task.completion_time);
+			}
+			waiting_sum += job_start_time - job.arrival_time;
+			sojourn_sum += job_completion_time - job.arrival_time;
+			service_sum += job_completion_time - job_start_time;
+		}
+		
+		ArrayList<Double> result = new ArrayList<Double>(3 + 1);
+		result.add(sojourn_sum/total);
+		result.add(waiting_sum/total);
+		result.add(service_sum/total);
+		result.add(total * 1.0);
+		return result;
+	}
+	
+	public void printExperimentPath(String outfile_base, int warmup_period) {
 		double binwidth = 0.1;
 		
-		// max value for the distribuions
+		// max value for the distributions
 		double max_value = 0;
 		
 		BufferedWriter writer = null;
@@ -94,15 +126,17 @@ public class FJSimulator {
 				}
 				double job_sojourn = job_completion_time - job.arrival_time;
 				max_value = Math.max(max_value, job_sojourn);
-				for (FJTask task : job.tasks) {
-					writer.write(task.ID
-							+"\t"+job.ID
-							+"\t"+job.arrival_time
-							+"\t"+job_start_time
-							+"\t"+job_completion_time
-							+"\t"+task.start_time
-							+"\t"+task.completion_time
-							+"\n");
+				if (server.all_jobs.size() < 100000) {
+					for (FJTask task : job.tasks) {
+						writer.write(task.ID
+								+"\t"+job.ID
+								+"\t"+job.arrival_time
+								+"\t"+job_start_time
+								+"\t"+job_completion_time
+								+"\t"+task.start_time
+								+"\t"+task.completion_time
+								+"\n");
+					}
 				}
 			}
 		} catch (Exception e) {
@@ -123,7 +157,15 @@ public class FJSimulator {
 		int[] job_service_d = new int[max_bin];
 		
 		// compute the distributions
+		int warmup_count = 0;
+		int total = 0;
 		for (FJJob job : server.all_jobs) {
+			if (warmup_count < warmup_period) {
+				warmup_count++;
+				continue;
+			}
+			total++;
+			
 			double job_start_time = job.tasks[0].start_time;
 			double job_completion_time = job.tasks[0].completion_time;
 			for (FJTask task : job.tasks) {
@@ -139,15 +181,15 @@ public class FJSimulator {
 		}
 		
 		// print out the distributions
+		// plot filename using 2:(log($3)) with lines title "sojourn", filename using 2:(log($4)) with lines title "waiting", filename using 2:(log($5)) with lines title "service"
 		try {
 			writer = new BufferedWriter(new FileWriter(outfile_base+"_dist.dat"));
-			double total = 1.0 * server.all_jobs.size();
 			for (int i=0; i<max_bin; i++) {
 				writer.write(i
 						+"\t"+(i*binwidth)
-						+"\t"+(1.0*job_sojourn_d[i])/total
-						+"\t"+(1.0*job_waiting_d[i])/total
-						+"\t"+(1.0*job_service_d[i])/total
+						+"\t"+(1.0*job_sojourn_d[i])/(total*binwidth)
+						+"\t"+(1.0*job_waiting_d[i])/(total*binwidth)
+						+"\t"+(1.0*job_service_d[i])/(total*binwidth)
 						+"\n");
 			}
 		} catch (Exception e) {
@@ -167,6 +209,10 @@ public class FJSimulator {
 	 * @param args
 	 */
 	public static void main(String[] args) {
+		if (args == null || args.length != 6) {
+			System.out.println("usage: FJSimulator <num_workers> <num_tasks> <arrival_rate> <service_rate> <numjobs> <filename_base>");
+			System.exit(0);
+		}
 		int num_workers = Integer.parseInt(args[0]);
 		int num_tasks = Integer.parseInt(args[1]);
 		double arrival_rate = Double.parseDouble(args[2]);
@@ -174,10 +220,26 @@ public class FJSimulator {
 		int num_jobs = Integer.parseInt(args[4]);
 		String outfile_base = args[5];
 		
+		// we always start the experiment with an empty queue, which gives a little
+		// bias to the experiment.  This parameter says we only consider results
+		// after the system has warmed up for 1000 or 5% of the jobs, whichever is less.
+		int warmup_period = (int) Math.min(1000, num_jobs*0.05);
+		
 		FJSimulator sim = new FJSimulator(num_workers, num_tasks, arrival_rate, service_rate);
 		sim.run(num_jobs);
 		
-		sim.printExperimentPath(outfile_base);
+		sim.printExperimentPath(outfile_base, warmup_period);
+		
+		ArrayList<Double> means = sim.experimentMeans(warmup_period);
+		System.out.println(
+				num_workers
+				+"\t"+num_tasks
+				+"\t"+arrival_rate
+				+"\t"+service_rate
+				+"\t"+means.get(0)
+				+"\t"+means.get(1)
+				+"\t"+means.get(2)
+				+"\t"+means.get(3));
 	}
 
 }
