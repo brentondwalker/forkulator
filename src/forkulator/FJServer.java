@@ -12,7 +12,7 @@ public class FJServer {
 	public FJWorker[] workers = null;
 	public Queue<FJJob> job_queue = new LinkedList<FJJob>();
 	public FJJob current_job = null;
-	public ArrayList<FJJob> all_jobs = new ArrayList<FJJob>();
+	public ArrayList<FJJob> sampled_jobs = new ArrayList<FJJob>();
 	
 	public FJServer(int num_workers) {
 		this.num_workers = num_workers;
@@ -45,9 +45,12 @@ public class FJServer {
 		}
 	}
 	
-	public void enqueJob(FJJob job) {
+	public void enqueJob(FJJob job, boolean sample) {
 		if (FJSimulator.DEBUG) System.out.println("enqueJob() "+job.arrival_time);
-		all_jobs.add(job);
+
+		// only keep a reference to the job if the simulator tells us to
+		if (sample)
+			sampled_jobs.add(job);
 		if (current_job == null) {
 			current_job = job;
 			if (FJSimulator.DEBUG) System.out.println("  current job was null");
