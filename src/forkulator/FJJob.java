@@ -25,6 +25,7 @@ public class FJJob {
 	public FJTask nextTask() {
 		task_index++;
 		if (task_index == num_tasks) complete = true;
+		if (task_index > num_tasks) return null;
 		return tasks[task_index-1];
 	}
 }
