@@ -27,15 +27,20 @@ public class FJSimulator {
 	 * @param arrival_rate
 	 * @param service_rate
 	 */
-	public FJSimulator(int num_workers, int num_tasks, double arrival_rate, double service_rate) {
+	public FJSimulator(String server_queue_type, int num_workers, int num_tasks, double arrival_rate, double service_rate) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_rate = arrival_rate;
 		this.service_rate = service_rate;
 		
-		//this.server = new FJSingleQueueServer(num_workers);
-		this.server = new FJWorkerQueueServer(num_workers);
-		
+		if (server_queue_type.toLowerCase().equals("s")) {
+			this.server = new FJSingleQueueServer(num_workers);
+		} else if (server_queue_type.toLowerCase().equals("w")) {
+			this.server = new FJWorkerQueueServer(num_workers);
+		} else {
+			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
+			System.exit(1);
+		}
 		FJServer.setSimulator(this);
 	}
 
@@ -140,9 +145,7 @@ public class FJSimulator {
 		double sojourn_sum = 0.0;
 		double waiting_sum = 0.0;
 		double service_sum = 0.0;
-		int total = 0;
 		for (FJJob job : server.sampled_jobs) {
-			total++;
 			double job_start_time = job.tasks[0].start_time;
 			double job_completion_time = job.tasks[0].completion_time;
 			for (FJTask task : job.tasks) {
@@ -154,6 +157,7 @@ public class FJSimulator {
 			service_sum += job_completion_time - job_start_time;
 		}
 		
+		double total = server.sampled_jobs.size();
 		ArrayList<Double> result = new ArrayList<Double>(3 + 1);
 		result.add(sojourn_sum/total);
 		result.add(waiting_sum/total);
@@ -344,19 +348,20 @@ public class FJSimulator {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		if (args == null || args.length != 7) {
-			System.out.println("usage: FJSimulator <num_workers> <num_tasks> <arrival_rate> <service_rate> <numjobs> <sampling_interval> <filename_base>");
+		if (args == null || args.length != 8) {
+			System.out.println("usage: FJSimulator <queue_type> <num_workers> <num_tasks> <arrival_rate> <service_rate> <numjobs> <sampling_interval> <filename_base>");
 			System.exit(0);
 		}
-		int num_workers = Integer.parseInt(args[0]);
-		int num_tasks = Integer.parseInt(args[1]);
-		double arrival_rate = Double.parseDouble(args[2]);
-		double service_rate = Double.parseDouble(args[3]);
-		long num_jobs = Long.parseLong(args[4]);
-		int sampling_interval = Integer.parseInt(args[5]);
-		String outfile_base = args[6];
-				
-		FJSimulator sim = new FJSimulator(num_workers, num_tasks, arrival_rate, service_rate);
+		String server_queue_type = args[0];
+		int num_workers = Integer.parseInt(args[1]);
+		int num_tasks = Integer.parseInt(args[2]);
+		double arrival_rate = Double.parseDouble(args[3]);
+		double service_rate = Double.parseDouble(args[4]);
+		long num_jobs = Long.parseLong(args[5]);
+		int sampling_interval = Integer.parseInt(args[6]);
+		String outfile_base = args[7];
+		
+		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_rate, service_rate);
 		sim.run(num_jobs, sampling_interval);
 		
 		sim.printExperimentPath(outfile_base);
