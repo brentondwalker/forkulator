@@ -6,8 +6,8 @@ public class FJTask {
 
 	private static Random rand = new Random();
 
-	private static int ID_counter = 0;
-	public int ID = ID_counter++;
+	private static long ID_counter = 0;
+	public long ID = ID_counter++;
 
 	public double start_time = 0.0;
 	public double service_time = 0.0;

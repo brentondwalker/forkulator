@@ -4,8 +4,8 @@ import java.util.ArrayList;
 
 public class FJJob {
 
-	private static int ID_counter = 0;
-	public int ID = ID_counter++;
+	private static long ID_counter = 0;
+	public long ID = ID_counter++;
 	
 	public double arrival_time = 0.0;
 	public double completion_time = 0.0;

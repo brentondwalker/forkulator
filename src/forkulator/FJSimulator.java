@@ -44,16 +44,10 @@ public class FJSimulator {
 	 * 
 	 * @param num_jobs
 	 */
-	public void run(int num_jobs, int sampling_interval) {
-		// we can generate all the job arrivals at once
-		double current_time = 0.0;
-		//System.out.println("Arrival times:");
-		for (int i=0; i<num_jobs; i++) {
-			double next_time = current_time + -Math.log(rand.nextDouble())/arrival_rate;
-			event_queue.add(new QJobArrivalEvent(next_time));
-			current_time = next_time;
-			//System.out.println("\t"+next_time);
-		}
+	public void run(long num_jobs, int sampling_interval) {
+		// before we generated all the job arrivals at once
+		// now to save space we only have one job arrival in the queue at a time
+		event_queue.add(new QJobArrivalEvent(-Math.log(rand.nextDouble())/arrival_rate));
 		
 		// start processing events
 		int sampling_countdown = sampling_interval;
@@ -75,12 +69,21 @@ public class FJSimulator {
 					server.enqueJob(job, false);
 				}
 				sampling_countdown--;
+				
+				// schedule the next job arrival
+				if (jobs_processed < num_jobs) {
+					double interval = -Math.log(rand.nextDouble())/arrival_rate;
+					if ((interval < 0.0) || (interval>1000)) {
+						System.err.println("WARNING: inter-arrival time of "+interval);
+					}
+					double next_time = et.time + interval;
+					this.addEvent(new QJobArrivalEvent(next_time));
+				}
 			} else if (e instanceof QTaskCompletionEvent) {
 				QTaskCompletionEvent et = (QTaskCompletionEvent) e;
 				server.taskCompleted(et.task.worker, et.time);
 			}
 		}
-		
 	}
 	
 	
@@ -90,6 +93,7 @@ public class FJSimulator {
 	 * @param e
 	 */
 	public void addEvent(QEvent e) {
+		int queue_len = this.event_queue.size();
 		if (event_queue.isEmpty()) {
 			event_queue.add(e);
 		} else if (e.time > this.event_queue.getLast().time) {
@@ -97,13 +101,30 @@ public class FJSimulator {
 		} else {
 			int i = 0;
 			for (QEvent le : this.event_queue) {
-				if (le.time > e.time) {
+				if (le.time >= e.time) {
 					event_queue.add(i, e);
 					if (DEBUG) System.out.println("inserting event with time "+e.time+" before event "+i+" with time "+le.time);
 					break;
 				}
 				i++;
 			}
+		}
+		
+		// do a sanity check
+		if ((this.event_queue.size() - queue_len) != 1) {
+			System.err.println("ERROR: adding one thing resulted in wrong change to queue len: "+this.event_queue.size()+"  "+queue_len);
+			System.err.println("new event time: "+e.time);
+			for (QEvent le : this.event_queue) {
+				System.err.println(le.time);
+			}
+		}
+		double last_time = 0.0;
+		for (QEvent le : this.event_queue) {
+			if (le.time < last_time) {
+				System.err.println("ERROR: events in queue out of order!");
+				System.exit(1);
+			}
+			last_time = le.time;
 		}
 	}
 	
@@ -237,8 +258,14 @@ public class FJSimulator {
 					job_completion_time = Math.max(job_completion_time, task.completion_time);
 				}
 				double job_sojourn = job_completion_time - job.arrival_time;
+				if (job_sojourn > 10000) {
+					System.err.println("WARNING: large job sojourn: "+job_sojourn);
+					System.err.println("completion: "+job_completion_time);
+					System.err.println("arrival:    "+job.arrival_time);
+					System.exit(1);
+				}
 				max_value = Math.max(max_value, job_sojourn);
-				if (server.sampled_jobs.size() < 100000) {
+				if (server.sampled_jobs.size() < 1000) {
 					for (FJTask task : job.tasks) {
 						writer.write(task.ID
 								+"\t"+job.ID
@@ -263,15 +290,15 @@ public class FJSimulator {
 		
 		// initialize the distributions
 		int max_bin = (int)(max_value/binwidth) + 1;
+		//System.err.println("max_value="+max_value);
 		
 		int[] job_sojourn_d = new int[max_bin];
 		int[] job_waiting_d = new int[max_bin];
 		int[] job_service_d = new int[max_bin];
 		
 		// compute the distributions
-		int total = 0;
+		int total = server.sampled_jobs.size();
 		for (FJJob job : server.sampled_jobs) {
-			total++;
 			
 			double job_start_time = job.tasks[0].start_time;
 			double job_completion_time = job.tasks[0].completion_time;
@@ -324,7 +351,7 @@ public class FJSimulator {
 		int num_tasks = Integer.parseInt(args[1]);
 		double arrival_rate = Double.parseDouble(args[2]);
 		double service_rate = Double.parseDouble(args[3]);
-		int num_jobs = Integer.parseInt(args[4]);
+		long num_jobs = Long.parseLong(args[4]);
 		int sampling_interval = Integer.parseInt(args[5]);
 		String outfile_base = args[6];
 				
