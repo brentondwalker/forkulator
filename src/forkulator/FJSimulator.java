@@ -33,7 +33,7 @@ public class FJSimulator {
 		this.arrival_rate = arrival_rate;
 		this.service_rate = service_rate;
 		
-		this.server = new FJServer(num_workers);
+		this.server = new FJSingleQueueServer(num_workers);
 		
 		FJServer.setSimulator(this);
 	}
