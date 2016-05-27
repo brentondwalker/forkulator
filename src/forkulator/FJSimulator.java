@@ -144,7 +144,6 @@ public class FJSimulator {
 	/**
 	 * compute the means of sojourn, waiting, and service times over (almost) all jobs
 	 * 
-	 * @param warmup_period
 	 * @return
 	 */
 	public ArrayList<Double> experimentMeans() {
@@ -247,10 +246,10 @@ public class FJSimulator {
 	
 	
 	/**
-	 * 
+	 * Print out the experiment path (if it's small enough) and the CDFs and PDFs
+	 * of sojourn, waiting, and service times
 	 * 
 	 * @param outfile_base
-	 * @param warmup_period
 	 */
 	public void printExperimentPath(String outfile_base) {
 		double binwidth = 0.1;
@@ -333,9 +332,9 @@ public class FJSimulator {
 			double waiting_cdf = 0.0;
 			double service_cdf = 0.0;
 			for (int i=0; i<max_bin; i++) {
-				sojourn_cdf += (1.0*job_sojourn_d[i])/(total*binwidth);
-				waiting_cdf += (1.0*job_waiting_d[i])/(total*binwidth);
-				service_cdf += (1.0*job_service_d[i])/(total*binwidth);
+				sojourn_cdf += (1.0*job_sojourn_d[i])/total;
+				waiting_cdf += (1.0*job_waiting_d[i])/total;
+				service_cdf += (1.0*job_service_d[i])/total;
 				writer.write(i
 						+"\t"+(i*binwidth)
 						+"\t"+(1.0*job_sojourn_d[i])/(total*binwidth)
