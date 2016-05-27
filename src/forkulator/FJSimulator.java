@@ -10,6 +10,7 @@ public class FJSimulator {
 
 	public static boolean DEBUG = false;
 	private static Random rand = new Random();
+	public static final int QUEUE_STABILITY_THRESHOLD = 10000;
 	
 	public LinkedList<QEvent> event_queue = new LinkedList<QEvent>();
 	
@@ -59,6 +60,11 @@ public class FJSimulator {
 		int sampling_countdown = sampling_interval;
 		long jobs_processed = 0;
 		while (! event_queue.isEmpty()) {
+			if (this.server.queueLength() > FJSimulator.QUEUE_STABILITY_THRESHOLD) {
+				System.err.println("ERROR: queue exceeded threshold.  The system is unstable.");
+				System.exit(0);
+			}
+			
 			QEvent e = event_queue.removeFirst();
 			
 			if (e instanceof QJobArrivalEvent) {
@@ -323,12 +329,21 @@ public class FJSimulator {
 		// plot filename using 2:(log($3)) with lines title "sojourn", filename using 2:(log($4)) with lines title "waiting", filename using 2:(log($5)) with lines title "service"
 		try {
 			writer = new BufferedWriter(new FileWriter(outfile_base+"_dist.dat"));
+			double sojourn_cdf = 0.0;
+			double waiting_cdf = 0.0;
+			double service_cdf = 0.0;
 			for (int i=0; i<max_bin; i++) {
+				sojourn_cdf += (1.0*job_sojourn_d[i])/(total*binwidth);
+				waiting_cdf += (1.0*job_waiting_d[i])/(total*binwidth);
+				service_cdf += (1.0*job_service_d[i])/(total*binwidth);
 				writer.write(i
 						+"\t"+(i*binwidth)
 						+"\t"+(1.0*job_sojourn_d[i])/(total*binwidth)
+						+"\t"+sojourn_cdf
 						+"\t"+(1.0*job_waiting_d[i])/(total*binwidth)
+						+"\t"+waiting_cdf
 						+"\t"+(1.0*job_service_d[i])/(total*binwidth)
+						+"\t"+service_cdf
 						+"\n");
 			}
 		} catch (Exception e) {

@@ -66,6 +66,14 @@ public abstract class FJServer {
 	
 	
 	/**
+	 * Return the length of the queue of jobs waiting for service.
+	 * 
+	 * @return
+	 */
+	public abstract int queueLength();
+	
+	
+	/**
 	 * Put the task on the specified worker and schedule its completion in the event queue.
 	 * 
 	 * @param workerId

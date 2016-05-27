@@ -108,6 +108,15 @@ public class FJSingleQueueServer extends FJServer {
 			feedWorkers(time);  // this should not do anything
 		}
 	}
+
+
+	/**
+	 * In the single-queue server the queue length is simply the length of the job queue.
+	 */
+	@Override
+	public int queueLength() {
+		return this.job_queue.size();
+	}
 	
 	
 }

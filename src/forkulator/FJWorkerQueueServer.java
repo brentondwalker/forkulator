@@ -90,6 +90,20 @@ public class FJWorkerQueueServer extends FJServer {
 		serviceTask(workerId, worker_queues[workerId].poll(), time);
 		
 	}
+
+
+	/**
+	 * In the multi-queue server we take the queue length to be the rounded average
+	 * length of all the worker queues.
+	 */
+	@Override
+	public int queueLength() {
+		int lsum = 0;
+		for (Queue<FJTask> q : worker_queues) {
+			lsum += q.size();
+		}
+		return (lsum / worker_queues.length);
+	}
 	
 	
 }
