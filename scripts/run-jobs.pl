@@ -16,7 +16,8 @@ if (@ARGV != 6) {
 }
 my ($q, $w, $t, $n, $service_f, $arrival_f) = @ARGV;
 
-my @service_rates = (1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1);
+#my @service_rates = (1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1);
+my @service_rate = (1.0);
 my @arrival_rates = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0);
 my $sample_interval = 1000;
 
