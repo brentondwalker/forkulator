@@ -5,29 +5,35 @@
 #d16 = read.table("sq_job_means_w16_t32_s2_sf2_af1.dat")
 #d32 = read.table("sq_job_means_w32_t64_s2_sf2_af1.dat")
 #d64 = read.table("sq_job_means_w64_t128_s2_sf2_af1.dat")
-d1 = read.table("sq_job_means_w1_t3_s3_sf3_af1.dat")
-d2 = read.table("sq_job_means_w2_t6_s3_sf3_af1.dat")
-d4 = read.table("sq_job_means_w4_t12_s3_sf3_af1.dat")
-d8 = read.table("sq_job_means_w8_t24_s3_sf3_af1.dat")
-d16 = read.table("sq_job_means_w16_t48_s3_sf3_af1.dat")
+#d1 = read.table("sq_job_means_w1_t3_s3_sf3_af1.dat")
+#d2 = read.table("sq_job_means_w2_t6_s3_sf3_af1.dat")
+#d4 = read.table("sq_job_means_w4_t12_s3_sf3_af1.dat")
+#d8 = read.table("sq_job_means_w8_t24_s3_sf3_af1.dat")
+#d16 = read.table("sq_job_means_w16_t48_s3_sf3_af1.dat")
+d1 = read.table("sq_job_means_w1_t16_s16_sf16_af1.dat")
+d2 = read.table("sq_job_means_w2_t32_s16_sf16_af1.dat")
+d4 = read.table("sq_job_means_w4_t64_s16_sf16_af1.dat")
+d8 = read.table("sq_job_means_w8_t128_s16_sf16_af1.dat")
+d16 = read.table("sq_job_means_w16_t256_s16_sf16_af1.dat")
+d32 = read.table("sq_job_means_w32_t512_s16_sf16_af1.dat")
 
 colors = rainbow(length(d1$V1))
 
 u = d1$V5[1]
 l = d1$V5[1]
 for (i in 1:length(d1$V1)) {
-    l = min(l, d1$V5[i], d2$V5[i], d4$V5[i], d8$V5[i], d16$V5[i]) #, d32$V5[i], d64$V5[i])
-    u = max(u, d1$V5[i], d2$V5[i], d4$V5[i], d8$V5[i], d16$V5[i]) #, d32$V5[i], d64$V5[i])
+    l = min(l, d1$V5[i], d2$V5[i], d4$V5[i], d8$V5[i], d16$V5[i], d32$V5[i])#, d64$V5[i])
+    u = max(u, d1$V5[i], d2$V5[i], d4$V5[i], d8$V5[i], d16$V5[i], d32$V5[i])#, d64$V5[i])
 }
 
-plot(c(), c(), ylim=range(0,u), xlim=range(0,4))
+plot(c(), c(), ylim=range(0,u), xlim=range(0,5))
 title("log2(workers) vs sojourn time for 2x task:worker ratio")
 
 fits = matrix(0,9,2)
 
 for (i in 1:length(d1$V1)) {
     print(i)
-    v = c(d1$V5[i], d2$V5[i], d4$V5[i], d8$V5[i], d16$V5[i])#, d32$V5[i], d64$V5[i])
+    v = c(d1$V5[i], d2$V5[i], d4$V5[i], d8$V5[i], d16$V5[i], d32$V5[i])#, d64$V5[i])
     print(cor(c(0:(length(v)-1)), v))
     fit = lm(v ~ c(0:(length(v)-1)))
     print(fit$coefficients)
@@ -49,9 +55,9 @@ abline(fit)
 title("fitted intercepts")
 
 # fit the slope
-cor(sqrt(log(fits[,2])-log(fits[1,2])), ll)
-fit = lm(sqrt(log(fits[,2])-log(fits[1,2])) ~ ll)
-plot(ll, sqrt(log(fits[,2])-log(fits[1,2])))
+cor(sqrt(log(fits[,2])-log(fits[9,2])), ll)
+fit = lm(sqrt(log(fits[,2])-log(fits[9,2])) ~ ll)
+plot(ll, sqrt(log(fits[,2])-log(fits[9,2])))
 abline(fit)
 title("fitted slopes")
 
