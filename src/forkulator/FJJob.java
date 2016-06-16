@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 public class FJJob {
 
+	public static final boolean ERLANG = false;
 	private static long ID_counter = 0;
 	public long ID = ID_counter++;
 	
@@ -15,10 +16,14 @@ public class FJJob {
 	public boolean complete = false;
 	
 	public FJJob(int num_tasks, double service_rate) {
-		this.num_tasks = num_tasks;
-		tasks = new FJTask[num_tasks];
-		for (int i=0; i<num_tasks; i++) {
-			tasks[i] = new FJTask(service_rate);
+		if (ERLANG) {
+			this.num_tasks = 1;
+		} else {
+			this.num_tasks = num_tasks;
+		}
+		tasks = new FJTask[this.num_tasks];
+		for (int i=0; i<this.num_tasks; i++) {
+			tasks[i] = new FJTask(num_tasks, service_rate);
 		}
 	}
 	
