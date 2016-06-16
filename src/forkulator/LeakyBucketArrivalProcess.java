@@ -69,7 +69,7 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 
 	
 	@Override
-	public double nextInterval() {
+	public double nextInterval(double jobSize) {
 		// get the next inter-arrival time from the feeder process
 		double dt = feederProcess.nextInterval();
 
@@ -77,25 +77,25 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 			// keep trying until we get an inter-arrival time at which
 			// the bucket will be full enough
 			if (lowerBound) {
-				while ((bucketLevel + dt*rho) <= 1.0) {
+				while ((bucketLevel + dt*rho) <= jobSize) {
 					dt = feederProcess.nextInterval();
 				}
 			} else {
-				while ((bucketLevel + dt*rho) >= 1.0) {
+				while ((bucketLevel + dt*rho) >= jobSize) {
 					dt = feederProcess.nextInterval();
 				}
 			}
 		} else {
 			// generate an inter-arrival time.  If the bucket can't afford it,
 			// return the next possible time the bucket will be able to afford it.
-			if ((!lowerBound && ((bucketLevel + dt*rho) < 1.0))
-				|| (lowerBound && ((bucketLevel + dt*rho) > 1.0))) {
-				dt = (1.0 - bucketLevel)/rho;
+			if ((!lowerBound && ((bucketLevel + dt*rho) < jobSize))
+				|| (lowerBound && ((bucketLevel + dt*rho) > jobSize))) {
+				dt = (jobSize - bucketLevel)/rho;
 			}
 		}
 		
 		bucketTime += dt;
-		bucketLevel += dt*rho - 1.0;
+		bucketLevel += dt*rho - jobSize;
 		
 		return dt;
 	}
