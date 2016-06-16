@@ -16,8 +16,18 @@ public class FJTask {
 	public boolean processing = false;
 	public boolean completed = false;
 	
-	public FJTask(double service_rate) {
-		this.service_time = -Math.log(rand.nextDouble())/service_rate;
+	public FJTask(int num_tasks, double service_rate) {
+		if (FJJob.ERLANG) {
+			// this version gives Erlang service times
+			double p = 1.0;
+			for (int i=0; i<num_tasks; i++) {
+				p *= rand.nextDouble();
+			}
+			this.service_time = -Math.log(p)/service_rate;
+		} else {
+			// exponential service times
+			this.service_time = -Math.log(rand.nextDouble())/service_rate;
+		}
 	}
 	
 	
