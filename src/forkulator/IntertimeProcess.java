@@ -1,5 +1,7 @@
 package forkulator;
 
+import java.util.Random;
+
 /**
  * This interface represents a random process of things arriving or being
  * serviced.  I defines the basic API where the user can ask: "When will the
@@ -13,6 +15,12 @@ package forkulator;
  */
 public abstract class IntertimeProcess {
 	
-	public abstract double nextInterval();
+	protected static Random rand = new Random();
+	
+	public abstract double nextInterval(double jobSize);
+	
+	public double nextInterval() {
+		return nextInterval(1.0);
+	}
 	
 }
