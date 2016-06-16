@@ -16,7 +16,7 @@ public class FJSimulator {
 	
 	public int num_workers;
 	public int num_tasks;
-	public double arrival_rate;
+	public IntertimeProcess arrival_process;
 	public double service_rate;
 	public FJServer server = null;
 	
@@ -28,10 +28,10 @@ public class FJSimulator {
 	 * @param arrival_rate
 	 * @param service_rate
 	 */
-	public FJSimulator(String server_queue_type, int num_workers, int num_tasks, double arrival_rate, double service_rate) {
+	public FJSimulator(String server_queue_type, int num_workers, int num_tasks, IntertimeProcess arrival_process, double service_rate) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
-		this.arrival_rate = arrival_rate;
+		this.arrival_process = arrival_process;
 		this.service_rate = service_rate;
 		
 		if (server_queue_type.toLowerCase().equals("s")) {
@@ -54,7 +54,7 @@ public class FJSimulator {
 	public void run(long num_jobs, int sampling_interval) {
 		// before we generated all the job arrivals at once
 		// now to save space we only have one job arrival in the queue at a time
-		event_queue.add(new QJobArrivalEvent(-Math.log(rand.nextDouble())/arrival_rate));
+		event_queue.add(new QJobArrivalEvent(arrival_process.nextInterval()));
 		
 		// start processing events
 		int sampling_countdown = sampling_interval;
@@ -84,7 +84,7 @@ public class FJSimulator {
 				
 				// schedule the next job arrival
 				if (jobs_processed < num_jobs) {
-					double interval = -Math.log(rand.nextDouble())/arrival_rate;
+					double interval = arrival_process.nextInterval();
 					if ((interval < 0.0) || (interval>1000)) {
 						System.err.println("WARNING: inter-arrival time of "+interval);
 					}
@@ -376,7 +376,10 @@ public class FJSimulator {
 		int sampling_interval = Integer.parseInt(args[6]);
 		String outfile_base = args[7];
 		
-		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_rate, service_rate);
+		// set this to be whatever you want
+		IntertimeProcess arrival_process = new ExponentialIntertimeProcess(arrival_rate);
+		
+		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_rate);
 		sim.run(num_jobs, sampling_interval);
 		
 		sim.printExperimentPath(outfile_base);
