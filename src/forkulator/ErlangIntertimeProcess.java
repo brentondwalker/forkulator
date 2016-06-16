@@ -20,4 +20,9 @@ public class ErlangIntertimeProcess extends IntertimeProcess {
 		return -Math.log(p)/rate;
 	}
 
+	@Override
+	public IntertimeProcess clone() {
+		return new ErlangIntertimeProcess(rate, k);
+	}
+
 }

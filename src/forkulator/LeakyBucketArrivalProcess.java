@@ -2,6 +2,10 @@ package forkulator;
 
 /**
  * 
+ * For arrival processes this model is a lower constraint on the
+ * inter-arrival times.  It ensures that you don't get too many 
+ * arrivals too close together.
+ * 
  * @author brenton
  *
  */
@@ -26,13 +30,6 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 	public double bucketTime = 0.0;
 	
 	/**
-	 * For arrival processes this model is an upper constraint on
-	 * the arrivals (default).  It can also be used as a model for
-	 * service times, in which case we use it as a lower bound.
-	 */
-	public boolean lowerBound = false;
-	
-	/**
 	 * If the feeder process gives us an inter-arrival time that the
 	 * bucket can't afford, we have two choices:
 	 * - discard the inter-arrival time and test a new one
@@ -41,8 +38,7 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 	 *   capacity.  This corresponds to a backlogged system with
 	 *   a sort of queue.
 	 */
-	public boolean discardBacklog = true;
-	
+	public boolean discardBacklog = true;	
 
 	public IntertimeProcess feederProcess = null;
 	
@@ -56,14 +52,13 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 	}
 
 	public LeakyBucketArrivalProcess(double sigma, double rho,
-			IntertimeProcess feederProcess, boolean lowerBound, boolean discardBacklog) {
+			IntertimeProcess feederProcess, boolean discardBacklog) {
 		this.sigma = sigma;
 		this.rho = rho;
 		this.bucketLevel = sigma;
 		
 		this.feederProcess = feederProcess;
 		
-		this.lowerBound = lowerBound;
 		this.discardBacklog = discardBacklog;
 	}
 
@@ -72,34 +67,62 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 	public double nextInterval(double jobSize) {
 		// get the next inter-arrival time from the feeder process
 		double dt = feederProcess.nextInterval();
-
+		
 		if (discardBacklog) {
 			// keep trying until we get an inter-arrival time at which
-			// the bucket will be full enough
-			if (lowerBound) {
-				while ((bucketLevel + dt*rho) <= jobSize) {
-					dt = feederProcess.nextInterval();
-				}
-			} else {
-				while ((bucketLevel + dt*rho) >= jobSize) {
-					dt = feederProcess.nextInterval();
-				}
+			// the bucket will be full enough to afford the job
+			while ((bucketLevel + dt*rho) < jobSize) {
+				dt = feederProcess.nextInterval();
 			}
 		} else {
 			// generate an inter-arrival time.  If the bucket can't afford it,
 			// return the next possible time the bucket will be able to afford it.
-			if ((!lowerBound && ((bucketLevel + dt*rho) < jobSize))
-				|| (lowerBound && ((bucketLevel + dt*rho) > jobSize))) {
+			if ((bucketLevel + dt*rho) < jobSize) {
 				dt = (jobSize - bucketLevel)/rho;
 			}
 		}
 		
 		bucketTime += dt;
-		bucketLevel += dt*rho - jobSize;
+		bucketLevel = Math.min(bucketLevel + dt*rho, sigma) - jobSize;
+		
+		if (bucketLevel < 0) {
+			System.err.println("ERROR: leaky bucket level is negative: "+bucketLevel);
+		}
 		
 		return dt;
 	}
 	
 	
+	@Override
+	public IntertimeProcess clone() {
+		return new LeakyBucketArrivalProcess(sigma, rho, feederProcess.clone(), discardBacklog);
+	}
 	
+	
+	/**
+	 * This main() is an q&d way to do some testing of the process.
+	 * 
+	 * @param argv
+	 */
+	public static void main(String args[]) {
+		double sigma = Double.parseDouble(args[0]);
+		double rho = Double.parseDouble(args[1]);
+		double rate = Double.parseDouble(args[2]);
+		int n = Integer.parseInt(args[3]);
+		
+		boolean discardBacklog = true;
+		
+		LeakyBucketArrivalProcess lbp = new LeakyBucketArrivalProcess(sigma, rho,
+				new ExponentialIntertimeProcess(rate), discardBacklog);
+		
+		double t = 0.0;
+		double dt = 0.0;
+		for (int i=0; i<n; i++) {
+			dt = lbp.nextInterval();
+			t += dt;
+			System.out.println(i+"\t"+t+"\t"+dt+"\t"+lbp.bucketLevel);
+		}
+		
+	}
+
 }

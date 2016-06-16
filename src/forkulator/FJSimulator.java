@@ -4,12 +4,10 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.LinkedList;
-import java.util.Random;
 
 public class FJSimulator {
 
 	public static boolean DEBUG = false;
-	private static Random rand = new Random();
 	public static final int QUEUE_STABILITY_THRESHOLD = 10000;
 	
 	public LinkedList<QEvent> event_queue = new LinkedList<QEvent>();
