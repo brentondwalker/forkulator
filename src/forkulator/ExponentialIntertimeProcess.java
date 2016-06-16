@@ -13,4 +13,9 @@ public class ExponentialIntertimeProcess extends IntertimeProcess {
 		return -Math.log(rand.nextDouble())/rate;
 	}
 
+	@Override
+	public IntertimeProcess clone() {
+		return new ExponentialIntertimeProcess(rate);
+	}
+
 }
