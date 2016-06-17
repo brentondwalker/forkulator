@@ -11,7 +11,7 @@ public class ErlangIntertimeProcess extends IntertimeProcess {
 	}
 	
 	@Override
-	public double nextInterval(double jobSize) {
+	public double nextInterval(int jobSize) {
 		double p = 1.0;
 		for (int i=0; i<k; i++) {
 			p *= rand.nextDouble();
