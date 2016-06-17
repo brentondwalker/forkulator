@@ -9,7 +9,7 @@ public class ExponentialIntertimeProcess extends IntertimeProcess {
 	}
 	
 	@Override
-	public double nextInterval(double jobSize) {
+	public double nextInterval(int jobSize) {
 		return -Math.log(rand.nextDouble())/rate;
 	}
 
