@@ -15,7 +15,7 @@ public class FJSimulator {
 	public int num_workers;
 	public int num_tasks;
 	public IntertimeProcess arrival_process;
-	public double service_rate;
+	public IntertimeProcess service_process;
 	public FJServer server = null;
 	
 	/**
@@ -26,11 +26,11 @@ public class FJSimulator {
 	 * @param arrival_rate
 	 * @param service_rate
 	 */
-	public FJSimulator(String server_queue_type, int num_workers, int num_tasks, IntertimeProcess arrival_process, double service_rate) {
+	public FJSimulator(String server_queue_type, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
-		this.service_rate = service_rate;
+		this.service_process = service_process;
 		
 		if (server_queue_type.toLowerCase().equals("s")) {
 			this.server = new FJSingleQueueServer(num_workers);
@@ -70,7 +70,7 @@ public class FJSimulator {
 				if (((jobs_processed*100)%num_jobs)==0)
 					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%");
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
-				FJJob job = new FJJob(num_tasks, service_rate);
+				FJJob job = new FJJob(num_tasks, service_process, e.time);
 				job.arrival_time = et.time;
 				if (sampling_countdown==0) {
 					server.enqueJob(job, true);
@@ -377,7 +377,10 @@ public class FJSimulator {
 		// set this to be whatever you want
 		IntertimeProcess arrival_process = new ExponentialIntertimeProcess(arrival_rate);
 		
-		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_rate);
+		// and the service time process
+		IntertimeProcess service_process = new ExponentialIntertimeProcess(service_rate);
+		
+		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_process);
 		sim.run(num_jobs, sampling_interval);
 		
 		sim.printExperimentPath(outfile_base);
