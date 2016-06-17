@@ -64,7 +64,7 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 
 	
 	@Override
-	public double nextInterval(double jobSize) {
+	public double nextInterval(int jobSize) {
 		// get the next inter-arrival time from the feeder process
 		double dt = feederProcess.nextInterval();
 		
@@ -74,16 +74,19 @@ public class LeakyBucketArrivalProcess extends IntertimeProcess {
 			while ((bucketLevel + dt*rho) < jobSize) {
 				dt = feederProcess.nextInterval();
 			}
+			bucketLevel = Math.min(bucketLevel + dt*rho, sigma) - jobSize;
 		} else {
 			// generate an inter-arrival time.  If the bucket can't afford it,
 			// return the next possible time the bucket will be able to afford it.
 			if ((bucketLevel + dt*rho) < jobSize) {
 				dt = (jobSize - bucketLevel)/rho;
+				bucketLevel = 0.0;
+			} else {
+				bucketLevel = Math.min(bucketLevel + dt*rho, sigma) - jobSize;
 			}
 		}
 		
 		bucketTime += dt;
-		bucketLevel = Math.min(bucketLevel + dt*rho, sigma) - jobSize;
 		
 		if (bucketLevel < 0) {
 			System.err.println("ERROR: leaky bucket level is negative: "+bucketLevel);
