@@ -28,6 +28,12 @@ public class LeakyBucketServiceProcess extends IntertimeProcess {
 	 */
 	public double bucketLevel = 0.0;
 	public double bucketTime = 0.0;
+
+	/**
+	 * For the sake of verification, keep track of what the
+	 * bucketLevel was when we returned the last interval.
+	 */
+	public double lastBucketLevel = 0.0;
 		
 	/**
 	 * If the feeder process gives us a service time that the
@@ -77,14 +83,16 @@ public class LeakyBucketServiceProcess extends IntertimeProcess {
 			}
 
 		} else {
-			// generate a service time.  If the bucket can't afford it,
+			// If the bucket can't afford the service time we generated,
 			// return the max possible service time the bucket can afford.
 			if (currentBucketLevel < dt) {
+				//System.err.println("bucketLevel: "+bucketLevel+"\t currentBucketLevel: "+currentBucketLevel+"\t dt: "+dt+"\t t: "+time+"\t bucketTime: "+bucketTime);
 				dt = currentBucketLevel;
 			}
 		}
 		
 		bucketTime = time;
+		lastBucketLevel = currentBucketLevel;
 		bucketLevel = currentBucketLevel - dt;
 		
 		if (bucketLevel < 0) {
@@ -107,36 +115,47 @@ public class LeakyBucketServiceProcess extends IntertimeProcess {
 	public static void main(String args[]) {
 		double sigma = Double.parseDouble(args[0]);
 		double rho = Double.parseDouble(args[1]);
-		double rate = Double.parseDouble(args[2]);
-		int n = Integer.parseInt(args[3]);
+		double serviceRate = Double.parseDouble(args[2]);
+		double arrivalRate = Double.parseDouble(args[3]);
+		int n = Integer.parseInt(args[4]);
 		
-		boolean discardBacklog = false;
+		boolean discardBacklog = true;
 		
-		LeakyBucketServiceProcess lbp = new LeakyBucketServiceProcess(sigma, rho,
-				new ExponentialIntertimeProcess(rate), discardBacklog);
+		IntertimeProcess arrivals = new ExponentialIntertimeProcess(arrivalRate);
+		
+		LeakyBucketServiceProcess lbs = new LeakyBucketServiceProcess(sigma, rho,
+				new ExponentialIntertimeProcess(serviceRate), discardBacklog);
 		
 		double t = 0.0;
 		double st = 0.0;
-
-		double[] arrivals = new double[n];
-		IntertimeProcess arrivalProcess = new ExponentialIntertimeProcess(rate);
+		
+		// for the test don't make it a proper queuing system.  Just
+		// the the arrivals come and assign them service times without requiring
+		// that the previous task finish.
+		double totalService = 0.0;
 		for (int i=0; i<n; i++) {
-			t += arrivalProcess.nextInterval();
-			arrivals[i] = t;
+			double nextArrival = arrivals.nextInterval();
+			t += nextArrival;
+			double nextService = lbs.nextInterval(t);
+			totalService += nextService;
+			System.out.println(i+"\t"+t+"\t"+nextArrival+"\t"+nextService+"\t"+lbs.bucketLevel+"\t"+lbs.lastBucketLevel+"\t"+totalService);
 		}
-
+		
+		/*
+		double nextArrival = arrivals.nextInterval();
+		double nextService = 0.0;
+		
+		// the arrival process ends up being something other than purely exponential here
 		for (int i=0; i<n; i++) {
-			
-			
-			if (t < arrivals[i]) {
-				t = arrivals[i];
-			} else {
-				
+			t += nextArrival;
+			nextService = lbs.nextInterval(t);
+			System.out.println(i+"\t"+t+"\t"+nextArrival+"\t"+nextService+"\t"+lbs.bucketLevel);
+			nextArrival = arrivals.nextInterval();
+			if (nextArrival < nextService) {
+				nextArrival = nextService;
 			}
-			
-			st = lbp.nextInterval(t);
-			System.out.println(i+"\t"+t+"\t"+st+"\t"+lbp.bucketLevel);
 		}
+		*/
 		
 	}
 	
