@@ -12,8 +12,8 @@ public class FJTask {
 	public boolean processing = false;
 	public boolean completed = false;
 	
-	public FJTask(IntertimeProcess service_process) {
-		this.service_time = service_process.nextInterval();
+	public FJTask(IntertimeProcess service_process, double arrival_time) {
+		this.service_time = service_process.nextInterval(arrival_time);
 	}
 	
 	

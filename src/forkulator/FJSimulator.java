@@ -375,13 +375,14 @@ public class FJSimulator {
 		String outfile_base = args[7];
 		
 		// set this to be whatever you want
-		//IntertimeProcess arrival_process = new ExponentialIntertimeProcess(arrival_rate);
-		IntertimeProcess arrival_process = new LeakyBucketArrivalProcess(1000, arrival_rate,
-				new ExponentialIntertimeProcess(arrival_rate), false);
+		IntertimeProcess arrival_process = new ExponentialIntertimeProcess(arrival_rate);
+		//IntertimeProcess arrival_process = new LeakyBucketArrivalProcess(20, arrival_rate,
+		//		new ExponentialIntertimeProcess(arrival_rate), false);
 		
 		// and the service time process
 		IntertimeProcess service_process = new ExponentialIntertimeProcess(service_rate);
-		
+		//IntertimeProcess service_process = new LeakyBucketServiceProcess(10, service_rate,
+		//		new ExponentialIntertimeProcess(service_rate), true);
 		
 		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_process);
 		sim.run(num_jobs, sampling_interval);
