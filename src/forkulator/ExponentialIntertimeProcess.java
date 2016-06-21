@@ -14,6 +14,11 @@ public class ExponentialIntertimeProcess extends IntertimeProcess {
 	}
 
 	@Override
+	public double nextInterval(double time) {
+		return nextInterval(1);
+	}
+
+	@Override
 	public IntertimeProcess clone() {
 		return new ExponentialIntertimeProcess(rate);
 	}
