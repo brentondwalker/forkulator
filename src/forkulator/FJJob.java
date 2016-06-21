@@ -40,7 +40,7 @@ public class FJJob {
 		
 		tasks = new FJTask[this.num_tasks];
 		for (int i=0; i<this.num_tasks; i++) {
-			tasks[i] = new FJTask(service_processes.get(i));
+			tasks[i] = new FJTask(service_processes.get(i), arrival_time);
 		}
 	}
 	

@@ -34,8 +34,8 @@ foreach my $s (@service_rates) {
 	#my $outfile = "data/erlang_".$q."q_w".$w."_t".$t."_a".$a."_s".$s."_n".$n."_sf".$service_f."_af".$arrival_f;
 	#my $meansfile = "data/erlang_".$q."q_job_means_w".$w."_t".$t."_s".$s."_sf".$service_f."_af".$arrival_f.".dat";
 
-	my $outfile = "lbfarrival_data/".$q."q_w".$w."_t".$t."_a".$a."_s".$s."_n".$n."_sf".$service_f."_af".$arrival_f;
-	my $meansfile = "lbfarrival_data/".$q."q_job_means_w".$w."_t".$t."_s".$s."_sf".$service_f."_af".$arrival_f.".dat";
+	my $outfile = "lbfservice_data/".$q."q_w".$w."_t".$t."_a".$a."_s".$s."_n".$n."_sf".$service_f."_af".$arrival_f;
+	my $meansfile = "lbfservice_data/".$q."q_job_means_w".$w."_t".$t."_s".$s."_sf".$service_f."_af".$arrival_f.".dat";
 
 	my $cmd = "java -Xmx5g -cp bin forkulator.FJSimulator $q $w $t $a $s $n $sample_interval $outfile";
 	print STDERR "$outfile \t $meansfile\n";
