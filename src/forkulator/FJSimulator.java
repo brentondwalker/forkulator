@@ -18,6 +18,12 @@ public class FJSimulator {
 	public IntertimeProcess service_process;
 	public FJServer server = null;
 	
+	public int[] job_sojourn_d = null;
+	public int[] job_waiting_d = null;
+	public int[] job_service_d = null;
+	public double binwidth = 0.1;
+	public double quanile_epsilon = 1e-6;
+	
 	/**
 	 * constructor
 	 * 
@@ -166,6 +172,52 @@ public class FJSimulator {
 		result.add(waiting_sum/total);
 		result.add(service_sum/total);
 		result.add(total * 1.0);
+		
+		// also throw in the 10^-6 quantiles
+		//
+		// make sure the distributions have been computed and are long enough
+		// to compute the quantile we're interested in
+		if (job_sojourn_d == null)
+			System.err.println("ERROR: distribution is null");
+		if (server.sampled_jobs.size() < 1.0/this.quanile_epsilon)
+			System.err.println("ERROR: datapoints: "+server.sampled_jobs.size()+"  required: "+(1.0/this.quanile_epsilon));
+		if (job_sojourn_d == null || server.sampled_jobs.size() < 1.0/this.quanile_epsilon) {
+			result.add(0.0);
+			result.add(0.0);
+			result.add(0.0);
+		} else {
+			long ccdf = server.sampled_jobs.size();
+			long limit = (long)(server.sampled_jobs.size()*this.quanile_epsilon);
+			for (int i=0; i<job_sojourn_d.length; i++) {
+				ccdf -= job_sojourn_d[i];
+				if (ccdf <= limit) {
+					System.err.println("exceeded epsilon at i="+i+"  where d[i]="+job_sojourn_d[i]);
+					result.add( binwidth*(i*job_sojourn_d[i] +(i-1)*job_sojourn_d[i-1])/(1.0*job_sojourn_d[i]+job_sojourn_d[i-1]));
+					break;
+				}
+			}
+
+			ccdf = server.sampled_jobs.size();
+			for (int i=0; i<job_waiting_d.length; i++) {
+				ccdf -= job_waiting_d[i];
+				if (ccdf <= limit) {
+					System.err.println("exceeded epsilon at i="+i+"  where d[i]="+job_waiting_d[i]);
+					result.add( binwidth*(i*job_waiting_d[i] +(i-1)*job_waiting_d[i-1])/(1.0*job_waiting_d[i]+job_waiting_d[i-1]));
+					break;
+				}
+			}
+
+			ccdf = server.sampled_jobs.size();
+			for (int i=0; i<job_service_d.length; i++) {
+				ccdf -= job_service_d[i];
+				if (ccdf <= limit) {
+					System.err.println("exceeded epsilon at i="+i+"  where d[i]="+job_service_d[i]);
+					result.add( binwidth*(i*job_service_d[i] +(i-1)*job_service_d[i-1])/(1.0*job_service_d[i]+job_service_d[i-1]));
+					break;
+				}
+			}
+		}
+		
 		return result;
 	}
 	
@@ -250,7 +302,6 @@ public class FJSimulator {
 	 * @param outfile_base
 	 */
 	public void printExperimentPath(String outfile_base) {
-		double binwidth = 0.1;
 		
 		// max value for the distributions
 		double max_value = 0;
@@ -300,9 +351,9 @@ public class FJSimulator {
 		int max_bin = (int)(max_value/binwidth) + 1;
 		//System.err.println("max_value="+max_value);
 		
-		int[] job_sojourn_d = new int[max_bin];
-		int[] job_waiting_d = new int[max_bin];
-		int[] job_service_d = new int[max_bin];
+		job_sojourn_d = new int[max_bin];
+		job_waiting_d = new int[max_bin];
+		job_service_d = new int[max_bin];
 		
 		// compute the distributions
 		int total = server.sampled_jobs.size();
@@ -398,7 +449,11 @@ public class FJSimulator {
 				+"\t"+means.get(0)
 				+"\t"+means.get(1)
 				+"\t"+means.get(2)
-				+"\t"+means.get(3));
+				+"\t"+means.get(3)
+				+"\t"+means.get(4)
+				+"\t"+means.get(5)
+				+"\t"+means.get(6)
+				);
 		
 		//sim.jobAutocorrelation(outfile_base, 5000);
 	}
