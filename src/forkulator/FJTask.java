@@ -11,9 +11,11 @@ public class FJTask {
 	public int worker = -1;
 	public boolean processing = false;
 	public boolean completed = false;
+	public FJJob job = null;
 	
-	public FJTask(IntertimeProcess service_process, double arrival_time) {
+	public FJTask(IntertimeProcess service_process, double arrival_time, FJJob job) {
 		this.service_time = service_process.nextInterval(arrival_time);
+		this.job = job;
 	}
 	
 	
