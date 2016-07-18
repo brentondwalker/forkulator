@@ -2,26 +2,58 @@ package forkulator;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Random;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
-public class FJWorkerQueueServer extends FJServer {
-
+public class FJThinningServer extends FJServer {
+	
+	/**
+	 * The thinning server is special because
+	 * - jobs are mapped entirely to one server
+	 * - the jobs must be resequenced before they depart
+	 * 
+	 * The 2nd fact requires us to keep a queue pile of jobs that have completed
+	 * servicing, but are still waiting to depart. 
+	 */
+	public TreeSet<FJJob> postservice_jobs = new TreeSet<FJJob>();
+	protected long job_departure_index = -1;
+	
 	/**
 	 * This type of server has a separate queue for each worker.
 	 * 
-	 * When a job is enqueued, its tasks are queued on the workers directly,
-	 * no mater the current state of the workers.
+	 * When a job comes in all of its tasks are put on the same worker.
+	 * We could model this with a Queue<FJJob>, but it's easier and just 
+	 * as valid to copy the model used by the FJWorkerQueueServer
 	 */
 	public Queue<FJTask>[] worker_queues = null;
 	private int worker_index = 0;
 	
 	/**
+	 * The assignment of jobs to servers can be random or deterministic.
+	 */
+	boolean random_thinning = false;
+	protected static Random rand = new Random();
+
+	/**
 	 * Constructor
 	 * 
-	 * Has to allocate the workers' task queues.
+	 * Allocate a FJJob queue for each worker.
 	 * 
 	 * @param num_workers
 	 */
-	public FJWorkerQueueServer(int num_workers) {
+	public FJThinningServer(int num_workers, boolean random_thinning) {
+		super(num_workers);
+		
+		this.random_thinning = random_thinning;
+		
+		worker_queues = new Queue[num_workers];
+		for (int i=0; i<num_workers; i++) {
+			worker_queues[i] = new LinkedList<FJTask>();
+		}
+	}
+
+	public FJThinningServer(int num_workers) {
 		super(num_workers);
 		
 		worker_queues = new Queue[num_workers];
@@ -29,7 +61,7 @@ public class FJWorkerQueueServer extends FJServer {
 			worker_queues[i] = new LinkedList<FJTask>();
 		}
 	}
-	
+
 	
 	/**
 	 * Check for any idle workers and try to put a task on them.
@@ -53,6 +85,9 @@ public class FJWorkerQueueServer extends FJServer {
 	 * This type of server has a separate queue for each worker.  When a job arrives
 	 * we immediately assign its tasks to the workers' queues.
 	 * 
+	 * In a thinning server, all tasks from a job go on the same server.
+	 * The server can be chosen randomly or deterministically (round-robin).
+	 * 
 	 * @param job
 	 * @param sample
 	 */
@@ -66,9 +101,15 @@ public class FJWorkerQueueServer extends FJServer {
 		}
 
 		FJTask t = null;
+		int wi = -1;
+		if (random_thinning) {
+			wi = rand.nextInt(this.num_workers);
+		} else {
+			wi = worker_index;
+			worker_index = (worker_index + 1) % num_workers;
+		}
 		while ((t = job.nextTask()) != null) {
 			worker_queues[worker_index].add(t);
-			worker_index = (worker_index + 1) % num_workers;
 		}
 		
 		// this just added the tasks to the queues.  Check if any
@@ -81,6 +122,10 @@ public class FJWorkerQueueServer extends FJServer {
 	 * Handle a task completion event.  Remove the task from its worker, and
 	 * give the worker a new task, if available.
 	 * 
+	 * With in the thinning server the task can't simply depart, though.  The
+	 * jobs need to be resequenced.  If a job has completed, we put it into the
+	 * departure queue and then try to clear any jobs from te departure queue.
+	 * 
 	 * @param workerId
 	 * @param time
 	 */
@@ -89,7 +134,7 @@ public class FJWorkerQueueServer extends FJServer {
 		FJTask task = workers[workerId].current_task;
 		task.completion_time = time;
 		task.completed = true;
-
+		
 		// check if this task was the last one of a job
 		//TODO: this could be more efficient
 		boolean compl = true;
@@ -97,18 +142,23 @@ public class FJWorkerQueueServer extends FJServer {
 			compl = compl && t.completed;
 		}
 		task.job.complete = compl;
-
+		
 		if (task.job.complete) {
 			// it is the last, record the completion time
 			task.job.completion_time = time;
 			
-			// for this type of server it is also the departure time
-			task.job.departure_time = time;
+			// and add it to the departure set
+			this.postservice_jobs.add(task.job);
 			
-			// dispose of the job (does nothing if this is a sampled job
-			task.job.dispose();
+			// check if any postservice_jobs can be cleared
+			while (postservice_jobs.first().ID == (job_departure_index+1)) {
+				FJJob j = postservice_jobs.pollFirst();
+				j.departure_time = time;
+				j.dispose();
+			}
 		}
 		
+		// try to start servicing a new task on this worker
 		serviceTask(workerId, worker_queues[workerId].poll(), time);
 		
 	}
