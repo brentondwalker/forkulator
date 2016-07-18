@@ -66,8 +66,10 @@ public class FJSingleQueueServer extends FJServer {
 		if (FJSimulator.DEBUG) System.out.println("enqueJob() "+job.arrival_time);
 
 		// only keep a reference to the job if the simulator tells us to
-		if (sample)
+		if (sample) {
+			job.setSample(sample);
 			sampled_jobs.add(job);
+		}
 		if (current_job == null) {
 			current_job = job;
 			if (FJSimulator.DEBUG) System.out.println("  current job was null");
@@ -88,8 +90,28 @@ public class FJSingleQueueServer extends FJServer {
 	 */
 	public void taskCompleted(int workerId, double time) {
 		if (FJSimulator.DEBUG) System.out.println("task "+workers[workerId].current_task.ID+" completed "+time);
-		workers[workerId].current_task.completion_time = time;
-		workers[workerId].current_task.completed = true;
+		FJTask task = workers[workerId].current_task;
+		task.completion_time = time;
+		task.completed = true;
+
+		// check if this task was the last one of a job
+		//TODO: this could be more efficient
+		boolean compl = true;
+		for (FJTask t : task.job.tasks) {
+			compl = compl && t.completed;
+		}
+		task.job.complete = compl;
+
+		if (task.job.complete) {
+			// it is the last, record the completion time
+			task.job.completion_time = time;
+			
+			// for this type of server it is also the departure time
+			task.job.departure_time = time;
+			
+			// dispose of the job (does nothing if this is a sampled job
+			task.job.dispose();
+		}
 		
 		// if there is no current job, just clear the worker
 		if (current_job == null) {
