@@ -182,48 +182,48 @@ public class FJSimulator {
 		//
 		// make sure the distributions have been computed and are long enough
 		// to compute the quantile we're interested in
-		if (job_sojourn_d == null)
-			System.err.println("ERROR: distribution is null");
-		if (server.sampled_jobs.size() < 1.0/this.quanile_epsilon)
-			System.err.println("ERROR: datapoints: "+server.sampled_jobs.size()+"  required: "+(1.0/this.quanile_epsilon));
-		if (job_sojourn_d == null || server.sampled_jobs.size() < 1.0/this.quanile_epsilon) {
-			result.add(0.0);
-			result.add(0.0);
-			result.add(0.0);
-		} else {
-			long ccdf = server.sampled_jobs.size();
-			long limit = (long)(server.sampled_jobs.size()*this.quanile_epsilon);
-			for (int i=0; i<job_sojourn_d.length; i++) {
-				ccdf -= job_sojourn_d[i];
-				if (ccdf <= limit) {
-					System.err.println("exceeded epsilon at i="+i+"  where d[i]="+job_sojourn_d[i]);
-					result.add( binwidth*(i*job_sojourn_d[i] +(i-1)*job_sojourn_d[i-1])/(1.0*job_sojourn_d[i]+job_sojourn_d[i-1]));
-					break;
-				}
-			}
+		result.add(quantile(job_sojourn_d, server.sampled_jobs.size(), quanile_epsilon, binwidth));
+		result.add(quantile(job_waiting_d, server.sampled_jobs.size(), quanile_epsilon, binwidth));
+		result.add(quantile(job_service_d, server.sampled_jobs.size(), quanile_epsilon, binwidth));
 
-			ccdf = server.sampled_jobs.size();
-			for (int i=0; i<job_waiting_d.length; i++) {
-				ccdf -= job_waiting_d[i];
-				if (ccdf <= limit) {
-					System.err.println("exceeded epsilon at i="+i+"  where d[i]="+job_waiting_d[i]);
-					result.add( binwidth*(i*job_waiting_d[i] +(i-1)*job_waiting_d[i-1])/(1.0*job_waiting_d[i]+job_waiting_d[i-1]));
-					break;
-				}
-			}
-
-			ccdf = server.sampled_jobs.size();
-			for (int i=0; i<job_service_d.length; i++) {
-				ccdf -= job_service_d[i];
-				if (ccdf <= limit) {
-					System.err.println("exceeded epsilon at i="+i+"  where d[i]="+job_service_d[i]);
-					result.add( binwidth*(i*job_service_d[i] +(i-1)*job_service_d[i-1])/(1.0*job_service_d[i]+job_service_d[i-1]));
-					break;
-				}
-			}
-		}
+		// also add 10^-3 quaniles
+		result.add(quantile(job_sojourn_d, server.sampled_jobs.size(), 1.0e-3, binwidth));
+		result.add(quantile(job_waiting_d, server.sampled_jobs.size(), 1.0e-3, binwidth));
+		result.add(quantile(job_service_d, server.sampled_jobs.size(), 1.0e-3, binwidth));
 		
 		return result;
+	}
+	
+	
+	/**
+	 * Compute the epsilon quantile of the specified histogram/distribution.
+	 * If n is too small to allow computation of the specified quantile, it 
+	 * returns 0.0 and prins a warning.
+	 * 
+	 * @param dpdf
+	 * @param n
+	 * @param epsilon
+	 * @return
+	 */
+	public static double quantile(int[] dpdf, long n, double epsilon, double binwidth) {
+		if (dpdf == null) {
+			System.err.println("WARNING: distribution is null");
+		} else if (n < 1.0/epsilon) {
+			System.err.println("WARNING: datapoints: "+n+"  required: "+(1.0/epsilon));
+		} else {
+			long ccdf = n;
+			long limit = (long)(n*epsilon);
+			for (int i=0; i<dpdf.length; i++) {
+				ccdf -= dpdf[i];
+				if (ccdf <= limit) {
+					System.err.println("exceeded epsilon="+epsilon+" at i="+i+"  where d[i]="+dpdf[i]);
+					return ( binwidth*(i*dpdf[i] +(i-1)*dpdf[i-1])/(1.0*dpdf[i]+dpdf[i-1]));
+				}
+			}
+			System.err.println("WARNING: never found the specified quantile!");
+		}
+		
+		return 0.0;
 	}
 	
 	
@@ -454,13 +454,16 @@ public class FJSimulator {
 				+"\t"+num_tasks
 				+"\t"+arrival_rate
 				+"\t"+service_rate
-				+"\t"+means.get(0)
-				+"\t"+means.get(1)
-				+"\t"+means.get(2)
-				+"\t"+means.get(3)
-				+"\t"+means.get(4)
-				+"\t"+means.get(5)
-				+"\t"+means.get(6)
+				+"\t"+means.get(0) // sojourn mean
+				+"\t"+means.get(1) // waiting mean
+				+"\t"+means.get(2) // service mean
+				+"\t"+means.get(3) // total
+				+"\t"+means.get(4) // sojourn quantile
+				+"\t"+means.get(5) // waiting quantile
+				+"\t"+means.get(6) // service quanile
+				+"\t"+means.get(7) // sojourn quantile 2
+				+"\t"+means.get(8) // waiting quantile 2
+				+"\t"+means.get(9) // service quanile 2
 				);
 		
 		//sim.jobAutocorrelation(outfile_base, 5000);
