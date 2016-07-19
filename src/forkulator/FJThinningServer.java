@@ -109,7 +109,7 @@ public class FJThinningServer extends FJServer {
 			worker_index = (worker_index + 1) % num_workers;
 		}
 		while ((t = job.nextTask()) != null) {
-			worker_queues[worker_index].add(t);
+			worker_queues[wi].add(t);
 		}
 		
 		// this just added the tasks to the queues.  Check if any
