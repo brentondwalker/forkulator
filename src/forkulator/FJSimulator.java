@@ -42,6 +42,10 @@ public class FJSimulator {
 			this.server = new FJSingleQueueServer(num_workers);
 		} else if (server_queue_type.toLowerCase().equals("w")) {
 			this.server = new FJWorkerQueueServer(num_workers);
+		} else if (server_queue_type.toLowerCase().equals("td")) {
+			this.server = new FJThinningServer(num_workers, false);
+		} else if (server_queue_type.toLowerCase().equals("tr")) {
+			this.server = new FJThinningServer(num_workers, true);
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);
@@ -156,13 +160,14 @@ public class FJSimulator {
 		double service_sum = 0.0;
 		for (FJJob job : server.sampled_jobs) {
 			double job_start_time = job.tasks[0].start_time;
+			double job_departure_time = job.departure_time;
 			double job_completion_time = job.tasks[0].completion_time;
 			for (FJTask task : job.tasks) {
 				job_start_time = Math.min(job_start_time, task.start_time);
 				job_completion_time = Math.max(job_completion_time, task.completion_time);
 			}
 			waiting_sum += job_start_time - job.arrival_time;
-			sojourn_sum += job_completion_time - job.arrival_time;
+			sojourn_sum += job_departure_time - job.arrival_time;
 			service_sum += job_completion_time - job_start_time;
 		}
 		
@@ -311,15 +316,16 @@ public class FJSimulator {
 			writer = new BufferedWriter(new FileWriter(outfile_base+"_path.dat"));
 			for (FJJob job : server.sampled_jobs) {
 				double job_start_time = job.tasks[0].start_time;
+				double job_departure_time = job.departure_time;
 				double job_completion_time = job.tasks[0].completion_time;
 				for (FJTask task : job.tasks) {
 					job_start_time = Math.min(job_start_time, task.start_time);
 					job_completion_time = Math.max(job_completion_time, task.completion_time);
 				}
-				double job_sojourn = job_completion_time - job.arrival_time;
+				double job_sojourn = job_departure_time - job.arrival_time;
 				if (job_sojourn > 10000) {
 					System.err.println("WARNING: large job sojourn: "+job_sojourn);
-					System.err.println("completion: "+job_completion_time);
+					System.err.println("departure: "+job_departure_time);
 					System.err.println("arrival:    "+job.arrival_time);
 					System.exit(1);
 				}
@@ -331,6 +337,7 @@ public class FJSimulator {
 								+"\t"+job.arrival_time
 								+"\t"+job_start_time
 								+"\t"+job_completion_time
+								+"\t"+job_departure_time
 								+"\t"+task.start_time
 								+"\t"+task.completion_time
 								+"\n");
@@ -360,13 +367,14 @@ public class FJSimulator {
 		for (FJJob job : server.sampled_jobs) {
 			
 			double job_start_time = job.tasks[0].start_time;
+			double job_departure_time = job.departure_time;
 			double job_completion_time = job.tasks[0].completion_time;
 			for (FJTask task : job.tasks) {
 				job_start_time = Math.min(job_start_time, task.start_time);
 				job_completion_time = Math.max(job_completion_time, task.completion_time);
 			}
 			double job_waiting_time = job_start_time - job.arrival_time;
-			double job_sojourn_time = job_completion_time - job.arrival_time;
+			double job_sojourn_time = job_departure_time - job.arrival_time;
 			double job_service_time = job_completion_time - job_start_time;
 			job_sojourn_d[(int)(job_sojourn_time/binwidth)]++;
 			job_waiting_d[(int)(job_waiting_time/binwidth)]++;
