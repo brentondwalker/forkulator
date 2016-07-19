@@ -212,13 +212,16 @@ public class FJSimulator {
 			System.err.println("WARNING: datapoints: "+n+"  required: "+(1.0/epsilon));
 		} else {
 			long ccdf = n;
+			long last_ccdf = n;
 			long limit = (long)(n*epsilon);
 			for (int i=0; i<dpdf.length; i++) {
 				ccdf -= dpdf[i];
 				if (ccdf <= limit) {
 					System.err.println("exceeded epsilon="+epsilon+" at i="+i+"  where d[i]="+dpdf[i]);
-					return ( binwidth*(i*dpdf[i] +(i-1)*dpdf[i-1])/(1.0*dpdf[i]+dpdf[i-1]));
+					//return ( binwidth*(i*dpdf[i] +(i-1)*dpdf[i-1])/(1.0*dpdf[i]+dpdf[i-1]));
+					return binwidth*( (i-1) + (limit - last_ccdf)/(ccdf - last_ccdf) );
 				}
+				last_ccdf = ccdf;
 			}
 			System.err.println("WARNING: never found the specified quantile!");
 		}
