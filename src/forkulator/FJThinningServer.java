@@ -148,12 +148,16 @@ public class FJThinningServer extends FJServer {
 			task.job.completion_time = time;
 			
 			// and add it to the departure set
-			this.postservice_jobs.add(task.job);
+			postservice_jobs.add(task.job);
 			
+			//System.out.println("postservice_jobs: "+postservice_jobs.size());
+			//System.out.println("first.ID: "+postservice_jobs.first().ID+"    job_departure_index: "+job_departure_index);
 			// check if any postservice_jobs can be cleared
-			while (postservice_jobs.first().ID == (job_departure_index+1)) {
+			while ((! postservice_jobs.isEmpty()) && (postservice_jobs.first().ID == (job_departure_index+1))) {
 				FJJob j = postservice_jobs.pollFirst();
+				job_departure_index++;
 				j.departure_time = time;
+				//System.out.println("JobID: "+task.job.ID+"  set departure time: "+time);
 				j.dispose();
 			}
 		}
