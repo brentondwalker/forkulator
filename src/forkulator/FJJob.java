@@ -13,7 +13,8 @@ public class FJJob implements Comparable<FJJob> {
 	public int num_tasks = 0;
 	public FJTask[] tasks = null;
 	private int task_index = 0;
-	public boolean complete = false;
+	public boolean completed = false;
+	public boolean fully_serviced = false;
 	public boolean sample = false;
 	
 	public static ArrayList<IntertimeProcess> service_processes = null;
@@ -69,7 +70,7 @@ public class FJJob implements Comparable<FJJob> {
 	 */
 	public FJTask nextTask() {
 		task_index++;
-		if (task_index == num_tasks) complete = true;
+		if (task_index == num_tasks) fully_serviced = true;
 		if (task_index > num_tasks) return null;
 		return tasks[task_index-1];
 	}

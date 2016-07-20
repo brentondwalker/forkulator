@@ -46,7 +46,7 @@ public class FJSingleQueueServer extends FJServer {
 				serviceTask(i, current_job.nextTask(), time);
 				
 				// if the current job is exhausted, grab a new one (or null)
-				if (current_job.complete) {
+				if (current_job.fully_serviced) {
 					current_job = job_queue.poll();
 				}
 			}
@@ -100,9 +100,9 @@ public class FJSingleQueueServer extends FJServer {
 		for (FJTask t : task.job.tasks) {
 			compl = compl && t.completed;
 		}
-		task.job.complete = compl;
+		task.job.completed = compl;
 
-		if (task.job.complete) {
+		if (task.job.completed) {
 			// it is the last, record the completion time
 			task.job.completion_time = time;
 			
@@ -124,7 +124,7 @@ public class FJSingleQueueServer extends FJServer {
 		serviceTask(workerId, current_job.nextTask(), time);
 		
 		// if the current job is exhausted, grab a new one (or null)
-		if (current_job.complete) {
+		if (current_job.fully_serviced) {
 			current_job = job_queue.poll();
 			if (FJSimulator.DEBUG) System.out.println("  set current_job to "+current_job);
 			feedWorkers(time);  // this should not do anything
