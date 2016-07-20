@@ -96,9 +96,9 @@ public class FJWorkerQueueServer extends FJServer {
 		for (FJTask t : task.job.tasks) {
 			compl = compl && t.completed;
 		}
-		task.job.complete = compl;
+		task.job.completed = compl;
 
-		if (task.job.complete) {
+		if (task.job.completed) {
 			// it is the last, record the completion time
 			task.job.completion_time = time;
 			
