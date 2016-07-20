@@ -437,10 +437,16 @@ public class FJSimulator {
 		int sampling_interval = Integer.parseInt(args[6]);
 		String outfile_base = args[7];
 		
-		// set this to be whatever you want
-		IntertimeProcess arrival_process = new ExponentialIntertimeProcess(arrival_rate);
-		//IntertimeProcess arrival_process = new LeakyBucketArrivalProcess(20, arrival_rate,
-		//		new ExponentialIntertimeProcess(arrival_rate), false);
+		IntertimeProcess arrival_process = null;
+		if (server_queue_type.startsWith("kl")) {
+			// for (k,l) servers we use constant-rate arrivals
+			arrival_process = new ConstantIntertimeProcess(arrival_rate);
+		} else {
+			// set this to be whatever you want
+			arrival_process = new ExponentialIntertimeProcess(arrival_rate);
+			//IntertimeProcess arrival_process = new LeakyBucketArrivalProcess(20, arrival_rate,
+			//		new ExponentialIntertimeProcess(arrival_rate), false);
+		}
 		
 		// and the service time process
 		IntertimeProcess service_process = new ExponentialIntertimeProcess(service_rate);
@@ -467,7 +473,7 @@ public class FJSimulator {
 				+"\t"+means.get(6) // service quanile
 				+"\t"+means.get(7) // sojourn quantile 2
 				+"\t"+means.get(8) // waiting quantile 2
-				+"\t"+means.get(9) // service quanile 2
+				+"\t"+means.get(9) // service quantile 2
 				);
 		
 		//sim.jobAutocorrelation(outfile_base, 5000);
