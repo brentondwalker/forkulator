@@ -2,21 +2,16 @@ package forkulator;
 
 import java.util.LinkedList;
 import java.util.Queue;
-import java.util.Random;
-import java.util.TreeSet;
 
-public class FJThinningServer extends FJServer {
+
+public class FJKLServer extends FJServer {
 	
 	/**
-	 * The thinning server is special because
-	 * - jobs are mapped entirely to one server
-	 * - the jobs must be resequenced before they depart
+	 * The (k,l) server considers a job done when l of its k tasks complete.
+	 * The remaining tasks are still left to run to completion.
 	 * 
-	 * The 2nd fact requires us to keep a queue pile of jobs that have completed
-	 * servicing, but are still waiting to depart. 
 	 */
-	public TreeSet<FJJob> postservice_jobs = new TreeSet<FJJob>();
-	protected long job_departure_index = -1;
+	public int l;
 	
 	/**
 	 * This type of server has a separate queue for each worker.
@@ -28,12 +23,7 @@ public class FJThinningServer extends FJServer {
 	public Queue<FJTask>[] worker_queues = null;
 	private int worker_index = 0;
 	
-	/**
-	 * The assignment of jobs to servers can be random or deterministic.
-	 */
-	boolean random_thinning = false;
-	protected static Random rand = new Random();
-
+	
 	/**
 	 * Constructor
 	 * 
@@ -41,26 +31,21 @@ public class FJThinningServer extends FJServer {
 	 * 
 	 * @param num_workers
 	 */
-	public FJThinningServer(int num_workers, boolean random_thinning) {
+	public FJKLServer(int num_workers, int l) {
 		super(num_workers);
 		
-		this.random_thinning = random_thinning;
+		if (l > num_workers) {
+			System.err.println("ERROR: FJKLServer cannot have l>k");
+			System.exit(0);
+		}
 		
+		this.l = l;
 		worker_queues = new Queue[num_workers];
 		for (int i=0; i<num_workers; i++) {
 			worker_queues[i] = new LinkedList<FJTask>();
 		}
 	}
-
-	public FJThinningServer(int num_workers) {
-		super(num_workers);
-		
-		worker_queues = new Queue[num_workers];
-		for (int i=0; i<num_workers; i++) {
-			worker_queues[i] = new LinkedList<FJTask>();
-		}
-	}
-
+	
 	
 	/**
 	 * Check for any idle workers and try to put a task on them.
@@ -84,8 +69,7 @@ public class FJThinningServer extends FJServer {
 	 * This type of server has a separate queue for each worker.  When a job arrives
 	 * we immediately assign its tasks to the workers' queues.
 	 * 
-	 * In a thinning server, all tasks from a job go on the same server.
-	 * The server can be chosen randomly or deterministically (round-robin).
+	 * This part should behave just like WQ server.
 	 * 
 	 * @param job
 	 * @param sample
@@ -100,15 +84,9 @@ public class FJThinningServer extends FJServer {
 		}
 
 		FJTask t = null;
-		int wi = -1;
-		if (random_thinning) {
-			wi = rand.nextInt(this.num_workers);
-		} else {
-			wi = worker_index;
-			worker_index = (worker_index + 1) % num_workers;
-		}
 		while ((t = job.nextTask()) != null) {
-			worker_queues[wi].add(t);
+			worker_queues[worker_index].add(t);
+			worker_index = (worker_index + 1) % num_workers;
 		}
 		
 		// this just added the tasks to the queues.  Check if any
@@ -121,9 +99,10 @@ public class FJThinningServer extends FJServer {
 	 * Handle a task completion event.  Remove the task from its worker, and
 	 * give the worker a new task, if available.
 	 * 
-	 * With in the thinning server the task can't simply depart, though.  The
-	 * jobs need to be resequenced.  If a job has completed, we put it into the
-	 * departure queue and then try to clear any jobs from te departure queue.
+	 * With in the (k,l) server we consider a job to be complete and
+	 * departed when k of its tasks are complete.  But we let the other
+	 * tasks keep running.  Do we need to keep the completed jobs around until
+	 * all their tasks finish (if they aren't sampled)?
 	 * 
 	 * @param workerId
 	 * @param time
@@ -134,39 +113,40 @@ public class FJThinningServer extends FJServer {
 		task.completion_time = time;
 		task.completed = true;
 		
-		// check if this task was the last one of a job
-		//TODO: this could be more efficient
-		boolean compl = true;
-		for (FJTask t : task.job.tasks) {
-			compl = compl && t.completed;
+		if (! task.job.completed) {
+			// check if this task is the l'th of the job.
+			//TODO: this could be more efficient
+			int num_completed = 0;
+			for (FJTask t : task.job.tasks) {
+				num_completed += t.completed ? 1 : 0;
+			}
+
+			if (num_completed == this.l) {
+				task.job.completed = true;
+				task.job.completion_time = time;
+				task.job.departure_time = time;
+				//System.out.println("Job "+task.job.ID+" completed at "+time);
+			}
 		}
-		task.job.completed = compl;
 		
+		// if the job is already complete, check if this was the last task
+		// so we can dispose the job object
 		if (task.job.completed) {
-			// it is the last, record the completion time
-			task.job.completion_time = time;
-			
-			// and add it to the departure set
-			postservice_jobs.add(task.job);
-			
-			//System.out.println("postservice_jobs: "+postservice_jobs.size());
-			//System.out.println("first.ID: "+postservice_jobs.first().ID+"    job_departure_index: "+job_departure_index);
-			// check if any postservice_jobs can be cleared
-			while ((! postservice_jobs.isEmpty()) && (postservice_jobs.first().ID == (job_departure_index+1))) {
-				FJJob j = postservice_jobs.pollFirst();
-				job_departure_index++;
-				j.departure_time = time;
-				//System.out.println("JobID: "+task.job.ID+"  set departure time: "+time);
+			boolean total_complete = true;
+			for (FJTask t : task.job.tasks) {
+				total_complete = total_complete && t.completed;
+			}
+			if (total_complete) {
+				FJJob j = task.job;
 				j.dispose();
 			}
 		}
 		
 		// try to start servicing a new task on this worker
 		serviceTask(workerId, worker_queues[workerId].poll(), time);
-		
 	}
-
-
+	
+	
 	/**
 	 * In the multi-queue server we take the queue length to be the rounded average
 	 * length of all the worker queues.
