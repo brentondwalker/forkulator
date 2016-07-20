@@ -68,7 +68,7 @@ public class FJSingleQueueServer extends FJServer {
 		// only keep a reference to the job if the simulator tells us to
 		if (sample) {
 			job.setSample(sample);
-			sampled_jobs.add(job);
+			//sampled_jobs.add(job);
 		}
 		if (current_job == null) {
 			current_job = job;
@@ -109,7 +109,7 @@ public class FJSingleQueueServer extends FJServer {
 			// for this type of server it is also the departure time
 			task.job.departure_time = time;
 			
-			// dispose of the job (does nothing if this is a sampled job
+			// dispose of the job
 			task.job.dispose();
 		}
 		
