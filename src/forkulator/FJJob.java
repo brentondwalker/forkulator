@@ -76,15 +76,19 @@ public class FJJob implements Comparable<FJJob> {
 	}
 	
 	/**
-	 * clean up the object to hopefully make things easier for the garbage collector
+	 * Clean up the object to hopefully make things easier for the garbage collector
+	 * 
+	 * This also feeds the sampled jobs to the data_aggregator before destroying the job.
+	 * 
 	 */
 	public void dispose() {
-		if (! this.sample) {
-			for (FJTask t : this.tasks) {
-				t.job = null;
-			}
-			this.tasks = null;
+		if (this.sample && FJSimulator.data_aggregator != null) {
+			FJSimulator.data_aggregator.sample(this);
 		}
+		for (FJTask t : this.tasks) {
+			t.job = null;
+		}
+		this.tasks = null;
 	}
 	
 	

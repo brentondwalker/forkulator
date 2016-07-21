@@ -80,7 +80,7 @@ public class FJKLServer extends FJServer {
 		// only keep a reference to the job if the simulator tells us to
 		if (sample) {
 			job.setSample(sample);
-			sampled_jobs.add(job);
+			//sampled_jobs.add(job);
 		}
 
 		FJTask t = null;
