@@ -9,6 +9,7 @@ public class FJSimulator {
 
 	public static boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 10000;
+	public static final int SAMPLE_PATH_LENGTH = 1000;
 	
 	public LinkedList<QEvent> event_queue = new LinkedList<QEvent>();
 	
@@ -18,11 +19,11 @@ public class FJSimulator {
 	public IntertimeProcess service_process;
 	public FJServer server = null;
 	
-	public int[] job_sojourn_d = null;
-	public int[] job_waiting_d = null;
-	public int[] job_service_d = null;
 	public double binwidth = 0.1;
 	public double quanile_epsilon = 1e-6;
+	
+	public static FJDataAggregator data_aggregator = null;
+	
 	
 	/**
 	 * constructor
@@ -32,11 +33,12 @@ public class FJSimulator {
 	 * @param arrival_rate
 	 * @param service_rate
 	 */
-	public FJSimulator(String server_queue_type, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process) {
+	public FJSimulator(String server_queue_type, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process, FJDataAggregator data_aggregator) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
+		this.data_aggregator = data_aggregator;
 		
 		if (server_queue_type.toLowerCase().equals("s")) {
 			this.server = new FJSingleQueueServer(num_workers);
@@ -152,85 +154,6 @@ public class FJSimulator {
 	}
 	
 	
-	/**
-	 * compute the means of sojourn, waiting, and service times over (almost) all jobs
-	 * 
-	 * @return
-	 */
-	public ArrayList<Double> experimentMeans() {
-		double sojourn_sum = 0.0;
-		double waiting_sum = 0.0;
-		double service_sum = 0.0;
-		for (FJJob job : server.sampled_jobs) {
-			double job_start_time = job.tasks[0].start_time;
-			double job_departure_time = job.departure_time;
-			double job_completion_time = job.tasks[0].completion_time;
-			for (FJTask task : job.tasks) {
-				job_start_time = Math.min(job_start_time, task.start_time);
-				job_completion_time = Math.max(job_completion_time, task.completion_time);
-			}
-			waiting_sum += job_start_time - job.arrival_time;
-			sojourn_sum += job_departure_time - job.arrival_time;
-			service_sum += job_completion_time - job_start_time;
-		}
-		
-		double total = server.sampled_jobs.size();
-		ArrayList<Double> result = new ArrayList<Double>(3 + 1);
-		result.add(sojourn_sum/total);
-		result.add(waiting_sum/total);
-		result.add(service_sum/total);
-		result.add(total * 1.0);
-		
-		// also throw in the 10^-6 quantiles
-		//
-		// make sure the distributions have been computed and are long enough
-		// to compute the quantile we're interested in
-		result.add(quantile(job_sojourn_d, server.sampled_jobs.size(), quanile_epsilon, binwidth));
-		result.add(quantile(job_waiting_d, server.sampled_jobs.size(), quanile_epsilon, binwidth));
-		result.add(quantile(job_service_d, server.sampled_jobs.size(), quanile_epsilon, binwidth));
-
-		// also add 10^-3 quaniles
-		result.add(quantile(job_sojourn_d, server.sampled_jobs.size(), 1.0e-3, binwidth));
-		result.add(quantile(job_waiting_d, server.sampled_jobs.size(), 1.0e-3, binwidth));
-		result.add(quantile(job_service_d, server.sampled_jobs.size(), 1.0e-3, binwidth));
-		
-		return result;
-	}
-	
-	
-	/**
-	 * Compute the epsilon quantile of the specified histogram/distribution.
-	 * If n is too small to allow computation of the specified quantile, it 
-	 * returns 0.0 and prins a warning.
-	 * 
-	 * @param dpdf
-	 * @param n
-	 * @param epsilon
-	 * @return
-	 */
-	public static double quantile(int[] dpdf, long n, double epsilon, double binwidth) {
-		if (dpdf == null) {
-			System.err.println("WARNING: distribution is null");
-		} else if (n < 1.0/epsilon) {
-			System.err.println("WARNING: datapoints: "+n+"  required: "+(1.0/epsilon));
-		} else {
-			long ccdf = n;
-			long last_ccdf = n;
-			long limit = (long)(n*epsilon);
-			for (int i=0; i<dpdf.length; i++) {
-				ccdf -= dpdf[i];
-				if (ccdf <= limit) {
-					System.err.println("exceeded epsilon="+epsilon+" at i="+i+"  where d[i]="+dpdf[i]);
-					//return ( binwidth*(i*dpdf[i] +(i-1)*dpdf[i-1])/(1.0*dpdf[i]+dpdf[i-1]));
-					return binwidth*( (i-1) + (limit - last_ccdf)/(ccdf - last_ccdf) );
-				}
-				last_ccdf = ccdf;
-			}
-			System.err.println("WARNING: never found the specified quantile!");
-		}
-		
-		return 0.0;
-	}
 	
 	
 	/**
@@ -239,6 +162,7 @@ public class FJSimulator {
 	 * @param outfile_base
 	 * @param max_offset
 	 */
+	/*
 	public void jobAutocorrelation(String outfile_base, int max_offset) {
 		double[] sojourns = new double[server.sampled_jobs.size()];
 		double[] waitings = new double[server.sampled_jobs.size()];
@@ -304,6 +228,7 @@ public class FJSimulator {
 			}
 		}
 	}
+	*/
 	
 	
 	/**
@@ -358,64 +283,9 @@ public class FJSimulator {
 			} catch (Exception e) {
 			}
 		}
-		
-		// initialize the distributions
-		int max_bin = (int)(max_value/binwidth) + 1;
-		//System.err.println("max_value="+max_value);
-		
-		job_sojourn_d = new int[max_bin];
-		job_waiting_d = new int[max_bin];
-		job_service_d = new int[max_bin];
-		
-		// compute the distributions
-		int total = server.sampled_jobs.size();
-		for (FJJob job : server.sampled_jobs) {
-			
-			double job_start_time = job.tasks[0].start_time;
-			double job_departure_time = job.departure_time;
-			double job_completion_time = job.completion_time;
-			for (FJTask task : job.tasks) {
-				job_start_time = Math.min(job_start_time, task.start_time);
-			}
-			double job_waiting_time = job_start_time - job.arrival_time;
-			double job_sojourn_time = job_departure_time - job.arrival_time;
-			double job_service_time = job_completion_time - job_start_time;
-			job_sojourn_d[(int)(job_sojourn_time/binwidth)]++;
-			job_waiting_d[(int)(job_waiting_time/binwidth)]++;
-			job_service_d[(int)(job_service_time/binwidth)]++;
-		}
-		
-		// print out the distributions
-		// plot filename using 2:(log($3)) with lines title "sojourn", filename using 2:(log($4)) with lines title "waiting", filename using 2:(log($5)) with lines title "service"
-		try {
-			writer = new BufferedWriter(new FileWriter(outfile_base+"_dist.dat"));
-			double sojourn_cdf = 0.0;
-			double waiting_cdf = 0.0;
-			double service_cdf = 0.0;
-			for (int i=0; i<max_bin; i++) {
-				sojourn_cdf += (1.0*job_sojourn_d[i])/total;
-				waiting_cdf += (1.0*job_waiting_d[i])/total;
-				service_cdf += (1.0*job_service_d[i])/total;
-				writer.write(i
-						+"\t"+(i*binwidth)
-						+"\t"+(1.0*job_sojourn_d[i])/(total*binwidth)
-						+"\t"+sojourn_cdf
-						+"\t"+(1.0*job_waiting_d[i])/(total*binwidth)
-						+"\t"+waiting_cdf
-						+"\t"+(1.0*job_service_d[i])/(total*binwidth)
-						+"\t"+service_cdf
-						+"\n");
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				// Close the writer regardless of what happens...
-				writer.close();
-			} catch (Exception e) {
-			}
-		}
 	}
+	
+	
 	
 	
 	/**
@@ -453,12 +323,15 @@ public class FJSimulator {
 		//IntertimeProcess service_process = new LeakyBucketServiceProcess(10, service_rate,
 		//		new ExponentialIntertimeProcess(service_rate), true);
 		
-		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_process);
+		FJDataAggregator data_aggregator = new FJDataAggregator((int)(1 + num_jobs/sampling_interval));
+		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
 		sim.run(num_jobs, sampling_interval);
 		
 		sim.printExperimentPath(outfile_base);
 		
-		ArrayList<Double> means = sim.experimentMeans();
+		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
+		
+		ArrayList<Double> means = data_aggregator.experimentMeans();
 		System.out.println(
 				num_workers
 				+"\t"+num_tasks
