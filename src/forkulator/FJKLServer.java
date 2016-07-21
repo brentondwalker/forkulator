@@ -1,7 +1,6 @@
 package forkulator;
 
 import java.util.LinkedList;
-import java.util.Queue;
 
 
 public class FJKLServer extends FJServer {
@@ -20,7 +19,6 @@ public class FJKLServer extends FJServer {
 	 * We could model this with a Queue<FJJob>, but it's easier and just 
 	 * as valid to copy the model used by the FJWorkerQueueServer
 	 */
-	public Queue<FJTask>[] worker_queues = null;
 	private int worker_index = 0;
 	
 	
@@ -40,9 +38,8 @@ public class FJKLServer extends FJServer {
 		}
 		
 		this.l = l;
-		worker_queues = new Queue[num_workers];
 		for (int i=0; i<num_workers; i++) {
-			worker_queues[i] = new LinkedList<FJTask>();
+			workers[0][i].queue = new LinkedList<FJTask>();
 		}
 	}
 	
@@ -55,9 +52,9 @@ public class FJKLServer extends FJServer {
 	public void feedWorkers(double time) {
 		// check for idle workers
 		for (int i=0; i<num_workers; i++) {
-			if (workers[i].current_task == null) {
+			if (workers[0][i].current_task == null) {
 				// if the worker is idle, pull the next task (or null) from its queue
-				serviceTask(i, worker_queues[i].poll(), time);
+				serviceTask(workers[0][i], workers[0][i].queue.poll(), time);
 			}
 		}
 	}
@@ -85,7 +82,7 @@ public class FJKLServer extends FJServer {
 
 		FJTask t = null;
 		while ((t = job.nextTask()) != null) {
-			worker_queues[worker_index].add(t);
+			workers[0][worker_index].queue.add(t);
 			worker_index = (worker_index + 1) % num_workers;
 		}
 		
@@ -107,9 +104,9 @@ public class FJKLServer extends FJServer {
 	 * @param workerId
 	 * @param time
 	 */
-	public void taskCompleted(int workerId, double time) {
-		if (FJSimulator.DEBUG) System.out.println("task "+workers[workerId].current_task.ID+" completed "+time);
-		FJTask task = workers[workerId].current_task;
+	public void taskCompleted(FJWorker worker, double time) {
+		if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
+		FJTask task = worker.current_task;
 		task.completion_time = time;
 		task.completed = true;
 		
@@ -143,7 +140,7 @@ public class FJKLServer extends FJServer {
 		}
 		
 		// try to start servicing a new task on this worker
-		serviceTask(workerId, worker_queues[workerId].poll(), time);
+		serviceTask(worker, worker.queue.poll(), time);
 	}
 	
 	
@@ -154,11 +151,10 @@ public class FJKLServer extends FJServer {
 	@Override
 	public int queueLength() {
 		int lsum = 0;
-		for (Queue<FJTask> q : worker_queues) {
-			lsum += q.size();
-		}
-		return (lsum / worker_queues.length);
+		for (FJWorker w : workers[0])
+			lsum += w.queue.size();
+
+		return (lsum / num_workers);
 	}
-	
 	
 }
