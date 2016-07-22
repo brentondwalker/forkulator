@@ -8,7 +8,7 @@ public class FJTask {
 	public double start_time = 0.0;
 	public double service_time = 0.0;
 	public double completion_time = 0.0;  // redundant
-	public int worker = -1;
+	public FJWorker worker = null;
 	public boolean processing = false;
 	public boolean completed = false;
 	public FJJob job = null;
