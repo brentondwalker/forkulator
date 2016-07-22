@@ -6,23 +6,38 @@ public abstract class FJServer {
 
 	static FJSimulator simulator = null;
 	
-	public int num_workers = 0;
-	public FJWorker[] workers = null;
-	public FJJob current_job = null;
+	public int num_workers = 1;
+	public int num_stages = 1;
+	public FJWorker[][] workers = null;
+	public FJJob current_job = null; // needs to change for multi-stage
 	public ArrayList<FJJob> sampled_jobs = new ArrayList<FJJob>();
 	
 	
 	/**
 	 * Super constructor.
 	 * 
+	 * This constructor now supports multi-stage systems.
+	 * 
+	 * @param num_workers
+	 */
+	public FJServer(int num_workers, int num_stages) {
+		this.num_workers = num_workers;
+		this.num_stages = num_stages;
+		this.workers = new FJWorker[num_stages][num_workers];
+		for (int j=0; j<num_stages; j++) {
+			for (int i=0; i<num_workers; i++) {
+				workers[j][i] = new FJWorker(j);
+			}
+		}
+	}
+	
+	/**
+	 * Constructor for single-stage system
+	 * 
 	 * @param num_workers
 	 */
 	public FJServer(int num_workers) {
-		this.num_workers = num_workers;
-		this.workers = new FJWorker[num_workers];
-		for (int i=0; i<num_workers; i++) {
-			workers[i] = new FJWorker();
-		}
+		this(num_workers,1);
 	}
 	
 	
@@ -62,7 +77,7 @@ public abstract class FJServer {
 	 * @param workerId
 	 * @param time
 	 */
-	public abstract void taskCompleted(int workerId, double time);
+	public abstract void taskCompleted(FJWorker worker, double time);
 	
 	
 	/**
@@ -80,11 +95,11 @@ public abstract class FJServer {
 	 * @param task
 	 * @param time
 	 */
-	public void serviceTask(int workerId, FJTask task, double time) {
+	public void serviceTask(FJWorker worker, FJTask task, double time) {
 		if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task.ID);
-		workers[workerId].current_task = task;
+		worker.current_task = task;
 		if (task != null) {
-			task.worker = workerId;
+			task.worker = worker;
 			task.start_time = time;
 			task.processing = true;
 
