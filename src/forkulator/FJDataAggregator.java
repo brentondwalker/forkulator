@@ -167,7 +167,7 @@ public class FJDataAggregator {
 		}
 		
 		double total = num_samples;
-		ArrayList<Double> result = new ArrayList<Double>(3 + 1);
+		ArrayList<Double> result = new ArrayList<Double>(9 + 1);
 		result.add(sojourn_sum/total);
 		result.add(waiting_sum/total);
 		result.add(service_sum/total);
