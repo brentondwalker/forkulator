@@ -1,7 +1,6 @@
 package forkulator;
 
 import java.util.LinkedList;
-import java.util.Queue;
 
 public class FJWorkerQueueServer extends FJServer {
 
@@ -11,7 +10,6 @@ public class FJWorkerQueueServer extends FJServer {
 	 * When a job is enqueued, its tasks are queued on the workers directly,
 	 * no mater the current state of the workers.
 	 */
-	public Queue<FJTask>[] worker_queues = null;
 	private int worker_index = 0;
 	
 	/**
@@ -24,9 +22,8 @@ public class FJWorkerQueueServer extends FJServer {
 	public FJWorkerQueueServer(int num_workers) {
 		super(num_workers);
 		
-		worker_queues = new Queue[num_workers];
 		for (int i=0; i<num_workers; i++) {
-			worker_queues[i] = new LinkedList<FJTask>();
+			workers[0][i].queue = new LinkedList<FJTask>();
 		}
 	}
 	
@@ -39,9 +36,9 @@ public class FJWorkerQueueServer extends FJServer {
 	public void feedWorkers(double time) {
 		// check for idle workers
 		for (int i=0; i<num_workers; i++) {
-			if (workers[i].current_task == null) {
+			if (workers[0][i].current_task == null) {
 				// if the worker is idle, pull the next task (or null) from its queue
-				serviceTask(i, worker_queues[i].poll(), time);
+				serviceTask(workers[0][i], workers[0][i].queue.poll(), time);
 			}
 		}
 	}
@@ -67,7 +64,7 @@ public class FJWorkerQueueServer extends FJServer {
 
 		FJTask t = null;
 		while ((t = job.nextTask()) != null) {
-			worker_queues[worker_index].add(t);
+			workers[0][worker_index].queue.add(t);
 			worker_index = (worker_index + 1) % num_workers;
 		}
 		
@@ -84,12 +81,12 @@ public class FJWorkerQueueServer extends FJServer {
 	 * @param workerId
 	 * @param time
 	 */
-	public void taskCompleted(int workerId, double time) {
-		if (FJSimulator.DEBUG) System.out.println("task "+workers[workerId].current_task.ID+" completed "+time);
-		FJTask task = workers[workerId].current_task;
+	public void taskCompleted(FJWorker worker, double time) {
+		if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
+		FJTask task = worker.current_task;
 		task.completion_time = time;
 		task.completed = true;
-
+		
 		// check if this task was the last one of a job
 		//TODO: this could be more efficient
 		boolean compl = true;
@@ -97,7 +94,7 @@ public class FJWorkerQueueServer extends FJServer {
 			compl = compl && t.completed;
 		}
 		task.job.completed = compl;
-
+		
 		if (task.job.completed) {
 			// it is the last, record the completion time
 			task.job.completion_time = time;
@@ -109,7 +106,7 @@ public class FJWorkerQueueServer extends FJServer {
 			task.job.dispose();
 		}
 		
-		serviceTask(workerId, worker_queues[workerId].poll(), time);
+		serviceTask(worker, worker.queue.poll(), time);
 		
 	}
 
@@ -121,10 +118,10 @@ public class FJWorkerQueueServer extends FJServer {
 	@Override
 	public int queueLength() {
 		int lsum = 0;
-		for (Queue<FJTask> q : worker_queues) {
-			lsum += q.size();
-		}
-		return (lsum / worker_queues.length);
+		for (FJWorker w : workers[0])
+			lsum += w.queue.size();
+
+		return (lsum / num_workers);
 	}
 	
 	
