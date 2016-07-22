@@ -41,9 +41,9 @@ public class FJSingleQueueServer extends FJServer {
 			// if there is no current job, just return
 			if (current_job == null) return;
 			
-			if (workers[i].current_task == null) {
+			if (workers[0][i].current_task == null) {
 				// service the next task
-				serviceTask(i, current_job.nextTask(), time);
+				serviceTask(workers[0][i], current_job.nextTask(), time);
 				
 				// if the current job is exhausted, grab a new one (or null)
 				if (current_job.fully_serviced) {
@@ -88,9 +88,9 @@ public class FJSingleQueueServer extends FJServer {
 	 * @param workerId
 	 * @param time
 	 */
-	public void taskCompleted(int workerId, double time) {
-		if (FJSimulator.DEBUG) System.out.println("task "+workers[workerId].current_task.ID+" completed "+time);
-		FJTask task = workers[workerId].current_task;
+	public void taskCompleted(FJWorker worker, double time) {
+		if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
+		FJTask task = worker.current_task;
 		task.completion_time = time;
 		task.completed = true;
 
@@ -116,12 +116,12 @@ public class FJSingleQueueServer extends FJServer {
 		// if there is no current job, just clear the worker
 		if (current_job == null) {
 			if (FJSimulator.DEBUG) System.out.println("  no current_job");
-			workers[workerId].current_task = null;
+			worker.current_task = null;
 			return;
 		}
 		
 		// put a new task on the worker
-		serviceTask(workerId, current_job.nextTask(), time);
+		serviceTask(worker, current_job.nextTask(), time);
 		
 		// if the current job is exhausted, grab a new one (or null)
 		if (current_job.fully_serviced) {
