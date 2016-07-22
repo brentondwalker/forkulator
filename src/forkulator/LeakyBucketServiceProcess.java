@@ -127,7 +127,7 @@ public class LeakyBucketServiceProcess extends IntertimeProcess {
 				new ExponentialIntertimeProcess(serviceRate), discardBacklog);
 		
 		double t = 0.0;
-		double st = 0.0;
+		//double st = 0.0;
 		
 		// for the test don't make it a proper queuing system.  Just
 		// the the arrivals come and assign them service times without requiring

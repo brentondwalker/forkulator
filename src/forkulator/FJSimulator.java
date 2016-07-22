@@ -51,6 +51,9 @@ public class FJSimulator {
 		} else if (server_queue_type.toLowerCase().startsWith("kl")) {
 			int l_diff = Integer.parseInt(server_queue_type.toLowerCase().substring(2));
 			this.server = new FJKLServer(num_workers, num_workers - l_diff);
+		} else if (server_queue_type.toLowerCase().startsWith("msw")) {
+			int num_stages = Integer.parseInt(server_queue_type.toLowerCase().substring(3));
+			this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages);
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);
