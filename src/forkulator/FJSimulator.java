@@ -338,6 +338,7 @@ public class FJSimulator {
 		System.out.println(
 				num_workers
 				+"\t"+num_tasks
+				+"\t"+sim.server.num_stages
 				+"\t"+arrival_rate
 				+"\t"+service_rate
 				+"\t"+means.get(0) // sojourn mean

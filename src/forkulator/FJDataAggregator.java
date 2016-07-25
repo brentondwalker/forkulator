@@ -176,12 +176,12 @@ public class FJDataAggregator {
 		// also throw in the 10^-6 quantiles
 		//
 		// make sure the distributions have been computed and are long enough
-		// to compute the quantile we're interested in
+		// to compute the quantiles we're interested in
 		result.add(quantile(job_sojourn_d, num_samples, 1.0e-6, binwidth));
 		result.add(quantile(job_waiting_d, num_samples, 1.0e-6, binwidth));
 		result.add(quantile(job_service_d, num_samples, 1.0e-6, binwidth));
 
-		// also add 10^-3 quaniles
+		// also add 10^-3 quantiles
 		result.add(quantile(job_sojourn_d, num_samples, 1.0e-3, binwidth));
 		result.add(quantile(job_waiting_d, num_samples, 1.0e-3, binwidth));
 		result.add(quantile(job_service_d, num_samples, 1.0e-3, binwidth));
