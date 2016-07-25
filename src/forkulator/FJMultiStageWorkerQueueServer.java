@@ -18,8 +18,6 @@ public class FJMultiStageWorkerQueueServer extends FJServer {
 	 * task completion include cleaning up the task and job and reporting statistics.
 	 * To do it that way would involve a lot of refactoring.
 	 */
-	
-	public int num_stages = 1;
 		
 	/**
 	 * The worker index keeps track of which worker the last task was assigned to.
