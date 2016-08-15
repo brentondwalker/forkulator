@@ -1,8 +1,12 @@
 package forkulator;
 
 import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * It is convenient to sample the actual jobs (and tasks) as we run,
@@ -87,7 +91,7 @@ public class FJDataAggregator {
 		
 		// initialize the distributions
 		int max_bin = (int)(max_value/binwidth) + 1;
-		System.err.println("max_bin="+max_bin);
+		//System.err.println("max_bin="+max_bin);
 		job_sojourn_d = new int[max_bin];
 		job_waiting_d = new int[max_bin];
 		job_service_d = new int[max_bin];
@@ -105,6 +109,7 @@ public class FJDataAggregator {
 	
 	
 	/**
+	 * Compute and print out the pdf and cdfs of sojourn time and the other stats for jobs
 	 * 
 	 * @param outfile_base
 	 * @param binwidth
@@ -135,6 +140,41 @@ public class FJDataAggregator {
 						+"\t"+(1.0*job_service_d[i])/(total*binwidth)
 						+"\t"+service_cdf
 						+"\n");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				// Close the writer regardless of what happens...
+				writer.close();
+			} catch (Exception e) {
+			}
+		}
+	}
+	
+	/**
+	 * Save the raw sojourn, waiting and service times for jobs.
+	 * I was computing and saving the binned distributions already,
+	 * but having this (almost) raw data will make later analysis
+	 * possible without re-running everything.
+	 * 
+	 * Save the file in compressed format because these will get huge.
+	 * 
+	 * @param outfile_base
+	 */
+	public void printRawJobData(String outfile_base) {
+		BufferedWriter writer = null;
+		try {
+			GZIPOutputStream zip = new GZIPOutputStream(new FileOutputStream(new File(outfile_base+"_jobdat.dat.gz")));
+			writer = new BufferedWriter(new OutputStreamWriter(zip, "UTF-8"));
+			for (int i=0; i<num_samples; i++) {
+				double job_waiting_time = job_start_time[i] - job_arrival_time[i];
+				double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
+				double job_service_time = job_completion_time[i] - job_start_time[i];
+				writer.write(i
+						+"\t"+job_sojourn_time
+						+"\t"+job_waiting_time
+						+"\t"+job_service_time+"\n");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
