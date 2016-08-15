@@ -334,6 +334,8 @@ public class FJSimulator {
 		
 		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 		
+		data_aggregator.printRawJobData(outfile_base);
+		
 		ArrayList<Double> means = data_aggregator.experimentMeans();
 		System.out.println(
 				num_workers
