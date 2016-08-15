@@ -1,9 +1,10 @@
 package forkulator;
 
 import java.util.LinkedList;
+import java.util.Queue;
 
 
-public class FJKLServer extends FJServer {
+public class FJKLSingleQueueServer extends FJServer {
 	
 	/**
 	 * The (k,l) server considers a job done when l of its k tasks complete.
@@ -11,16 +12,18 @@ public class FJKLServer extends FJServer {
 	 * 
 	 */
 	public int l;
+
 	
 	/**
-	 * This type of server has a separate queue for each worker.
+	 * This type of server has a single job queue, and tasks are drawn from
+	 * the job at the front of the queue until the job is fully serviced.
 	 * 
-	 * When a job comes in all of its tasks are put on the same worker.
-	 * We could model this with a Queue<FJJob>, but it's easier and just 
-	 * as valid to copy the model used by the FJWorkerQueueServer
+	 * The way I implemented this, I put the current "head" job in current_job,
+	 * and the jobs in the queue are the ones not serviced yet.
 	 */
-	private int worker_index = 0;
-	
+	public Queue<FJJob> job_queue = new LinkedList<FJJob>();
+	public FJJob current_job = null;
+		
 	
 	/**
 	 * Constructor
@@ -29,11 +32,11 @@ public class FJKLServer extends FJServer {
 	 * 
 	 * @param num_workers
 	 */
-	public FJKLServer(int num_workers, int l) {
+	public FJKLSingleQueueServer(int num_workers, int l) {
 		super(num_workers);
 		
 		if (l > num_workers) {
-			System.err.println("ERROR: FJKLServer cannot have l>k");
+			System.err.println("ERROR: FJKLSingleQueueServer cannot have l>k");
 			System.exit(0);
 		}
 		
@@ -52,9 +55,18 @@ public class FJKLServer extends FJServer {
 	public void feedWorkers(double time) {
 		// check for idle workers
 		for (int i=0; i<num_workers; i++) {
+
+			// if there is no current job, just return
+			if (current_job == null) return;
+			
 			if (workers[0][i].current_task == null) {
-				// if the worker is idle, pull the next task (or null) from its queue
-				serviceTask(workers[0][i], workers[0][i].queue.poll(), time);
+				// service the next task
+				serviceTask(workers[0][i], current_job.nextTask(), time);
+				
+				// if the current job is exhausted, grab a new one (or null)
+				if (current_job.fully_serviced) {
+					current_job = job_queue.poll();
+				}
 			}
 		}
 	}
@@ -79,16 +91,14 @@ public class FJKLServer extends FJServer {
 			job.setSample(sample);
 			//sampled_jobs.add(job);
 		}
-
-		FJTask t = null;
-		while ((t = job.nextTask()) != null) {
-			workers[0][worker_index].queue.add(t);
-			worker_index = (worker_index + 1) % num_workers;
+		if (current_job == null) {
+			current_job = job;
+			if (FJSimulator.DEBUG) System.out.println("  current job was null");
+			feedWorkers(job.arrival_time);
+		} else {
+			job_queue.add(job);
+			if (FJSimulator.DEBUG) System.out.println("  current job was full, so I queued this one");
 		}
-		
-		// this just added the tasks to the queues.  Check if any
-		// workers were idle, and put them to work.
-		feedWorkers(job.arrival_time);
 	}
 	
 	
@@ -117,7 +127,7 @@ public class FJKLServer extends FJServer {
 			for (FJTask t : task.job.tasks) {
 				num_completed += t.completed ? 1 : 0;
 			}
-
+			
 			if (num_completed == this.l) {
 				task.job.completed = true;
 				task.job.completion_time = time;
@@ -139,22 +149,31 @@ public class FJKLServer extends FJServer {
 			}
 		}
 		
-		// try to start servicing a new task on this worker
-		serviceTask(worker, worker.queue.poll(), time);
+		// if there is no current job, just clear the worker
+		if (current_job == null) {
+			if (FJSimulator.DEBUG) System.out.println("  no current_job");
+			worker.current_task = null;
+			return;
+		}
+		
+		// put a new task on the worker
+		serviceTask(worker, current_job.nextTask(), time);
+		
+		// if the current job is exhausted, grab a new one (or null)
+		if (current_job.fully_serviced) {
+			current_job = job_queue.poll();
+			if (FJSimulator.DEBUG) System.out.println("  set current_job to "+current_job);
+			feedWorkers(time);  // this should not do anything
+		}
 	}
 	
 	
 	/**
-	 * In the multi-queue server we take the queue length to be the rounded average
-	 * length of all the worker queues.
+	 * In the single-queue server the queue length is simply the length of the job queue.
 	 */
 	@Override
 	public int queueLength() {
-		int lsum = 0;
-		for (FJWorker w : workers[0])
-			lsum += w.queue.size();
-
-		return (lsum / num_workers);
+		return this.job_queue.size();
 	}
 	
 }
