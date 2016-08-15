@@ -314,7 +314,7 @@ public class FJSimulator {
 		String outfile_base = args[7];
 		
 		IntertimeProcess arrival_process = null;
-		if (server_queue_type.startsWith("kl")) {
+		if (server_queue_type.substring(1).startsWith("kl")) {
 			// for (k,l) servers we use constant-rate arrivals
 			arrival_process = new ConstantIntertimeProcess(arrival_rate);
 		} else {
