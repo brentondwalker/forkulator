@@ -326,7 +326,7 @@ public class FJSimulator {
 		
 		// and the service time process
 		//IntertimeProcess service_process = new ExponentialIntertimeProcess(service_rate);
-		IntertimeProcess service_process = new ExponentialOverheadIntertimeProcess(service_rate, (2.92887566138+1.45744708995)/1000, 2/1000);
+		IntertimeProcess service_process = new ExponentialOverheadIntertimeProcess(service_rate, (2.92887566138+1.45744708995)/100, 2/100);
 		//IntertimeProcess service_process = new LeakyBucketServiceProcess(10, service_rate,
 		//		new ExponentialIntertimeProcess(service_rate), true);
 		

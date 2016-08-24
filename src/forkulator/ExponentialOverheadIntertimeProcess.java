@@ -23,6 +23,7 @@ public class ExponentialOverheadIntertimeProcess extends IntertimeProcess {
 		this.rate = rate;
 		this.overhead_mean = overhead_mean;
 		this.overhead_variance = overhead_variance;
+		System.err.println("WARNING: using service process with overhead with mean "+overhead_mean);
 	}
 	
 	@Override
