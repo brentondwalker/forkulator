@@ -10,6 +10,7 @@
     <property name="source" value="1.8"/>
     <path id="forkulator.classpath">
         <pathelement location="bin"/>
+        <pathelement location="lib/commons-math3-3.6.1.jar"/>
     </path>
     <target name="init">
         <mkdir dir="bin"/>
