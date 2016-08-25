@@ -5,10 +5,18 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
+/**
+ * Simulate fork-join systems.
+ * 
+ * java -Xmx5g -cp "lib/commons-math3-3.6.1.jar:bin" forkulator.FJSimulator w 1 1 0.7 1.0 100000000 1000 fjpaper-data/mm1boundsmu1lambda07.dat
+ * 
+ * @author brenton
+ *
+ */
 public class FJSimulator {
 
 	public static boolean DEBUG = false;
-	public static final int QUEUE_STABILITY_THRESHOLD = 10000;
+	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
 	public static final int SAMPLE_PATH_LENGTH = 1000;
 	
 	public LinkedList<QEvent> event_queue = new LinkedList<QEvent>();
@@ -326,7 +334,8 @@ public class FJSimulator {
 		
 		// and the service time process
 		//IntertimeProcess service_process = new ExponentialIntertimeProcess(service_rate);
-		IntertimeProcess service_process = new ExponentialOverheadIntertimeProcess(service_rate, (2.92887566138+1.45744708995)/100, 2/100);
+		IntertimeProcess service_process = new WeibullIntertimeProcess(service_rate);
+		//IntertimeProcess service_process = new ExponentialOverheadIntertimeProcess(service_rate, (2.92887566138+1.45744708995)/100, 2/100);
 		//IntertimeProcess service_process = new LeakyBucketServiceProcess(10, service_rate,
 		//		new ExponentialIntertimeProcess(service_rate), true);
 		
