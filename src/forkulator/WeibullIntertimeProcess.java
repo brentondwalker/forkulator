@@ -7,6 +7,11 @@ import org.apache.commons.math3.distribution.WeibullDistribution;
 /**
  * With this we only take the shape parameter and adjust the scale
  * parameter to maintain a mean of 1.0.
+ * Idea to do this from https://arxiv.org/pdf/1403.5996.pdf
+ * 
+ * - shape of 0.25 looks heavy-tailed
+ * - shape of 1.0 looks exponential
+ * - shape of 4.0 looks roughly Gaussian
  * 
  * @author brenton
  *
@@ -38,5 +43,20 @@ public class WeibullIntertimeProcess extends IntertimeProcess {
 		return new WeibullIntertimeProcess(shape);
 	}
 
+	/**
+	 * The main routine here just produces a number of samples for
+	 * testing purposes.
+	 * 
+	 * @param args
+	 */
+	public static void main(String[] args) {
+		double shape = Double.parseDouble(args[0]);
+		int n = Integer.parseInt(args[1]);
+
+		WeibullIntertimeProcess f = new WeibullIntertimeProcess(shape);
+		for (int i=0; i<n; i++) {
+			System.out.println(f.nextInterval());
+		}
+	}
 }
 
