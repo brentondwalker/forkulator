@@ -112,9 +112,9 @@ public class FJSimulator {
 				// schedule the next job arrival
 				if (jobs_processed < num_jobs) {
 					double interval = arrival_process.nextInterval();
-					if ((interval < 0.0) || (interval>1000)) {
-						System.err.println("WARNING: inter-arrival time of "+interval);
-					}
+					//if ((interval < 0.0) || (interval>1000)) {
+					//	System.err.println("WARNING: inter-arrival time of "+interval);
+					//}
 					double next_time = et.time + interval;
 					this.addEvent(new QJobArrivalEvent(next_time));
 				}
@@ -328,6 +328,8 @@ public class FJSimulator {
 		} else {
 			// set this to be whatever you want
 			arrival_process = new ExponentialIntertimeProcess(arrival_rate);
+			//arrival_process = new FullNormalIntertimeProcess(1.0/0.7, arrival_rate);  // in this case use the argument as the variance
+			//arrival_process = new FullNormalIntertimeProcess(1.0/arrival_rate, 1.0);  // in this case use the argument as the mean
 			//IntertimeProcess arrival_process = new LeakyBucketArrivalProcess(20, arrival_rate,
 			//		new ExponentialIntertimeProcess(arrival_rate), false);
 		}
