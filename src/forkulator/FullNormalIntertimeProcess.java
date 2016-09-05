@@ -119,4 +119,9 @@ public class FullNormalIntertimeProcess extends IntertimeProcess {
 			System.out.println(f.nextInterval());
 		}
 	}
+
+	@Override
+	public String processParameters() {
+		return ""+this.mu+"\t"+this.sigma;
+	}
 }

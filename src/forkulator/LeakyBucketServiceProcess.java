@@ -159,6 +159,9 @@ public class LeakyBucketServiceProcess extends IntertimeProcess {
 		
 	}
 	
-	
+	@Override
+	public String processParameters() {
+		return ""+this.rho+"\t"+this.sigma+"\t"+this.feederProcess.processParameters();
+	}
 	
 }

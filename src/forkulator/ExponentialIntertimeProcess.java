@@ -23,4 +23,9 @@ public class ExponentialIntertimeProcess extends IntertimeProcess {
 		return new ExponentialIntertimeProcess(rate);
 	}
 
+	@Override
+	public String processParameters() {
+		return ""+this.rate;
+	}
+
 }
