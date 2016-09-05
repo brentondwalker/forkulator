@@ -63,8 +63,24 @@ public class FJSimulator {
 			int l_diff = Integer.parseInt(server_queue_type.toLowerCase().substring(3));
 			this.server = new FJKLSingleQueueServer(num_workers, num_workers - l_diff);
 		} else if (server_queue_type.toLowerCase().startsWith("msw")) {
+			// multi-stage worker-queue
 			int num_stages = Integer.parseInt(server_queue_type.toLowerCase().substring(3));
 			this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages);
+		} else if (server_queue_type.toLowerCase().startsWith("mse")) {
+			// multi-server with erlang service times
+			// use num_tasks as the erlang parameter
+			//XXX This is ugly.  I am not happy about this.
+			ErlangIntertimeProcess sp = (ErlangIntertimeProcess)service_process;
+			this.service_process = new ErlangIntertimeProcess(sp.rate, num_tasks);
+			this.num_tasks = 1;
+			if (server_queue_type.toLowerCase().equals("mses")) {
+				this.server = new FJSingleQueueServer(num_workers);
+			} else if (server_queue_type.toLowerCase().equals("msew")) {
+				this.server = new FJWorkerQueueServer(num_workers);
+			} else {
+				System.err.println("ERROR: unknown server queue type: "+server_queue_type);
+				System.exit(1);
+			}
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);
@@ -335,8 +351,9 @@ public class FJSimulator {
 		}
 		
 		// and the service time process
+		IntertimeProcess service_process = new ErlangIntertimeProcess(service_rate, num_tasks);
 		//IntertimeProcess service_process = new ExponentialIntertimeProcess(service_rate);
-		IntertimeProcess service_process = new WeibullIntertimeProcess(service_rate);
+		//IntertimeProcess service_process = new WeibullIntertimeProcess(service_rate);
 		//IntertimeProcess service_process = new ExponentialOverheadIntertimeProcess(service_rate, (2.92887566138+1.45744708995)/100, 2/100);
 		//IntertimeProcess service_process = new LeakyBucketServiceProcess(10, service_rate,
 		//		new ExponentialIntertimeProcess(service_rate), true);
