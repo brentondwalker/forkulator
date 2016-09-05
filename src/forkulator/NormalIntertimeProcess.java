@@ -62,4 +62,9 @@ public class NormalIntertimeProcess extends IntertimeProcess {
 		return new NormalIntertimeProcess(mu, sigma, round_to_zero);
 	}
 
+	@Override
+	public String processParameters() {
+		return ""+this.mu+"\t"+this.sigma;
+	}
+
 }

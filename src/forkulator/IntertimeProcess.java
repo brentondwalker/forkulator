@@ -50,4 +50,11 @@ public abstract class IntertimeProcess {
 	 */
 	public abstract IntertimeProcess clone();
 	
+	/**
+	 * return a tab-separated string containing the processes parameters
+	 * 
+	 * @return
+	 */
+	public abstract String processParameters();
+	
 }

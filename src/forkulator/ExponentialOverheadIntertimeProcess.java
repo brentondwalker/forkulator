@@ -41,4 +41,10 @@ public class ExponentialOverheadIntertimeProcess extends IntertimeProcess {
 		return new ExponentialOverheadIntertimeProcess(rate, overhead_mean, overhead_variance);
 	}
 
+	@Override
+	public String processParameters() {
+		return ""+this.rate;
+	}
+
+	
 }

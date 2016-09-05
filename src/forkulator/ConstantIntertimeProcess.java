@@ -23,4 +23,9 @@ public class ConstantIntertimeProcess  extends IntertimeProcess {
 		return new ConstantIntertimeProcess(rate);
 	}
 
+	@Override
+	public String processParameters() {
+		return ""+this.rate;
+	}
+
 }
