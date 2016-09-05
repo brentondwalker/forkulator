@@ -22,6 +22,24 @@ public class WeibullIntertimeProcess extends IntertimeProcess {
 	public double scale = 1.0;    // beta   // lambda
 	public WeibullDistribution f = null;
 	
+	/**
+	 * Constructor where you set both shape and scale.
+	 * 
+	 * @param shape
+	 * @param scale
+	 */
+	public WeibullIntertimeProcess(double shape, double scale) {
+		this.shape = shape;
+		this.scale = scale;
+		this.f = new WeibullDistribution(shape, scale);
+	}
+	
+	/**
+	 * Constructor produces weibull inter-times with scale param calculated
+	 * to give expectation of 1.0 for the given shape parameter.
+	 * 
+	 * @param shape
+	 */
 	public WeibullIntertimeProcess(double shape) {
 		this.shape = shape;
 		this.scale = 1.0/Gamma.gamma(1.0 + 1.0/shape);
@@ -57,6 +75,11 @@ public class WeibullIntertimeProcess extends IntertimeProcess {
 		for (int i=0; i<n; i++) {
 			System.out.println(f.nextInterval());
 		}
+	}
+
+	@Override
+	public String processParameters() {
+		return ""+this.shape;
 	}
 }
 

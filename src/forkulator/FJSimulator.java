@@ -5,6 +5,15 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+
+
 /**
  * Simulate fork-join systems.
  * 
@@ -87,7 +96,7 @@ public class FJSimulator {
 		}
 		FJServer.setSimulator(this);
 	}
-
+	
 	
 	/**
 	 * put the initial events in the simulation queue and start processing them
@@ -316,6 +325,44 @@ public class FJSimulator {
 	}
 	
 	
+	public static IntertimeProcess parseProcessSpec(String[] process_spec) {
+		IntertimeProcess process = null;
+		if (process_spec[0].equals("x")) {
+			// exponential
+			double rate = Double.parseDouble(process_spec[1]);
+			process = new ExponentialIntertimeProcess(rate);
+		} else if (process_spec[0].startsWith("e")) {
+			// erlang k
+			double rate = Double.parseDouble(process_spec[1]);
+			int k = Integer.parseInt(process_spec[0].substring(1));
+			process = new ErlangIntertimeProcess(rate, k);
+		} else if (process_spec[0].equals("g") || process_spec[0].equals("n")) {
+			// gaussian/normal
+			double mean = Double.parseDouble(process_spec[1]);
+			double var = Double.parseDouble(process_spec[2]);
+			process = new FullNormalIntertimeProcess(mean, var);
+		} else if (process_spec[0].equals("w")) {
+			// weibull
+			double shape = Double.parseDouble(process_spec[1]);
+			if (process_spec.length == 2) {
+				// normalized to have mean 1.0
+				process = new WeibullIntertimeProcess(shape);
+			} else if (process_spec.length == 3) {
+				double scale = Double.parseDouble(process_spec[2]);
+				process = new WeibullIntertimeProcess(shape, scale);
+			}
+		} else if (process_spec[0].equals("c")) {
+			// constant inter-arrival times
+			double rate = Double.parseDouble(process_spec[1]);
+			process = new ConstantIntertimeProcess(rate);
+		} else {
+			System.err.println("ERROR: unable to parse process spec!");
+			System.exit(1);
+		}
+		
+		return process;
+	}
+	
 	
 	
 	/**
@@ -324,42 +371,61 @@ public class FJSimulator {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		if (args == null || args.length != 8) {
-			System.out.println("usage: FJSimulator <queue_type> <num_workers> <num_tasks> <arrival_rate> <service_rate> <numjobs> <sampling_interval> <filename_base>");
+		//if (args == null || args.length != 8) {
+		//	System.out.println("usage: FJSimulator <queue_type> <num_workers> <num_tasks> <arrival_rate> <service_rate> <numjobs> <sampling_interval> <filename_base>");
+		//	System.exit(0);
+		//}
+		
+		Options cli_options = new Options();
+		cli_options.addOption("h", "help", false, "print help message");
+		cli_options.addOption("q", "queuetype", true, "queue type code");
+		cli_options.addOption("w", "numworkers", true, "number of workers/servers");
+		cli_options.addOption("t", "numtasks", true, "number of tasks per job");
+		cli_options.addOption("n", "numjobs", true, "number of jobs to run");
+		cli_options.addOption("i", "samplinginterval", true, "samplig interval");
+		cli_options.addOption("o", "outfile", true, "the base name of the output files");
+		cli_options.addOption(Option.builder("o").longOpt("outfile").hasArg().required().desc("the base name of the output files").build());
+		cli_options.addOption(Option.builder("A").longOpt("arrivalprocess").hasArgs().required().desc("arrival process").build());
+		cli_options.addOption(Option.builder("S").longOpt("serviceprocess").hasArgs().required().desc("service process").build());
+		// TODO: add options for leaky bucket process filters
+		
+		CommandLineParser parser = new DefaultParser();
+		CommandLine options = null;
+		try {
+			options = parser.parse(cli_options, args);
+		} catch (ParseException e) {
+			HelpFormatter formatter = new HelpFormatter();
+			formatter.printHelp("FJSimulator", cli_options);
+			e.printStackTrace();
 			System.exit(0);
 		}
-		String server_queue_type = args[0];
-		int num_workers = Integer.parseInt(args[1]);
-		int num_tasks = Integer.parseInt(args[2]);
-		double arrival_rate = Double.parseDouble(args[3]);
-		double service_rate = Double.parseDouble(args[4]);
-		long num_jobs = Long.parseLong(args[5]);
-		int sampling_interval = Integer.parseInt(args[6]);
-		String outfile_base = args[7];
 		
-		IntertimeProcess arrival_process = null;
-		if (server_queue_type.substring(1).startsWith("kl")) {
-			// for (k,l) servers we use constant-rate arrivals
-			arrival_process = new ConstantIntertimeProcess(arrival_rate);
-		} else {
-			// set this to be whatever you want
-			arrival_process = new ExponentialIntertimeProcess(arrival_rate);
-			//arrival_process = new FullNormalIntertimeProcess(1.0/0.7, arrival_rate);  // in this case use the argument as the variance
-			//arrival_process = new FullNormalIntertimeProcess(1.0/arrival_rate, 1.0);  // in this case use the argument as the mean
-			//IntertimeProcess arrival_process = new LeakyBucketArrivalProcess(20, arrival_rate,
-			//		new ExponentialIntertimeProcess(arrival_rate), false);
-		}
+		String server_queue_type = options.getOptionValue("q");
+		int num_workers = Integer.parseInt(options.getOptionValue("w"));
+		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
+		long num_jobs = Long.parseLong(options.getOptionValue("n"));
+		int sampling_interval = Integer.parseInt(options.getOptionValue("i"));
+		String outfile_base = options.getOptionValue("o");
 		
-		// and the service time process
-		IntertimeProcess service_process = new ErlangIntertimeProcess(service_rate, num_tasks);
-		//IntertimeProcess service_process = new ExponentialIntertimeProcess(service_rate);
-		//IntertimeProcess service_process = new WeibullIntertimeProcess(service_rate);
-		//IntertimeProcess service_process = new ExponentialOverheadIntertimeProcess(service_rate, (2.92887566138+1.45744708995)/100, 2/100);
-		//IntertimeProcess service_process = new LeakyBucketServiceProcess(10, service_rate,
-		//		new ExponentialIntertimeProcess(service_rate), true);
+		//
+		// figure out the arrival process
+		//
+		String[] arrival_process_spec = options.getOptionValues("A");
+		IntertimeProcess arrival_process = FJSimulator.parseProcessSpec(arrival_process_spec);
 		
+		//
+		// figure out the service process
+		//
+		String[] service_process_spec = options.getOptionValues("S");
+		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
+		
+		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator((int)(1 + num_jobs/sampling_interval));
+		
+		// simulator
 		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
+
+		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 		
 		sim.printExperimentPath(outfile_base);
@@ -373,8 +439,8 @@ public class FJSimulator {
 				num_workers
 				+"\t"+num_tasks
 				+"\t"+sim.server.num_stages
-				+"\t"+arrival_rate
-				+"\t"+service_rate
+				+"\t"+sim.arrival_process.processParameters()
+				+"\t"+sim.service_process.processParameters()
 				+"\t"+means.get(0) // sojourn mean
 				+"\t"+means.get(1) // waiting mean
 				+"\t"+means.get(2) // service mean
