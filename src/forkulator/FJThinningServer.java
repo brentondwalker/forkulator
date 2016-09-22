@@ -81,6 +81,10 @@ public class FJThinningServer extends FJServer {
 	 * In a thinning server, all tasks from a job go on the same server.
 	 * The server can be chosen randomly or deterministically (round-robin).
 	 * 
+	 * Note: with the thinning server you could have k tasks with exponential service times
+	 *       per job, or equivalently one task with erlang-k service time, which should
+	 *       run faster.
+	 * 
 	 * @param job
 	 * @param sample
 	 */
@@ -102,7 +106,7 @@ public class FJThinningServer extends FJServer {
 			worker_index = (worker_index + 1) % num_workers;
 		}
 		while ((t = job.nextTask()) != null) {
-			worker_queues[wi].add(t);
+			workers[0][wi].queue.add(t);
 		}
 		
 		// this just added the tasks to the queues.  Check if any
@@ -117,11 +121,12 @@ public class FJThinningServer extends FJServer {
 	 * 
 	 * With in the thinning server the task can't simply depart, though.  The
 	 * jobs need to be resequenced.  If a job has completed, we put it into the
-	 * departure queue and then try to clear any jobs from te departure queue.
+	 * departure queue and then try to clear any jobs from the departure queue.
 	 * 
 	 * @param workerId
 	 * @param time
 	 */
+	
 	public void taskCompleted(FJWorker worker, double time) {
 		if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
 		FJTask task = worker.current_task;
@@ -167,11 +172,10 @@ public class FJThinningServer extends FJServer {
 	@Override
 	public int queueLength() {
 		int lsum = 0;
-		for (Queue<FJTask> q : worker_queues) {
-			lsum += q.size();
-		}
-		return (lsum / worker_queues.length);
+		for (FJWorker w : workers[0])
+			lsum += w.queue.size();
+
+		return (lsum / num_workers);
 	}
-	
 	
 }
