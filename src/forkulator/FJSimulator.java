@@ -61,10 +61,18 @@ public class FJSimulator {
 			this.server = new FJSingleQueueServer(num_workers);
 		} else if (server_queue_type.toLowerCase().equals("w")) {
 			this.server = new FJWorkerQueueServer(num_workers);
-		} else if (server_queue_type.toLowerCase().equals("td")) {
-			this.server = new FJThinningServer(num_workers, false);
-		} else if (server_queue_type.toLowerCase().equals("tr")) {
-			this.server = new FJThinningServer(num_workers, true);
+		} else if (server_queue_type.toLowerCase().startsWith("td")) {
+			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
+				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
+			} else {
+				this.server = new FJThinningServer(num_workers, false, false);
+			}
+		} else if (server_queue_type.toLowerCase().startsWith("tr")) {
+			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
+				this.server = new FJThinningServer(num_workers, true, true);  // resequencing
+			} else {
+				this.server = new FJThinningServer(num_workers, true, false);
+			}
 		} else if (server_queue_type.toLowerCase().startsWith("wkl")) {
 			int l_diff = Integer.parseInt(server_queue_type.toLowerCase().substring(3));
 			this.server = new FJKLWorkerQueueServer(num_workers, num_workers - l_diff);

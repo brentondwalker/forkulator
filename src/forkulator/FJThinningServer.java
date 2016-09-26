@@ -10,7 +10,7 @@ public class FJThinningServer extends FJServer {
 	/**
 	 * The thinning server is special because
 	 * - jobs are mapped entirely to one server
-	 * - the jobs must be resequenced before they depart
+	 * - the jobs (optionally) must be resequenced before they depart
 	 * 
 	 * The 2nd fact requires us to keep a queue pile of jobs that have completed
 	 * servicing, but are still waiting to depart. 
@@ -33,24 +33,37 @@ public class FJThinningServer extends FJServer {
 	 */
 	boolean random_thinning = false;
 	protected static Random rand = new Random();
-
+	
 	/**
-	 * Constructor
-	 * 
+	 * We optionally can require resequencing of jobs before they depart.
+	 * With reqsequencing job n cannot depart before job n-1
+	 */
+	boolean resequencing = false;
+	
+	
+	/**
 	 * Allocate a FJJob queue for each worker.
 	 * 
 	 * @param num_workers
+	 * @param random_thinning
+	 * @param resequencing
 	 */
-	public FJThinningServer(int num_workers, boolean random_thinning) {
+	public FJThinningServer(int num_workers, boolean random_thinning, boolean resequencing) {
 		super(num_workers);
 		
 		this.random_thinning = random_thinning;
+		
+		this.resequencing = resequencing;
 		
 		for (int i=0; i<num_workers; i++) {
 			workers[0][i].queue = new LinkedList<FJTask>();
 		}
 	}
-
+	
+	public FJThinningServer(int num_workers, boolean random_thinning) {
+		this(num_workers, random_thinning, false);
+	}
+	
 	public FJThinningServer(int num_workers) {
 		this(num_workers, false);
 	}
@@ -145,18 +158,26 @@ public class FJThinningServer extends FJServer {
 			// it is the last, record the completion time
 			task.job.completion_time = time;
 			
-			// and add it to the departure set
-			postservice_jobs.add(task.job);
-			
-			//System.out.println("postservice_jobs: "+postservice_jobs.size());
-			//System.out.println("first.ID: "+postservice_jobs.first().ID+"    job_departure_index: "+job_departure_index);
-			// check if any postservice_jobs can be cleared
-			while ((! postservice_jobs.isEmpty()) && (postservice_jobs.first().ID == (job_departure_index+1))) {
-				FJJob j = postservice_jobs.pollFirst();
-				job_departure_index++;
-				j.departure_time = time;
+			// if we are resequencing, do this complicated stuff
+			if (resequencing) {
+				// and add it to the departure set
+				postservice_jobs.add(task.job);
+
+				//System.out.println("postservice_jobs: "+postservice_jobs.size());
+				//System.out.println("first.ID: "+postservice_jobs.first().ID+"    job_departure_index: "+job_departure_index);
+				// check if any postservice_jobs can be cleared
+				while ((! postservice_jobs.isEmpty()) && (postservice_jobs.first().ID == (job_departure_index+1))) {
+					FJJob j = postservice_jobs.pollFirst();
+					job_departure_index++;
+					j.departure_time = time;
+					//System.out.println("JobID: "+task.job.ID+"  set departure time: "+time);
+					j.dispose();
+				}
+			} else {
+				// otherwise the job departs immediately
+				task.job.departure_time = time;
 				//System.out.println("JobID: "+task.job.ID+"  set departure time: "+time);
-				j.dispose();
+				task.job.dispose();
 			}
 		}
 		
