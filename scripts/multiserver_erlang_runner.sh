@@ -8,4 +8,9 @@ java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" fork
 java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x $2 -S e32 1.0 -w 32 -t 1 -n 1000000000 -i 100 -o testdata/multiserver_erlang_$1q_l$3_mu10_w32 >> testdata/multiserver_erlang_$1q_l$3_means.dat &
 java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x $2 -S e64 1.0 -w 64 -t 1 -n 1000000000 -i 100 -o testdata/multiserver_erlang_$1q_l$3_mu10_w64 >> testdata/multiserver_erlang_$1q_l$3_means.dat
 
+for job in `jobs -p`
+do
+echo $job
+    wait $job || let "FAIL+=1"
+done
 
