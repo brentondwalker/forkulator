@@ -81,22 +81,14 @@ public class FJSimulator {
 			this.server = new FJKLSingleQueueServer(num_workers, num_workers - l_diff);
 		} else if (server_queue_type.toLowerCase().startsWith("msw")) {
 			// multi-stage worker-queue
-			int num_stages = Integer.parseInt(server_queue_type.toLowerCase().substring(3));
-			this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages);
-		} else if (server_queue_type.toLowerCase().startsWith("mse")) {
-			// multi-server with erlang service times
-			// use num_tasks as the erlang parameter
-			//XXX This is ugly.  I am not happy about this.
-			ErlangIntertimeProcess sp = (ErlangIntertimeProcess)service_process;
-			this.service_process = new ErlangIntertimeProcess(sp.rate, num_tasks);
-			this.num_tasks = 1;
-			if (server_queue_type.toLowerCase().equals("mses")) {
-				this.server = new FJSingleQueueServer(num_workers);
-			} else if (server_queue_type.toLowerCase().equals("msew")) {
-				this.server = new FJWorkerQueueServer(num_workers);
+			if (server_queue_type.toLowerCase().startsWith("mswi")) {
+				// independent service times at each stage
+				int num_stages = Integer.parseInt(server_queue_type.toLowerCase().substring(4));
+				this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages, true);
 			} else {
-				System.err.println("ERROR: unknown server queue type: "+server_queue_type);
-				System.exit(1);
+				// otherwise service times of each task stay the same across all stages
+				int num_stages = Integer.parseInt(server_queue_type.toLowerCase().substring(3));
+				this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages, false);
 			}
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);

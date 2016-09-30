@@ -24,13 +24,13 @@ public class FJMultiStageWorkerQueueServer extends FJServer {
 	 * In the multi-stage system we need a worker_index for each stage.
 	 */
 	private int worker_index[] = null;
-
-	/**
-	 * The superclass has an array of workers, but we need more workers for the
-	 * multi-stage system.
-	 */
-	public FJWorker[][] workers = null;
 	
+	/**
+	 * Optionally re-sample the service times of the tasks between stages.
+	 * If this is false the service times of the tasks will be 100% correlated
+	 * across stages, which changes the behavior of the system.
+	 */
+	public boolean independent_stages = false;
 	
 	/**
 	 * Constructor
@@ -39,10 +39,11 @@ public class FJMultiStageWorkerQueueServer extends FJServer {
 	 * 
 	 * @param num_workers
 	 */
-	public FJMultiStageWorkerQueueServer(int num_workers, int num_stages) {
+	public FJMultiStageWorkerQueueServer(int num_workers, int num_stages, boolean independent_stages) {
 		super(num_workers);
 		
 		this.num_stages = num_stages;
+		this.independent_stages = independent_stages;
 		
 		this.worker_index = new int[num_stages];
 		for (int j=0; j<num_stages; j++)
@@ -159,9 +160,13 @@ public class FJMultiStageWorkerQueueServer extends FJServer {
 				//
 				// reset the tasks to completed=false and queue them
 				// with the next stage
+				// optionally resample the tasks' service times
 				int s = worker.stage + 1;
 				for (FJTask t : task.job.tasks) {
 					t.completed = false;
+					if (independent_stages) {
+						t.resampleServiceTime(time);
+					}
 					workers[s][worker_index[s]].queue.add(t);
 					worker_index[s] = (worker_index[s] + 1) % num_workers;
 				}
