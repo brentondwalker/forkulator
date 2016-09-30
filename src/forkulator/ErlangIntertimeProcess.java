@@ -32,7 +32,7 @@ public class ErlangIntertimeProcess extends IntertimeProcess {
 
 	@Override
 	public String processParameters() {
-		return ""+this.rate;
+		return ""+this.k+"\t"+this.rate;
 	}
 	
 
