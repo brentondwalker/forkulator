@@ -7,7 +7,9 @@ import java.util.LinkedList;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
+//import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.PosixParser;
+import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
@@ -18,6 +20,8 @@ import org.apache.commons.cli.ParseException;
  * Simulate fork-join systems.
  * 
  * java -Xmx5g -cp "lib/commons-math3-3.6.1.jar:bin" forkulator.FJSimulator w 1 1 0.7 1.0 100000000 1000 fjpaper-data/mm1boundsmu1lambda07.dat
+ * 
+ * sbt "runMain forkulator.FJSimulator -q w -A x 0.5 -S x 1.0 -w 10 -t 10 -i 1 -n 1000 -o testrun"
  * 
  * @author brenton
  *
@@ -383,13 +387,17 @@ public class FJSimulator {
 		cli_options.addOption("t", "numtasks", true, "number of tasks per job");
 		cli_options.addOption("n", "numjobs", true, "number of jobs to run");
 		cli_options.addOption("i", "samplinginterval", true, "samplig interval");
-		cli_options.addOption("o", "outfile", true, "the base name of the output files");
-		cli_options.addOption(Option.builder("o").longOpt("outfile").hasArg().required().desc("the base name of the output files").build());
-		cli_options.addOption(Option.builder("A").longOpt("arrivalprocess").hasArgs().required().desc("arrival process").build());
-		cli_options.addOption(Option.builder("S").longOpt("serviceprocess").hasArgs().required().desc("service process").build());
+		//cli_options.addOption("o", "outfile", true, "the base name of the output files");
+		//cli_options.addOption(Option.builder("o").longOpt("outfile").hasArg().required().desc("the base name of the output files").build());
+		//cli_options.addOption(Option.builder("A").longOpt("arrivalprocess").hasArgs().required().desc("arrival process").build());
+		//cli_options.addOption(Option.builder("S").longOpt("serviceprocess").hasArgs().required().desc("service process").build());
+		cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().isRequired().withDescription("the base name of the output files").create("o"));
+		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
+		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
 		// TODO: add options for leaky bucket process filters
 		
-		CommandLineParser parser = new DefaultParser();
+		//CommandLineParser parser = new DefaultParser();
+		CommandLineParser parser = new PosixParser();
 		CommandLine options = null;
 		try {
 			options = parser.parse(cli_options, args);
