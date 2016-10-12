@@ -6,4 +6,4 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "1.6.1" % "provided"
 libraryDependencies += "commons-cli" % "commons-cli" % "1.2" % "provided"
 libraryDependencies += "org.apache.commons" % "commons-math3" % "3.6.1"
 resolvers += Resolver.mavenLocal
-mainClass in assembly := Some("forlulator.FJSimulator")
+//mainClass in assembly := Some("forlulator.FJSimulator")
