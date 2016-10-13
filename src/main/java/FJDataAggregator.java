@@ -32,7 +32,6 @@ public class FJDataAggregator implements Serializable {
 	public int num_samples = 0;
 	
 	// arrays to hold the various data we collect
-	public long job_id[] = null;
 	public double job_arrival_time[] = null;
 	public double job_start_time[] = null;
 	public double job_completion_time[] = null;
@@ -53,7 +52,6 @@ public class FJDataAggregator implements Serializable {
 	 */
 	public FJDataAggregator(int max_samples) {
 		this.max_samples = max_samples;
-		job_id = new long[max_samples];
 		job_arrival_time = new double[max_samples];
 		job_start_time = new double[max_samples];
 		job_completion_time = new double[max_samples];
@@ -67,7 +65,6 @@ public class FJDataAggregator implements Serializable {
 	 * @param job
 	 */
 	public void sample(FJJob job) {
-		job_id[num_samples] = job.ID;
 		job_arrival_time[num_samples] = job.arrival_time;
 		double jst = job.tasks[0].start_time;
 		for (FJTask task : job.tasks) {

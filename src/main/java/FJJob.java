@@ -4,9 +4,6 @@ import java.util.ArrayList;
 
 public class FJJob implements Comparable<FJJob> {
 
-	private static long ID_counter = 0;
-	public long ID = ID_counter++;
-	
 	public double arrival_time = 0.0;
 	public double completion_time = 0.0;
 	public double departure_time = 0.0;
@@ -16,9 +13,7 @@ public class FJJob implements Comparable<FJJob> {
 	public boolean completed = false;
 	public boolean fully_serviced = false;
 	public boolean sample = false;
-	
-	public static ArrayList<IntertimeProcess> service_processes = null;
-	
+		
 	/**
 	 * Constructor
 	 * 
@@ -29,28 +24,9 @@ public class FJJob implements Comparable<FJJob> {
 	public FJJob(int num_tasks, IntertimeProcess service_process, double arrival_time) {
 		this.num_tasks = num_tasks;
 		
-		// in the first call set up an independent service_process for each
-		// task "channel".  That is, task 1 will always come from the same
-		// service process, all task 2's will etc...
-		// If the number of service processes allocated before is not enough,
-		// add more.
-		// I am not really happy with this implicit initialization.
-		if (service_processes == null) {
-			service_processes = new ArrayList<IntertimeProcess>(num_tasks);
-			System.err.println("service_processes.size="+service_processes.size());
-			for (int i=0; i<num_tasks; i++) {
-				service_processes.add(i, service_process.clone());
-			}
-		} else if (service_processes.size() < num_tasks) {
-			service_processes.ensureCapacity(num_tasks);
-			for (int i=service_processes.size(); i<num_tasks; i++) {
-				service_processes.add(i, service_process.clone());
-			}
-		}
-		
 		tasks = new FJTask[this.num_tasks];
 		for (int i=0; i<this.num_tasks; i++) {
-			tasks[i] = new FJTask(service_processes.get(i), arrival_time, this);
+			tasks[i] = new FJTask(service_process, arrival_time, this);
 		}
 	}
 	
@@ -82,9 +58,9 @@ public class FJJob implements Comparable<FJJob> {
 	 * 
 	 */
 	public void dispose() {
-		if (this.sample && FJSimulator.data_aggregator != null) {
-			FJSimulator.data_aggregator.sample(this);
-		}
+		//if (this.sample && FJSimulator.data_aggregator != null) {
+		//	FJSimulator.data_aggregator.sample(this);
+		//}
 		for (FJTask t : this.tasks) {
 			t.job = null;
 		}
@@ -99,9 +75,9 @@ public class FJJob implements Comparable<FJJob> {
 	 */
 	@Override
 	public int compareTo(FJJob o) {
-		if (ID < o.ID) {
+		if (arrival_time < o.arrival_time) {
 			return -1;
-		} else if (ID > o.ID) {
+		} else if (arrival_time > o.arrival_time) {
 			return 1;
 		}
 		return 0;
