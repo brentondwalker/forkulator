@@ -47,7 +47,7 @@ public class FJSimulator {
 	public double binwidth = 0.1;
 	public double quanile_epsilon = 1e-6;
 	
-	public static FJDataAggregator data_aggregator = null;
+	public FJDataAggregator data_aggregator = null;
 	
 	
 	/**
@@ -102,7 +102,7 @@ public class FJSimulator {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);
 		}
-		FJServer.setSimulator(this);
+		this.server.setSimulator(this);
 	}
 	
 	
@@ -313,10 +313,12 @@ public class FJSimulator {
 					System.exit(1);
 				}
 				max_value = Math.max(max_value, job_sojourn);
+				int task_count = 0;
+				int job_count = 0;
 				if (server.sampled_jobs.size() < 1000) {
 					for (FJTask task : job.tasks) {
-						writer.write(task.ID
-								+"\t"+job.ID
+						writer.write(task_count++
+								+"\t"+job_count
 								+"\t"+job.arrival_time
 								+"\t"+job_start_time
 								+"\t"+job_completion_time
@@ -325,6 +327,7 @@ public class FJSimulator {
 								+"\t"+task.completion_time
 								+"\n");
 					}
+					job_count++;
 				}
 			}
 		} catch (Exception e) {
