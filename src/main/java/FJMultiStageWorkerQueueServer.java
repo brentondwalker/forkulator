@@ -132,7 +132,7 @@ public class FJMultiStageWorkerQueueServer extends FJServer {
 	 * @param time
 	 */
 	public void taskCompleted(FJWorker worker, double time) {
-		if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
+		//if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
 		FJTask task = worker.current_task;
 		task.completion_time = time;
 		task.completed = true;

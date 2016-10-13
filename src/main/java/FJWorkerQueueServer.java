@@ -82,7 +82,7 @@ public class FJWorkerQueueServer extends FJServer {
 	 * @param time
 	 */
 	public void taskCompleted(FJWorker worker, double time) {
-		if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
+		//if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
 		FJTask task = worker.current_task;
 		task.completion_time = time;
 		task.completed = true;
@@ -102,8 +102,8 @@ public class FJWorkerQueueServer extends FJServer {
 			// for this type of server it is also the departure time
 			task.job.departure_time = time;
 			
-			// dispose of the job
-			task.job.dispose();
+			// sample and dispose of the job
+			jobDepart(task.job);
 		}
 		
 		serviceTask(worker, worker.queue.poll(), time);
