@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.zip.GZIPOutputStream;
+import java.io.Serializable;
 
 /**
  * It is convenient to sample the actual jobs (and tasks) as we run,
@@ -22,7 +23,7 @@ import java.util.zip.GZIPOutputStream;
  * @author brenton
  *
  */
-public class FJDataAggregator {
+public class FJDataAggregator implements Serializable {
 	
 	// the maximum number of samples we will aggregate
 	public int max_samples = 0;
@@ -185,6 +186,32 @@ public class FJDataAggregator {
 			} catch (Exception e) {
 			}
 		}
+	}
+
+	
+	/**
+	 * Save the raw sojourn, waiting and service times for jobs.
+	 * This version takes the BufferedWriter and just adds more lines to it.
+	 * 
+	 * Save the file in compressed format because these will get huge.
+	 * 
+	 * @param outfile_base
+	 */
+	public void appendRawJobData(BufferedWriter writer) {
+		try {
+			for (int i=0; i<num_samples; i++) {
+				double job_waiting_time = job_start_time[i] - job_arrival_time[i];
+				double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
+				double job_service_time = job_completion_time[i] - job_start_time[i];
+				writer.write(i
+						+"\t"+job_sojourn_time
+						+"\t"+job_waiting_time
+						+"\t"+job_service_time+"\n");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		System.out.println("   ...wrote "+num_samples+" samples");
 	}
 
 	

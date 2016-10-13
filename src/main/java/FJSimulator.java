@@ -112,12 +112,16 @@ public class FJSimulator {
 	 * @param num_jobs
 	 */
 	public void run(long num_jobs, int sampling_interval) {
+		// compute the warmup period.
+		// Let's say sampling_interval*10*num_stages
+		int warmup_interval = sampling_interval * 10 * server.num_stages;
+		
 		// before we generated all the job arrivals at once
 		// now to save space we only have one job arrival in the queue at a time
 		event_queue.add(new QJobArrivalEvent(arrival_process.nextInterval()));
 		
 		// start processing events
-		int sampling_countdown = sampling_interval;
+		int sampling_countdown = 0;
 		long jobs_processed = 0;
 		while (! event_queue.isEmpty()) {
 			if (this.server.queueLength() > FJSimulator.QUEUE_STABILITY_THRESHOLD) {
@@ -134,16 +138,18 @@ public class FJSimulator {
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
 				FJJob job = new FJJob(num_tasks, service_process, e.time);
 				job.arrival_time = et.time;
-				if (sampling_countdown==0) {
-					server.enqueJob(job, true);
-					sampling_countdown = sampling_interval;
-				} else {
-					server.enqueJob(job, false);
+				if (jobs_processed > warmup_interval) {
+					if (sampling_countdown==0) {
+						server.enqueJob(job, true);
+						sampling_countdown = sampling_interval;
+					} else {
+						server.enqueJob(job, false);
+					}
+					sampling_countdown--;
 				}
-				sampling_countdown--;
 				
 				// schedule the next job arrival
-				if (jobs_processed < num_jobs) {
+				if (jobs_processed < (num_jobs + warmup_interval)) {
 					double interval = arrival_process.nextInterval();
 					//if ((interval < 0.0) || (interval>1000)) {
 					//	System.err.println("WARNING: inter-arrival time of "+interval);
