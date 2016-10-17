@@ -37,10 +37,10 @@ We include a runner script, `forkulator.sh`, that saves you from having to type 
 * `-q tdr` deterministic thinning with resequencing
 * `-q tr` random thinning without resequencing
 * `-q trr` random thinning with resequencing
-* `-q wkl<l_diff>` standard "worker-queue" _(k,l)_ system with *k-l=l_diff*
-* `-q skl<l_diff>` "single-queue" _(k,l)_ system with *k-l=l_diff*
-* `-q msw<h>` multi-stage worker-queue system with _h_ stages.  Each task has the same service time at each stage.
-* `-q mswi<h>` multi-stage worker-queue system with _h_ stages.  The tasks' service times at each stage are iid.
+* `-q wkl <l_diff>` standard "worker-queue" _(k,l)_ system with *k-l=l_diff*
+* `-q skl <l_diff>` "single-queue" _(k,l)_ system with *k-l=l_diff*
+* `-q msw <h>` multi-stage worker-queue system with _h_ stages.  Each task has the same service time at each stage.
+* `-q mswi <h>` multi-stage worker-queue system with _h_ stages.  The tasks' service times at each stage are iid.
 
 
 ### Arrival/Service Processes
@@ -60,7 +60,7 @@ We include a runner script, `forkulator.sh`, that saves you from having to type 
 #### Erlang-_k_
 
 ```
--A e<k> <rate>
+-A e <k> <rate>
 ```
 
 #### Gaussian
