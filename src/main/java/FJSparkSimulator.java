@@ -1,7 +1,6 @@
 package forkulator;
 
 import org.apache.spark.api.java.JavaSparkContext;
-//import com.sun.xml.internal.bind.v2.schemagen.xmlschema.List;
 import org.apache.spark.api.java.JavaRDD;
 import java.io.BufferedWriter;
 import java.io.File;

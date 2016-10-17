@@ -405,10 +405,6 @@ public class FJSimulator {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		//if (args == null || args.length != 8) {
-		//	System.out.println("usage: FJSimulator <queue_type> <num_workers> <num_tasks> <arrival_rate> <service_rate> <numjobs> <sampling_interval> <filename_base>");
-		//	System.exit(0);
-		//}
 		
 		Options cli_options = new Options();
 		cli_options.addOption("h", "help", false, "print help message");
