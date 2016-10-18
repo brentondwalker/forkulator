@@ -1,0 +1,16 @@
+#!/bin/bash
+
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.05 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l005_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.1 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l01_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.2 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l02_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.3 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l03_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.4 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l04_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.5 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l05_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.6 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l06_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.7 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l07_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.8 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l08_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.9 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l09_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.95 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l095_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+java -Xmx5g -cp "bin:lib/commons-math3-3.6.1.jar:lib/commons-cli-1.3.1.jar" forkulator.FJSimulator -q $1 -A x 0.98 -S e$2 1.0 -w $2 -t 1 -n 100000000 -i 100 -o testdata/multiserver_erlang_loads_$1q_k$2_l098_mu10_w$2 >> testdata/multiserver_erlang_loads_$1q_k$2_means.dat
+
+

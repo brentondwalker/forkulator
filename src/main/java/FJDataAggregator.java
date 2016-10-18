@@ -25,11 +25,6 @@ import java.io.Serializable;
  */
 public class FJDataAggregator implements Serializable {
 	
-	/**
-	 * Supposed to add this to say the class implements Serializable.
-	 */
-	private static final long serialVersionUID = 1L;
-
 	// the maximum number of samples we will aggregate
 	public int max_samples = 0;
 	
@@ -194,7 +189,6 @@ public class FJDataAggregator implements Serializable {
 	/**
 	 * Save the raw sojourn, waiting and service times for jobs.
 	 * This version takes the BufferedWriter and just adds more lines to it.
-	 * This version of the method was added to support running on a Spark cluster.
 	 * 
 	 * Save the file in compressed format because these will get huge.
 	 * 
@@ -219,7 +213,7 @@ public class FJDataAggregator implements Serializable {
 
 	
 	/**
-	 * Compute the means of sojourn, waiting, and service times over (almost) all jobs.
+	 * compute the means of sojourn, waiting, and service times over (almost) all jobs
 	 * 
 	 * @return
 	 */

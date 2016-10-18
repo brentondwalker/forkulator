@@ -1,5 +1,7 @@
 package forkulator;
 
+import java.util.ArrayList;
+
 public class FJJob implements Comparable<FJJob> {
 
 	public double arrival_time = 0.0;

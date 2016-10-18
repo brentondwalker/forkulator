@@ -1,6 +1,7 @@
 package forkulator;
 
 import org.apache.spark.api.java.JavaSparkContext;
+//import com.sun.xml.internal.bind.v2.schemagen.xmlschema.List;
 import org.apache.spark.api.java.JavaRDD;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -80,8 +81,7 @@ public class FJSparkSimulator {
 		FJDataAggregator data_aggregator = new FJDataAggregator(samples_per_slice);
 		
 		// simulator
-		String[] server_queue_spec = options.getOptionValues("q");
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_type, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
 
 		// start the simulator running...
 		sim.run(jobs_per_slice, sampling_interval);
@@ -95,12 +95,12 @@ public class FJSparkSimulator {
 		
 		Options cli_options = new Options();
 		cli_options.addOption("h", "help", false, "print help message");
+		cli_options.addOption("q", "queuetype", true, "queue type code");
 		cli_options.addOption("w", "numworkers", true, "number of workers/servers");
 		cli_options.addOption("t", "numtasks", true, "number of tasks per job");
 		cli_options.addOption("n", "numsamples", true, "number of samples to produce.  Multiply this by the sampling interval to get the number of jobs that will be run");
 		cli_options.addOption("i", "samplinginterval", true, "samplig interval");
 		cli_options.addOption("s", "numslices", true, "the number of slices to divide te job into.  This is ideally a multiple of the number of cores.");
-		cli_options.addOption(OptionBuilder.withLongOpt("queuetype").hasArgs().isRequired().withDescription("queue type and arguments").create("q"));
 		cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().isRequired().withDescription("the base name of the output files").create("o"));
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
@@ -115,7 +115,6 @@ public class FJSparkSimulator {
 			e.printStackTrace();
 			System.exit(0);
 		}
-		System.out.println("options: "+options);
 		
 		// we need to make the options final in order to use them in a lambda expression
 		final CommandLine foptions = options;
@@ -125,7 +124,7 @@ public class FJSparkSimulator {
 		// are more slices than cores they will just execute in tandem.
 		// But it is most efficient if the number of slices is a multiple
 		// of the number of cores.
-		//XXX - It would be nicer to divide this into segments equal to the number of
+		//XXX - It would be nicer to divide this into segments equal to te number of
 		//      cores and write out data as we go.
 		int num_slices = 1;
 		if (options.hasOption("s")) { num_slices = Integer.parseInt(options.getOptionValue("s")); }
