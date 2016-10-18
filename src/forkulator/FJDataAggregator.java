@@ -18,7 +18,7 @@ import java.io.Serializable;
  * This class is a more efficient way to extract just the stats we
  * want from each job as they are disposed.  If we later want to
  * compute something new, we need to modify this class to collect
- * the data suring the experiment.
+ * the data during the experiment.
  * 
  * @author brenton
  *
@@ -81,6 +81,7 @@ public class FJDataAggregator implements Serializable {
 		num_samples++;
 	}
 	
+	
 	/**
 	 * 
 	 * @param binwidth
@@ -94,7 +95,6 @@ public class FJDataAggregator implements Serializable {
 		
 		// initialize the distributions
 		int max_bin = (int)(max_value/binwidth) + 1;
-		//System.err.println("max_bin="+max_bin);
 		job_sojourn_d = new int[max_bin];
 		job_waiting_d = new int[max_bin];
 		job_service_d = new int[max_bin];
@@ -155,6 +155,7 @@ public class FJDataAggregator implements Serializable {
 		}
 	}
 	
+	
 	/**
 	 * Save the raw sojourn, waiting and service times for jobs.
 	 * I was computing and saving the binned distributions already,
@@ -214,7 +215,6 @@ public class FJDataAggregator implements Serializable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		System.out.println("   ...wrote "+num_samples+" samples");
 	}
 
 	
@@ -282,7 +282,7 @@ public class FJDataAggregator implements Serializable {
 			for (int i=0; i<dpdf.length; i++) {
 				ccdf -= dpdf[i];
 				if (ccdf <= limit) {
-					System.err.println("exceeded epsilon="+epsilon+" at i="+i+"  where d[i]="+dpdf[i]);
+					//System.err.println("exceeded epsilon="+epsilon+" at i="+i+"  where d[i]="+dpdf[i]);
 					//return ( binwidth*(i*dpdf[i] +(i-1)*dpdf[i-1])/(1.0*dpdf[i]+dpdf[i-1]));
 					return binwidth*( (i-1) + (limit - last_ccdf)/(ccdf - last_ccdf) );
 				}

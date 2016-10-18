@@ -1,11 +1,13 @@
 package forkulator;
 
-import java.util.LinkedList;
-
+/**
+ * Abstract superclass for all event types handled by the simulator.
+ * 
+ * @author brenton
+ *
+ */
 public abstract class QEvent {
 
 	public double time = 0.0;
-		
-	public abstract void happen();
 	
 }

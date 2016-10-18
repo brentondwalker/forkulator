@@ -170,12 +170,16 @@ public class FJThinningServer extends FJServer {
 					FJJob j = postservice_jobs.pollFirst();
 					job_departure_index++;
 					j.departure_time = time;
-					j.dispose();
+					
+					// sample and dispose of the job
+					jobDepart(j);
 				}
 			} else {
 				// otherwise the job departs immediately
 				task.job.departure_time = time;
-				task.job.dispose();
+
+				// sample and dispose of the job
+				jobDepart(task.job);
 			}
 		}
 		

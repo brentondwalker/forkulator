@@ -131,8 +131,8 @@ public class FJKLWorkerQueueServer extends FJServer {
 				total_complete = total_complete && t.completed;
 			}
 			if (total_complete) {
-				FJJob j = task.job;
-				j.dispose();
+				// sample and dispose of the job
+				jobDepart(task.job);
 			}
 		}
 		
