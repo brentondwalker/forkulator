@@ -7,15 +7,25 @@ import java.util.LinkedList;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.PosixParser;
 import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.commons.cli.PosixParser;
 
 
 /**
  * Simulate fork-join systems.
+ * 
+ * java -Xmx5g -cp "lib/commons-math3-3.6.1.jar:bin" forkulator.FJSimulator w 1 1 0.7 1.0 100000000 1000 fjpaper-data/mm1boundsmu1lambda07.dat
+ * 
+ * sbt assembly
+ * 
+ * sbt "runMain forkulator.FJSimulator -q w -A x 0.5 -S x 1.0 -w 10 -t 10 -i 1 -n 1000 -o testrun"
+ * 
+ * ./bin/spark-submit --master spark://172.23.27.20:7077  --conf spark.cores.max=2 --class forkulator.FJSimulator /home/brenton/properbounds/forkulator-sbt/target/scala-2.10/forkulator-assembly-1.0.jar -q w -A x 0.5 -S x 1.0 -w 10 -t 10 -i 1 -n 10000000 -o testrun
+ * 
+ * ./bin/spark-submit --master spark://172.23.27.10:7077  --executor-memory 40g --class forkulator.FJSparkSimulator /home/brenton/properbounds/forkulator-sbt/target/scala-2.10/forkulator-assembly-1.0.jar -q w -A x 0.5 -S x 1.0 -w 100 -t 100 -i 100 -n 1000000 -o testrun -s 500
  * 
  * @author brenton
  *
@@ -37,17 +47,9 @@ public class FJSimulator {
 	public double binwidth = 0.1;
 	public double quanile_epsilon = 1e-6;
 	
-	public static FJDataAggregator data_aggregator = null;
+	public FJDataAggregator data_aggregator = null;
 	
 	
-	/**
-	 * constructor
-	 * 
-	 * @param num_workers
-	 * @param num_tasks
-	 * @param arrival_rate
-	 * @param service_rate
-	 */
 	/**
 	 * constructor
 	 * 
@@ -83,14 +85,14 @@ public class FJSimulator {
 			} else {
 				this.server = new FJThinningServer(num_workers, true, false);
 			}
-		} else if (server_queue_type.toLowerCase().startsWith("wkl")) {
+		} else if (server_queue_type.toLowerCase().equals("wkl")) {
 			if (server_queue_spec.length != 2) {
 				System.err.println("ERROR: wkl queue requires a numeric (k-l) parameter");
 				System.exit(0);
 			}
 			int l_diff = Integer.parseInt(server_queue_spec[1]);
 			this.server = new FJKLWorkerQueueServer(num_workers, num_workers - l_diff);
-		} else if (server_queue_type.toLowerCase().startsWith("skl")) {
+		} else if (server_queue_type.toLowerCase().equals("skl")) {
 			if (server_queue_spec.length != 2) {
 				System.err.println("ERROR: wkl queue requires a numeric (k-l) parameter");
 				System.exit(0);
@@ -104,7 +106,7 @@ public class FJSimulator {
 			}
 
 			// multi-stage worker-queue
-			if (server_queue_type.toLowerCase().startsWith("mswi")) {
+			if (server_queue_type.toLowerCase().equals("mswi")) {
 				// independent service times at each stage
 				int num_stages = Integer.parseInt(server_queue_spec[1]);
 				this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages, true);
@@ -127,13 +129,17 @@ public class FJSimulator {
 	 * @param num_jobs
 	 */
 	public void run(long num_jobs, int sampling_interval) {
+		// compute the warmup period.
+		// Let's say sampling_interval*10*num_stages
+		int warmup_interval = sampling_interval * 10 * server.num_stages;
+		
 		// before we generated all the job arrivals at once
 		// now to save space we only have one job arrival in the queue at a time
 		event_queue.add(new QJobArrivalEvent(arrival_process.nextInterval()));
 		
 		// start processing events
 		int sampling_countdown = sampling_interval;
-		long jobs_processed = 0;
+		long jobs_processed = -warmup_interval;
 		while (! event_queue.isEmpty()) {
 			if (this.server.queueLength() > FJSimulator.QUEUE_STABILITY_THRESHOLD) {
 				System.err.println("ERROR: queue exceeded threshold.  The system is unstable.");
@@ -149,13 +155,15 @@ public class FJSimulator {
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
 				FJJob job = new FJJob(num_tasks, service_process, e.time);
 				job.arrival_time = et.time;
-				if (sampling_countdown==0) {
-					server.enqueJob(job, true);
-					sampling_countdown = sampling_interval;
-				} else {
-					server.enqueJob(job, false);
+				if (jobs_processed >= 0) {
+					if (sampling_countdown==0) {
+						server.enqueJob(job, true);
+						sampling_countdown = sampling_interval;
+					} else {
+						server.enqueJob(job, false);
+					}
+					sampling_countdown--;
 				}
-				sampling_countdown--;
 				
 				// schedule the next job arrival
 				if (jobs_processed < num_jobs) {
@@ -322,10 +330,12 @@ public class FJSimulator {
 					System.exit(1);
 				}
 				max_value = Math.max(max_value, job_sojourn);
+				int task_count = 0;
+				int job_count = 0;
 				if (server.sampled_jobs.size() < 1000) {
 					for (FJTask task : job.tasks) {
-						writer.write(task.ID
-								+"\t"+job.ID
+						writer.write(task_count++
+								+"\t"+job_count
 								+"\t"+job.arrival_time
 								+"\t"+job_start_time
 								+"\t"+job_completion_time
@@ -334,6 +344,7 @@ public class FJSimulator {
 								+"\t"+task.completion_time
 								+"\n");
 					}
+					job_count++;
 				}
 			}
 		} catch (Exception e) {
@@ -348,6 +359,13 @@ public class FJSimulator {
 	}
 	
 	
+	/**
+	 * Parse the arguments given for either the arrival or service process, and
+	 * return an appropriately configured IntertimeProcess.
+	 * 
+	 * @param process_spec
+	 * @return
+	 */
 	public static IntertimeProcess parseProcessSpec(String[] process_spec) {
 		IntertimeProcess process = null;
 		if (process_spec[0].equals("x")) {
@@ -394,11 +412,6 @@ public class FJSimulator {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		//if (args == null || args.length != 8) {
-		//	System.out.println("usage: FJSimulator <queue_type> <num_workers> <num_tasks> <arrival_rate> <service_rate> <numjobs> <sampling_interval> <filename_base>");
-		//	System.exit(0);
-		//}
-		
 		
 		Options cli_options = new Options();
 		cli_options.addOption("h", "help", false, "print help message");
@@ -407,16 +420,13 @@ public class FJSimulator {
 		cli_options.addOption("t", "numtasks", true, "number of tasks per job");
 		cli_options.addOption("n", "numsamples", true, "number of samples to produce.  Multiply this by the sampling interval to get the number of jobs that will be run");
 		cli_options.addOption("i", "samplinginterval", true, "samplig interval");
-		cli_options.addOption("s", "numslices", true, "the number of slices to divide te job into.  This is ideally a multiple of the number of cores.");
 		cli_options.addOption(OptionBuilder.withLongOpt("queuetype").hasArgs().isRequired().withDescription("queue type and arguments").create("q"));
 		cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().isRequired().withDescription("the base name of the output files").create("o"));
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
-		//cli_options.addOption(Option.builder("o").longOpt("outfile").hasArg().required().desc("the base name of the output files").build());
-		//cli_options.addOption(Option.builder("A").longOpt("arrivalprocess").hasArgs().required().desc("arrival process").build());
-		//cli_options.addOption(Option.builder("S").longOpt("serviceprocess").hasArgs().required().desc("service process").build());
 		// TODO: add options for leaky bucket process filters
 		
+		//CommandLineParser parser = new DefaultParser();
 		CommandLineParser parser = new PosixParser();
 		CommandLine options = null;
 		try {
@@ -429,8 +439,6 @@ public class FJSimulator {
 		}
 		
 		String[] server_queue_spec = options.getOptionValues("q");
-		System.out.println("server_queue_spec.length="+server_queue_spec.length);
-		
 		int num_workers = Integer.parseInt(options.getOptionValue("w"));
 		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
 		long num_jobs = Long.parseLong(options.getOptionValue("n"));
@@ -454,7 +462,7 @@ public class FJSimulator {
 		
 		// simulator
 		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
-		
+
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 		

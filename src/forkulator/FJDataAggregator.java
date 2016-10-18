@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.zip.GZIPOutputStream;
+import java.io.Serializable;
 
 /**
  * It is convenient to sample the actual jobs (and tasks) as we run,
@@ -22,8 +23,13 @@ import java.util.zip.GZIPOutputStream;
  * @author brenton
  *
  */
-public class FJDataAggregator {
+public class FJDataAggregator implements Serializable {
 	
+	/**
+	 * Supposed to add this to say the class implements Serializable.
+	 */
+	private static final long serialVersionUID = 1L;
+
 	// the maximum number of samples we will aggregate
 	public int max_samples = 0;
 	
@@ -31,7 +37,6 @@ public class FJDataAggregator {
 	public int num_samples = 0;
 	
 	// arrays to hold the various data we collect
-	public long job_id[] = null;
 	public double job_arrival_time[] = null;
 	public double job_start_time[] = null;
 	public double job_completion_time[] = null;
@@ -52,7 +57,6 @@ public class FJDataAggregator {
 	 */
 	public FJDataAggregator(int max_samples) {
 		this.max_samples = max_samples;
-		job_id = new long[max_samples];
 		job_arrival_time = new double[max_samples];
 		job_start_time = new double[max_samples];
 		job_completion_time = new double[max_samples];
@@ -66,7 +70,6 @@ public class FJDataAggregator {
 	 * @param job
 	 */
 	public void sample(FJJob job) {
-		job_id[num_samples] = job.ID;
 		job_arrival_time[num_samples] = job.arrival_time;
 		double jst = job.tasks[0].start_time;
 		for (FJTask task : job.tasks) {
@@ -189,7 +192,34 @@ public class FJDataAggregator {
 
 	
 	/**
-	 * compute the means of sojourn, waiting, and service times over (almost) all jobs
+	 * Save the raw sojourn, waiting and service times for jobs.
+	 * This version takes the BufferedWriter and just adds more lines to it.
+	 * This version of the method was added to support running on a Spark cluster.
+	 * 
+	 * Save the file in compressed format because these will get huge.
+	 * 
+	 * @param outfile_base
+	 */
+	public void appendRawJobData(BufferedWriter writer) {
+		try {
+			for (int i=0; i<num_samples; i++) {
+				double job_waiting_time = job_start_time[i] - job_arrival_time[i];
+				double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
+				double job_service_time = job_completion_time[i] - job_start_time[i];
+				writer.write(i
+						+"\t"+job_sojourn_time
+						+"\t"+job_waiting_time
+						+"\t"+job_service_time+"\n");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		System.out.println("   ...wrote "+num_samples+" samples");
+	}
+
+	
+	/**
+	 * Compute the means of sojourn, waiting, and service times over (almost) all jobs.
 	 * 
 	 * @return
 	 */

@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 public abstract class FJServer {
 
-	static FJSimulator simulator = null;
+	FJSimulator simulator = null;
 	
 	public int num_workers = 1;
 	public int num_stages = 1;
@@ -46,10 +46,9 @@ public abstract class FJServer {
 	 * 
 	 * @param simulator
 	 */
-	public static void setSimulator(FJSimulator simulator) {
-		FJServer.simulator = simulator;
+	public void setSimulator(FJSimulator simulator) {
+		this.simulator = simulator;
 	}
-	
 	
 	/**
 	 * Check for any idle workers and try to put a task on them.  This depends
@@ -96,7 +95,7 @@ public abstract class FJServer {
 	 * @param time
 	 */
 	public void serviceTask(FJWorker worker, FJTask task, double time) {
-		if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task.ID);
+		//if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task.ID);
 		worker.current_task = task;
 		if (task != null) {
 			task.worker = worker;
@@ -107,6 +106,22 @@ public abstract class FJServer {
 			QTaskCompletionEvent e = new QTaskCompletionEvent(task, time + task.service_time);
 			simulator.addEvent(e);
 		}
+	}
+	
+	
+	/**
+	 * The server should call this when a job is complete and departing.
+	 * This samples the stats of the job if it is marked for sampling, and
+	 * prepares the job for disposal.
+	 * A job object shouldn't be accessed after this is called.
+	 * 
+	 * @param j
+	 */
+	public void jobDepart(FJJob j) {
+		if (j.sample && this.simulator.data_aggregator != null) {
+			this.simulator.data_aggregator.sample(j);
+		}
+		j.dispose();
 	}
 
 }
