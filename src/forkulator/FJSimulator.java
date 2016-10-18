@@ -1,7 +1,5 @@
 package forkulator;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
@@ -34,7 +32,6 @@ public class FJSimulator {
 
 	public static boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
-	public static final int SAMPLE_PATH_LENGTH = 1000;
 	
 	public LinkedList<QEvent> event_queue = new LinkedList<QEvent>();
 	
@@ -90,14 +87,14 @@ public class FJSimulator {
 			}
 		} else if (server_queue_type.toLowerCase().equals("wkl")) {
 			if (server_queue_spec.length != 2) {
-				System.err.println("ERROR: wkl queue requires a numeric (k-l) parameter");
+				System.err.println("ERROR: wkl/skl queue requires a numeric (k-l) parameter");
 				System.exit(0);
 			}
 			int l_diff = Integer.parseInt(server_queue_spec[1]);
 			this.server = new FJKLWorkerQueueServer(num_workers, num_workers - l_diff);
 		} else if (server_queue_type.toLowerCase().equals("skl")) {
 			if (server_queue_spec.length != 2) {
-				System.err.println("ERROR: wkl queue requires a numeric (k-l) parameter");
+				System.err.println("ERROR: wkl/skl queue requires a numeric (k-l) parameter");
 				System.exit(0);
 			}
 			int l_diff = Integer.parseInt(server_queue_spec[1]);

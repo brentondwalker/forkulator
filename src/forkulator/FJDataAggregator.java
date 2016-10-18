@@ -83,10 +83,13 @@ public class FJDataAggregator implements Serializable {
 	
 	
 	/**
+	 * Tabulate the distributions for job sojourn, waiting, and service times
+	 * for the sampled jobs.
+	 * This is called internally by printExperimentDistributions(), so I made it protected.
 	 * 
 	 * @param binwidth
 	 */
-	public void computeExperimentDistributions(double binwidth) {
+	protected void computeExperimentDistributions(double binwidth) {
 		this.binwidth = binwidth;
 		double max_value = 0.0;
 		for (int i=0; i<num_samples; i++) {
