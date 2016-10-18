@@ -153,8 +153,9 @@ public class FJMultiStageWorkerQueueServer extends FJServer {
 				// for this type of server it is also the departure time
 				task.job.departure_time = time;
 				
-				// dispose of the job
-				task.job.dispose();
+				// sample and dispose of the job
+				jobDepart(task.job);
+				
 			} else {
 				// this job has completed an intermediate stage.
 				//

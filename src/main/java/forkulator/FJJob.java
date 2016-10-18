@@ -11,6 +11,7 @@ public class FJJob implements Comparable<FJJob> {
 	public boolean completed = false;
 	public boolean fully_serviced = false;
 	public boolean sample = false;
+	public boolean pathlog = false;
 		
 	/**
 	 * Constructor
@@ -39,6 +40,16 @@ public class FJJob implements Comparable<FJJob> {
 	}
 	
 	/**
+	 * Set a flag that records whether or not this job is
+	 * being saved to record the experiment path.
+	 * 
+	 * @param s
+	 */
+	public void setPatlog(boolean s) {
+		this.pathlog = s;
+	}
+	
+	/**
 	 * 
 	 * @return
 	 */
@@ -50,19 +61,19 @@ public class FJJob implements Comparable<FJJob> {
 	}
 	
 	/**
-	 * Clean up the object to hopefully make things easier for the garbage collector
+	 * Clean up the object to hopefully make things easier for the garbage collector.
 	 * 
 	 * This also feeds the sampled jobs to the data_aggregator before destroying the job.
 	 * 
+	 * Having pathlog set prevents this from doing anything.
 	 */
 	public void dispose() {
-		//if (this.sample && FJSimulator.data_aggregator != null) {
-		//	FJSimulator.data_aggregator.sample(this);
-		//}
-		for (FJTask t : this.tasks) {
-			t.job = null;
+		if (! this.pathlog) {
+			for (FJTask t : this.tasks) {
+				t.job = null;
+			}
+			this.tasks = null;
 		}
-		this.tasks = null;
 	}
 	
 	

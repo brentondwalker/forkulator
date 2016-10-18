@@ -1,7 +1,5 @@
 package forkulator;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
@@ -34,7 +32,6 @@ public class FJSimulator {
 
 	public static boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
-	public static final int SAMPLE_PATH_LENGTH = 1000;
 	
 	public LinkedList<QEvent> event_queue = new LinkedList<QEvent>();
 	
@@ -48,7 +45,8 @@ public class FJSimulator {
 	public double quanile_epsilon = 1e-6;
 	
 	public FJDataAggregator data_aggregator = null;
-	
+
+	public FJPathLogger path_logger = null;
 	
 	/**
 	 * constructor
@@ -59,13 +57,15 @@ public class FJSimulator {
 	 * @param arrival_process
 	 * @param service_process
 	 * @param data_aggregator
+	 * @param path_logger
 	 */
-	public FJSimulator(String[] server_queue_spec, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process, FJDataAggregator data_aggregator) {
+	public FJSimulator(String[] server_queue_spec, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process, FJDataAggregator data_aggregator, FJPathLogger path_logger) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
 		this.data_aggregator = data_aggregator;
+		this.path_logger = path_logger;
 		
 		String server_queue_type = server_queue_spec[0];
 		
@@ -87,14 +87,14 @@ public class FJSimulator {
 			}
 		} else if (server_queue_type.toLowerCase().equals("wkl")) {
 			if (server_queue_spec.length != 2) {
-				System.err.println("ERROR: wkl queue requires a numeric (k-l) parameter");
+				System.err.println("ERROR: wkl/skl queue requires a numeric (k-l) parameter");
 				System.exit(0);
 			}
 			int l_diff = Integer.parseInt(server_queue_spec[1]);
 			this.server = new FJKLWorkerQueueServer(num_workers, num_workers - l_diff);
 		} else if (server_queue_type.toLowerCase().equals("skl")) {
 			if (server_queue_spec.length != 2) {
-				System.err.println("ERROR: wkl queue requires a numeric (k-l) parameter");
+				System.err.println("ERROR: wkl/skl queue requires a numeric (k-l) parameter");
 				System.exit(0);
 			}
 			int l_diff = Integer.parseInt(server_queue_spec[1]);
@@ -156,6 +156,9 @@ public class FJSimulator {
 				FJJob job = new FJJob(num_tasks, service_process, e.time);
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
+					if (path_logger != null) {
+						path_logger.addJob(job);
+					}
 					if (sampling_countdown==0) {
 						server.enqueJob(job, true);
 						sampling_countdown = sampling_interval;
@@ -164,6 +167,7 @@ public class FJSimulator {
 					}
 					sampling_countdown--;
 				}
+
 				
 				// schedule the next job arrival
 				if (jobs_processed < num_jobs) {
@@ -224,6 +228,36 @@ public class FJSimulator {
 	}
 	
 	
+	/**
+	 * compute the means of sojourn, waiting, and service times over (almost) all jobs
+	 * 
+	 * @param warmup_period
+	 * @return
+	 */
+	public ArrayList<Double> experimentMeans() {
+		double sojourn_sum = 0.0;
+		double waiting_sum = 0.0;
+		double service_sum = 0.0;
+		for (FJJob job : server.sampled_jobs) {
+			double job_start_time = job.tasks[0].start_time;
+			double job_completion_time = job.tasks[0].completion_time;
+			for (FJTask task : job.tasks) {
+				job_start_time = Math.min(job_start_time, task.start_time);
+				job_completion_time = Math.max(job_completion_time, task.completion_time);
+			}
+			waiting_sum += job_start_time - job.arrival_time;
+			sojourn_sum += job_completion_time - job.arrival_time;
+			service_sum += job_completion_time - job_start_time;
+		}
+		
+		double total = server.sampled_jobs.size();
+		ArrayList<Double> result = new ArrayList<Double>(3 + 1);
+		result.add(sojourn_sum/total);
+		result.add(waiting_sum/total);
+		result.add(service_sum/total);
+		result.add(total * 1.0);
+		return result;
+	}
 	
 	
 	/**
@@ -302,64 +336,6 @@ public class FJSimulator {
 	
 	
 	/**
-	 * Print out the experiment path (if it's small enough) and the CDFs and PDFs
-	 * of sojourn, waiting, and service times
-	 * 
-	 * @param outfile_base
-	 */
-	public void printExperimentPath(String outfile_base) {
-		
-		// max value for the distributions
-		double max_value = 0;
-		
-		BufferedWriter writer = null;
-		try {
-			writer = new BufferedWriter(new FileWriter(outfile_base+"_path.dat"));
-			for (FJJob job : server.sampled_jobs) {
-				double job_start_time = job.tasks[0].start_time;
-				double job_departure_time = job.departure_time;
-				double job_completion_time = job.completion_time;
-				for (FJTask task : job.tasks) {
-					job_start_time = Math.min(job_start_time, task.start_time);
-				}
-				double job_sojourn = job_departure_time - job.arrival_time;
-				if (job_sojourn > 10000) {
-					System.err.println("WARNING: large job sojourn: "+job_sojourn);
-					System.err.println("departure: "+job_departure_time);
-					System.err.println("arrival:    "+job.arrival_time);
-					System.exit(1);
-				}
-				max_value = Math.max(max_value, job_sojourn);
-				int task_count = 0;
-				int job_count = 0;
-				if (server.sampled_jobs.size() < 1000) {
-					for (FJTask task : job.tasks) {
-						writer.write(task_count++
-								+"\t"+job_count
-								+"\t"+job.arrival_time
-								+"\t"+job_start_time
-								+"\t"+job_completion_time
-								+"\t"+job_departure_time
-								+"\t"+task.start_time
-								+"\t"+task.completion_time
-								+"\n");
-					}
-					job_count++;
-				}
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			try {
-				// Close the writer regardless of what happens...
-				writer.close();
-			} catch (Exception e) {
-			}
-		}
-	}
-	
-	
-	/**
 	 * Parse the arguments given for either the arrival or service process, and
 	 * return an appropriately configured IntertimeProcess.
 	 * 
@@ -411,15 +387,16 @@ public class FJSimulator {
 	 * 
 	 * @param args
 	 */
+	@SuppressWarnings("static-access")
 	public static void main(String[] args) {
 		
 		Options cli_options = new Options();
 		cli_options.addOption("h", "help", false, "print help message");
-		cli_options.addOption("q", "queuetype", true, "queue type code");
 		cli_options.addOption("w", "numworkers", true, "number of workers/servers");
 		cli_options.addOption("t", "numtasks", true, "number of tasks per job");
 		cli_options.addOption("n", "numsamples", true, "number of samples to produce.  Multiply this by the sampling interval to get the number of jobs that will be run");
 		cli_options.addOption("i", "samplinginterval", true, "samplig interval");
+		cli_options.addOption("p", "savepath", true, "save some iterations of the simulation path (arrival time, service time etc...)");
 		cli_options.addOption(OptionBuilder.withLongOpt("queuetype").hasArgs().isRequired().withDescription("queue type and arguments").create("q"));
 		cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().isRequired().withDescription("the base name of the output files").create("o"));
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
@@ -441,9 +418,12 @@ public class FJSimulator {
 		String[] server_queue_spec = options.getOptionValues("q");
 		int num_workers = Integer.parseInt(options.getOptionValue("w"));
 		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
-		long num_jobs = Long.parseLong(options.getOptionValue("n"));
+		long num_samples = Long.parseLong(options.getOptionValue("n"));
 		int sampling_interval = Integer.parseInt(options.getOptionValue("i"));
 		String outfile_base = options.getOptionValue("o");
+
+		// compute the number of jobs necessary to get the desired samples
+		long num_jobs = num_samples * sampling_interval;
 		
 		//
 		// figure out the arrival process
@@ -460,13 +440,21 @@ public class FJSimulator {
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator((int)(1 + num_jobs/sampling_interval));
 		
+		// optional path logger
+		FJPathLogger path_logger = null;
+		if (options.hasOption("p")) {
+			path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")));
+		}
+		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator, path_logger);
 
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 		
-		sim.printExperimentPath(outfile_base);
+		if (sim.path_logger != null) {
+			sim.path_logger.writePathlog(outfile_base, false);
+		}
 		
 		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 		

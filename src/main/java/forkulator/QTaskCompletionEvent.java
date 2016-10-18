@@ -8,11 +8,5 @@ public class QTaskCompletionEvent extends QEvent {
 		this.time = time;
 		this.task = task;
 	}
-	
-	@Override
-	public void happen() {
-		// TODO Auto-generated method stub
-
-	}
 
 }
