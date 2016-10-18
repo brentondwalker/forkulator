@@ -395,7 +395,6 @@ public class FJSimulator {
 		
 		Options cli_options = new Options();
 		cli_options.addOption("h", "help", false, "print help message");
-		cli_options.addOption("q", "queuetype", true, "queue type code");
 		cli_options.addOption("w", "numworkers", true, "number of workers/servers");
 		cli_options.addOption("t", "numtasks", true, "number of tasks per job");
 		cli_options.addOption("n", "numsamples", true, "number of samples to produce.  Multiply this by the sampling interval to get the number of jobs that will be run");
@@ -422,9 +421,12 @@ public class FJSimulator {
 		String[] server_queue_spec = options.getOptionValues("q");
 		int num_workers = Integer.parseInt(options.getOptionValue("w"));
 		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
-		long num_jobs = Long.parseLong(options.getOptionValue("n"));
+		long num_samples = Long.parseLong(options.getOptionValue("n"));
 		int sampling_interval = Integer.parseInt(options.getOptionValue("i"));
 		String outfile_base = options.getOptionValue("o");
+
+		// compute the number of jobs necessary to get the desired samples
+		long num_jobs = num_samples * sampling_interval;
 		
 		//
 		// figure out the arrival process
