@@ -21,9 +21,13 @@ We include a runner script, `forkulator.sh`, that saves you from having to type 
  -A,--arrivalprocess <arg>     arrival process
  -h,--help                     print help message
  -i,--samplinginterval <arg>   samplig interval
- -n,--numjobs <arg>            number of jobs to run
+ -n,--numsamples <arg>         number of samples to produce.  Multiply
+                               this by the sampling interval to get the
+                               number of jobs that will be run
  -o,--outfile <arg>            the base name of the output files
- -q,--queuetype <arg>          queue type code
+ -p,--savepath <arg>           save some iterations of the simulation path
+                               (arrival time, service time etc...)
+ -q,--queuetype <arg>          queue type and arguments
  -S,--serviceprocess <arg>     service process
  -t,--numtasks <arg>           number of tasks per job
  -w,--numworkers <arg>         number of workers/servers
@@ -79,6 +83,44 @@ Given one parameter the process will be normalized to have expectation 1.0.
 Or you can specify both the shape and scale parameters.
 ```
 -A w <shape> <scale>
+```
+
+## Example
+
+Here is an example running with exponential arrivals at rate 0.1, erlang-9 task service at rate 1.0, jobs sampled at interval 100, 100,000 samples, single-queue, 10 workers, 10 tasks/job, and logging the first 100 jobs of the experiment path.
+```
+./forkulator.sh -A x 0.1 -S e 9 1.0 -i 100 -n 100000 -o testrun_s -q s -t 10 -w 10 -p 100
+```
+
+Then we can look at the experiment path in gnuplot
+```
+gunzip testrun_s_path.dat.gz
+
+gnuplot
+plot 'testrun_s_path.dat' using 1:3 with line title "arrival time"
+set ylabel "time"
+set xlabel "task index"
+replot 'testrun_s_path.dat' using 1:7 with line title "task start service"
+replot 'testrun_s_path.dat' using 1:8 with line title "task finish service"
+replot 'testrun_s_path.dat' using 1:6 with line title "job departure"
+```
+
+Then you can compare this to the standard fork-join model where each worker keeps a separate queue.
+```
+./forkulator.sh -A x 0.1 -S e 9 1.0 -i 100 -n 100000 -o testrun_w -q w -t 10 -w 10 -p 100
+```
+
+Then we can look at the experiment path in gnuplot
+```
+gunzip testrun_w_path.dat.gz
+
+gnuplot
+plot 'testrun_w_path.dat' using 1:3 with line title "arrival time"
+set ylabel "time"
+set xlabel "task index"
+replot 'testrun_w_path.dat' using 1:7 with line title "task start service"
+replot 'testrun_w_path.dat' using 1:8 with line title "task finish service"
+replot 'testrun_w_path.dat' using 1:6 with line title "job departure"
 ```
 
 
