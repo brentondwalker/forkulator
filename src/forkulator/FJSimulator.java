@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Random;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -164,6 +165,7 @@ public class FJSimulator {
 					}
 					sampling_countdown--;
 				}
+
 				
 				// schedule the next job arrival
 				if (jobs_processed < num_jobs) {
@@ -224,6 +226,36 @@ public class FJSimulator {
 	}
 	
 	
+	/**
+	 * compute the means of sojourn, waiting, and service times over (almost) all jobs
+	 * 
+	 * @param warmup_period
+	 * @return
+	 */
+	public ArrayList<Double> experimentMeans() {
+		double sojourn_sum = 0.0;
+		double waiting_sum = 0.0;
+		double service_sum = 0.0;
+		for (FJJob job : server.sampled_jobs) {
+			double job_start_time = job.tasks[0].start_time;
+			double job_completion_time = job.tasks[0].completion_time;
+			for (FJTask task : job.tasks) {
+				job_start_time = Math.min(job_start_time, task.start_time);
+				job_completion_time = Math.max(job_completion_time, task.completion_time);
+			}
+			waiting_sum += job_start_time - job.arrival_time;
+			sojourn_sum += job_completion_time - job.arrival_time;
+			service_sum += job_completion_time - job_start_time;
+		}
+		
+		double total = server.sampled_jobs.size();
+		ArrayList<Double> result = new ArrayList<Double>(3 + 1);
+		result.add(sojourn_sum/total);
+		result.add(waiting_sum/total);
+		result.add(service_sum/total);
+		result.add(total * 1.0);
+		return result;
+	}
 	
 	
 	/**
@@ -306,8 +338,10 @@ public class FJSimulator {
 	 * of sojourn, waiting, and service times
 	 * 
 	 * @param outfile_base
+	 * @param warmup_period
 	 */
 	public void printExperimentPath(String outfile_base) {
+		double binwidth = 0.1;
 		
 		// max value for the distributions
 		double max_value = 0;
@@ -321,6 +355,7 @@ public class FJSimulator {
 				double job_completion_time = job.completion_time;
 				for (FJTask task : job.tasks) {
 					job_start_time = Math.min(job_start_time, task.start_time);
+					job_completion_time = Math.max(job_completion_time, task.completion_time);
 				}
 				double job_sojourn = job_departure_time - job.arrival_time;
 				if (job_sojourn > 10000) {

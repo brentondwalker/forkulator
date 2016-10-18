@@ -50,6 +50,7 @@ public abstract class FJServer {
 		this.simulator = simulator;
 	}
 	
+	
 	/**
 	 * Check for any idle workers and try to put a task on them.  This depends
 	 * on the type of queuing system we are working with.
