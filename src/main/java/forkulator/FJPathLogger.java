@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.OutputStreamWriter;
+import java.io.Serializable;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -34,16 +35,18 @@ import java.util.zip.GZIPOutputStream;
  * @author brenton
  *
  */
-public class FJPathLogger {
-		
+public class FJPathLogger implements Serializable {
+	
+	/**
+	 * Supposed to add this to say the class implements Serializable.
+	 */
+	private static final long serialVersionUID = 1L;
+	
 	// the number of jobs of the path to save
 	int numjobs = 0;
 	
 	// keep track of how many jobs we've logged
 	int job_index = 0;
-	
-	// this writer is opened when the class is instantiated, and written to as data is added
-	BufferedWriter writer = null;
 	
 	// the jobs we record path data for (in the order of arrival)
 	public FJJob[] jobs = null;
@@ -85,6 +88,8 @@ public class FJPathLogger {
 			System.err.println("WARNING: tried to save a pathlog, but none was recorded");
 			return;
 		}
+		
+		BufferedWriter writer = null;
 		
 		try {
 			if (compress) {

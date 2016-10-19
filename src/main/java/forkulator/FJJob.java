@@ -1,7 +1,14 @@
 package forkulator;
 
-public class FJJob implements Comparable<FJJob> {
+import java.io.Serializable;
 
+public class FJJob implements Comparable<FJJob>, Serializable {
+	
+	/**
+	 * Supposed to add this to say the class implements Serializable.
+	 */
+	private static final long serialVersionUID = 1L;
+	
 	public double arrival_time = 0.0;
 	public double completion_time = 0.0;
 	public double departure_time = 0.0;

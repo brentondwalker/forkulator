@@ -1,5 +1,6 @@
 package forkulator;
 
+import java.io.Serializable;
 import java.util.Random;
 
 /**
@@ -13,7 +14,12 @@ import java.util.Random;
  * @author brenton
  *
  */
-public abstract class IntertimeProcess {
+public abstract class IntertimeProcess implements Serializable {
+	
+	/**
+	 * Supposed to add this to say the class implements Serializable.
+	 */
+	private static final long serialVersionUID = 1L;
 	
 	protected static Random rand = new Random();
 	

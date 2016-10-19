@@ -50,7 +50,7 @@ public class FJSparkSimulator {
 	 * @param s
 	 * @return
 	 */
-    public static FJSimulator doSimulation(CommandLine options, int segment_index) {
+    public static FJDataAggregator doSimulation(CommandLine options, int segment_index) {
 		String server_queue_type = options.getOptionValue("q");
 		int num_workers = Integer.parseInt(options.getOptionValue("w"));
 		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
@@ -64,13 +64,6 @@ public class FJSparkSimulator {
 		int samples_per_slice = (int) Math.ceil( ((double)num_samples) / num_slices );
 		long jobs_per_slice = ((long) samples_per_slice) * ((long) sampling_interval);
 
-		// optional path logger
-		// when running on Spark we only do the path logging for the first segment
-		FJPathLogger path_logger = null;
-		if ((segment_index==0) && (options.hasOption("p"))) {
-			path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")));
-		}
-		
 		//
 		// figure out the arrival process
 		//
@@ -85,15 +78,21 @@ public class FJSparkSimulator {
 		
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator(samples_per_slice);
+
+		// optional path logger
+		// when running on Spark we only do the path logging for the first slice
+		if ((segment_index==0) && (options.hasOption("p"))) {
+			data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")));
+		}
 		
 		// simulator
 		String[] server_queue_spec = options.getOptionValues("q");
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator, path_logger);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
 
 		// start the simulator running...
 		sim.run(jobs_per_slice, sampling_interval);
 		
-		return sim;
+		return sim.data_aggregator;
 	}
 	
 	public static void main(String[] args) {
@@ -141,22 +140,27 @@ public class FJSparkSimulator {
 		// distribute the simulation segments to workers
 		ArrayList<Integer> ar = new ArrayList<Integer>(num_slices);
 		for (int i=0; i<num_slices; i++) { ar.add(i); }
-		JavaRDD<FJSimulator> rdd = spark.parallelize(ar, num_slices)
+		JavaRDD<FJDataAggregator> rdd = spark.parallelize(ar, num_slices)
 		    .map(s -> doSimulation(foptions,s))
 		  .cache();
-		List<FJSimulator> sl = rdd.collect();
-		System.out.println("rdd = "+rdd);
-		System.out.println("sl = "+sl);
+		List<FJDataAggregator> dl = rdd.collect();
+		//System.out.println("rdd = "+rdd);
+		//System.out.println("dl = "+dl);
 		
+		// write out the path data, if it was recorded
 		String outfile_base = options.getOptionValue("o");
+		if (dl.get(0).path_logger != null) {
+		    dl.get(0).path_logger.writePathlog(outfile_base, false);
+		}
+		
 		BufferedWriter writer = null;
 		try {
 			GZIPOutputStream zip = new GZIPOutputStream(new FileOutputStream(new File(outfile_base+"_jobdat.dat.gz")));
 			writer = new BufferedWriter(new OutputStreamWriter(zip, "UTF-8"));
 			//final BufferedWriter fwriter = writer;
 			//rdd.foreach(d -> d.appendRawJobData(fwriter));
-			for (FJSimulator sim : sl) {
-				sim.data_aggregator.appendRawJobData(writer);
+			for (FJDataAggregator d : dl) {
+				d.appendRawJobData(writer);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -166,11 +170,6 @@ public class FJSparkSimulator {
 				writer.close();
 			} catch (Exception e) {
 			}
-		}
-		
-		// if saving path info, do it
-		if (sl.get(0).path_logger != null) {
-		    sl.get(0).path_logger.writePathlog(outfile_base, false);
 		}
 		
 		try {
