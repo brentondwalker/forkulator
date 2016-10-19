@@ -1,5 +1,6 @@
 package forkulator;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
@@ -29,7 +30,7 @@ import org.apache.commons.cli.ParseException;
  *
  */
 public class FJSimulator {
-
+	
 	public static boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
 	
@@ -46,8 +47,6 @@ public class FJSimulator {
 	
 	public FJDataAggregator data_aggregator = null;
 
-	public FJPathLogger path_logger = null;
-	
 	/**
 	 * constructor
 	 * 
@@ -59,13 +58,12 @@ public class FJSimulator {
 	 * @param data_aggregator
 	 * @param path_logger
 	 */
-	public FJSimulator(String[] server_queue_spec, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process, FJDataAggregator data_aggregator, FJPathLogger path_logger) {
+	public FJSimulator(String[] server_queue_spec, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process, FJDataAggregator data_aggregator) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
 		this.data_aggregator = data_aggregator;
-		this.path_logger = path_logger;
 		
 		String server_queue_type = server_queue_spec[0];
 		
@@ -156,8 +154,8 @@ public class FJSimulator {
 				FJJob job = new FJJob(num_tasks, service_process, e.time);
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
-					if (path_logger != null) {
-						path_logger.addJob(job);
+					if (data_aggregator.path_logger != null) {
+						data_aggregator.path_logger.addJob(job);
 					}
 					if (sampling_countdown==0) {
 						server.enqueJob(job, true);
@@ -441,19 +439,18 @@ public class FJSimulator {
 		FJDataAggregator data_aggregator = new FJDataAggregator((int)(1 + num_jobs/sampling_interval));
 		
 		// optional path logger
-		FJPathLogger path_logger = null;
 		if (options.hasOption("p")) {
-			path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")));
+			data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")));
 		}
 		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator, path_logger);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
 
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 		
-		if (sim.path_logger != null) {
-			sim.path_logger.writePathlog(outfile_base, false);
+		if (sim.data_aggregator.path_logger != null) {
+			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
 		}
 		
 		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);

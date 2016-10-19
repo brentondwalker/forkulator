@@ -47,8 +47,9 @@ public class FJDataAggregator implements Serializable {
 	int[] job_sojourn_d = null;
 	int[] job_waiting_d = null;
 	int[] job_service_d = null;
-
 	
+	// optionally this object can contain a FJPathLogger
+	public FJPathLogger path_logger = null;
 	
 	/**
 	 * Constructor
