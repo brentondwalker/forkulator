@@ -71,15 +71,21 @@ public class FJDataAggregator implements Serializable {
 	 * @param job
 	 */
 	public void sample(FJJob job) {
-		job_arrival_time[num_samples] = job.arrival_time;
-		double jst = job.tasks[0].start_time;
-		for (FJTask task : job.tasks) {
-			jst = Math.min(jst, task.start_time);
+		if (job.sample) {
+			job_arrival_time[num_samples] = job.arrival_time;
+			double jst = job.tasks[0].start_time;
+			for (FJTask task : job.tasks) {
+				jst = Math.min(jst, task.start_time);
+			}
+			job_start_time[num_samples] = jst;
+			job_completion_time[num_samples] = job.completion_time;
+			job_departure_time[num_samples] = job.departure_time;
+			num_samples++;
 		}
-		job_start_time[num_samples] = jst;
-		job_completion_time[num_samples] = job.completion_time;
-		job_departure_time[num_samples] = job.departure_time;
-		num_samples++;
+		
+		if (this.path_logger != null) {
+			path_logger.recordJob(job);
+		}
 	}
 	
 	

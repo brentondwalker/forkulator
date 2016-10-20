@@ -72,10 +72,7 @@ public class FJKLWorkerQueueServer extends FJServer {
 		if (FJSimulator.DEBUG) System.out.println("enqueJob() "+job.arrival_time);
 
 		// only keep a reference to the job if the simulator tells us to
-		if (sample) {
-			job.setSample(sample);
-			//sampled_jobs.add(job);
-		}
+		job.setSample(sample);
 
 		FJTask t = null;
 		while ((t = job.nextTask()) != null) {

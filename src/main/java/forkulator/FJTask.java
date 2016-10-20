@@ -1,14 +1,8 @@
 package forkulator;
 
-import java.io.Serializable;
 
-public class FJTask implements Serializable {
+public class FJTask {
 	
-	/**
-	 * Supposed to add this to say the class implements Serializable.
-	 */
-	private static final long serialVersionUID = 1L;
-
 	public double start_time = 0.0;
 	public double service_time = 0.0;
 	public double completion_time = 0.0;  // redundant

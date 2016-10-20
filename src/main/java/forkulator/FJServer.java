@@ -116,11 +116,15 @@ public abstract class FJServer {
 	 * prepares the job for disposal.
 	 * A job object shouldn't be accessed after this is called.
 	 * 
+	 * The FJDataAggregator will only sample the job if it is marked for sampling, 
+	 * but we call this on each job in case the aggregator is recording the
+	 * experiment path or something.
+	 * 
 	 * @param j
 	 */
 	public void jobDepart(FJJob j) {
-		if (j.sample && this.simulator.data_aggregator != null) {
-			this.simulator.data_aggregator.sample(j);
+		if (simulator.data_aggregator != null) {
+			simulator.data_aggregator.sample(j);
 		}
 		j.dispose();
 	}

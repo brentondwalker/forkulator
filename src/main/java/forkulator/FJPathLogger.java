@@ -41,15 +41,31 @@ public class FJPathLogger implements Serializable {
 	 * Supposed to add this to say the class implements Serializable.
 	 */
 	private static final long serialVersionUID = 1L;
+
+	// this is basically a struct
+	class TaskDatum {
+		int task_id = 0;
+		int job_id = 0;
+		double job_arrival_time = 0.0;
+		double job_start_time = 0.0;
+		double job_departure_time = 0.0;
+		double job_completion_time = 0.0;
+		double task_start_time = 0.0;
+		double task_completion_time = 0.0;
+	}
 	
 	// the number of jobs of the path to save
 	int numjobs = 0;
 	
-	// keep track of how many jobs we've logged
-	int job_index = 0;
+	// number of tasks per job
+	int tasks_per_job = 0;
 	
-	// the jobs we record path data for (in the order of arrival)
-	public FJJob[] jobs = null;
+	// keep track of how many jobs and tasks we've logged
+	int job_index = 0;
+	int task_index = 0;
+	
+	// the path data we recorded
+	private TaskDatum[] task_data = null;
 	
 	
 	/**
@@ -57,9 +73,10 @@ public class FJPathLogger implements Serializable {
 	 * 
 	 * @param numjobs
 	 */
-	public FJPathLogger(int numjobs) {
+	public FJPathLogger(int numjobs, int tasks_per_job) {
 		this.numjobs = numjobs;
-		jobs = new FJJob[numjobs];
+		this.tasks_per_job = tasks_per_job;
+		task_data = new TaskDatum[numjobs*tasks_per_job];
 	}
 	
 	/**
@@ -70,8 +87,33 @@ public class FJPathLogger implements Serializable {
 	 */
 	public void addJob(FJJob job) {
 		if (job_index < numjobs) {
-			jobs[job_index++] = job;
-			job.setPatlog(true);
+			job.path_log_id = job_index++;
+		}
+	}
+	
+	/**
+	 * Call this when a job departs and has its data sampled.
+	 * 
+	 * @param job
+	 */
+	public void recordJob(FJJob job) {
+		if (job.path_log_id >= 0) {
+			double job_start_time = job.tasks[0].start_time;
+			for (int i=0; i<job.num_tasks; i++) {
+				job_start_time = Math.min(job_start_time, job.tasks[i].start_time);
+			}
+			for (int i=0; i<job.num_tasks; i++) {
+				task_data[task_index] = new TaskDatum();
+				task_data[task_index].task_id = task_index;
+				task_data[task_index].job_id = job.path_log_id;
+				task_data[task_index].job_arrival_time = job.arrival_time;
+				task_data[task_index].job_start_time = job_start_time;
+				task_data[task_index].job_completion_time = job.completion_time;
+				task_data[task_index].job_departure_time = job.departure_time;
+				task_data[task_index].task_completion_time = job.tasks[i].completion_time;
+				task_data[task_index].task_start_time = job.tasks[i].start_time;
+				task_index++;
+			}
 		}
 	}
 	
@@ -84,7 +126,7 @@ public class FJPathLogger implements Serializable {
 	public void writePathlog(String outfile_base, boolean compress) {
 		String outfile = outfile_base+"_path.dat";
 		
-		if (jobs == null) {
+		if (task_data == null) {
 			System.err.println("WARNING: tried to save a pathlog, but none was recorded");
 			return;
 		}
@@ -100,42 +142,22 @@ public class FJPathLogger implements Serializable {
 				writer = new BufferedWriter(new FileWriter(outfile));
 			}
 			
-			int task_count = 0;
-			int job_count = 0;
-			
-			for (FJJob job : jobs) {
+			for (TaskDatum td : task_data) {
 				// it's possible we didn't record as many jobs as requested.
 				// if so, just print out what we have
-				if (job == null) {
+				if (td == null) {
 					break;
 				}
-				double job_start_time = job.tasks[0].start_time;
-				double job_departure_time = job.departure_time;
-				double job_completion_time = job.completion_time;
-				for (FJTask task : job.tasks) {
-					job_start_time = Math.min(job_start_time, task.start_time);
-					job_completion_time = Math.max(job_completion_time, task.completion_time);
-				}
-				double job_sojourn = job_departure_time - job.arrival_time;
-				if (job_sojourn > 10000) {
-					System.err.println("WARNING: large job sojourn: "+job_sojourn);
-					System.err.println("departure: "+job_departure_time);
-					System.err.println("arrival:    "+job.arrival_time);
-					System.exit(1);
-				}
 				
-				for (FJTask task : job.tasks) {
-					writer.write(task_count++
-							+"\t"+job_count
-							+"\t"+job.arrival_time
-							+"\t"+job_start_time
-							+"\t"+job_completion_time
-							+"\t"+job_departure_time
-							+"\t"+task.start_time
-							+"\t"+task.completion_time
-							+"\n");
-				}
-				job_count++;
+				writer.write(td.task_id++
+						+"\t"+td.job_id
+						+"\t"+td.job_arrival_time
+						+"\t"+td.job_start_time
+						+"\t"+td.job_completion_time
+						+"\t"+td.job_departure_time
+						+"\t"+td.task_start_time
+						+"\t"+td.task_completion_time
+						+"\n");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -144,6 +166,7 @@ public class FJPathLogger implements Serializable {
 				// Close the writer regardless of what happens...
 				writer.close();
 			} catch (Exception e) {
+				System.err.println("ERROR: everything has gone wrong\n"+e);
 			}
 		}
 	}
