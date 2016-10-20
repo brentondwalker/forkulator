@@ -82,7 +82,7 @@ public class FJSparkSimulator {
 		// optional path logger
 		// when running on Spark we only do the path logging for the first slice
 		if ((segment_index==0) && (options.hasOption("p"))) {
-			data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")));
+		    data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")), num_tasks);
 		}
 		
 		// simulator

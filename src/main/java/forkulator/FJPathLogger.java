@@ -43,7 +43,9 @@ public class FJPathLogger implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	// this is basically a struct
-	class TaskDatum {
+	class TaskDatum implements Serializable {
+		private static final long serialVersionUID = 1L;
+
 		int task_id = 0;
 		int job_id = 0;
 		double job_arrival_time = 0.0;

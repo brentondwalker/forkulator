@@ -1,6 +1,5 @@
 package forkulator;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
@@ -440,12 +439,12 @@ public class FJSimulator {
 		
 		// optional path logger
 		if (options.hasOption("p")) {
-			data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")));
+			data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")), num_tasks);
 		}
 		
 		// simulator
 		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
-
+		
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 		
