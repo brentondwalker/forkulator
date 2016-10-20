@@ -1,24 +1,31 @@
 package forkulator;
 
-import java.io.Serializable;
 
-public class FJJob implements Comparable<FJJob>, Serializable {
+public class FJJob implements Comparable<FJJob> {
 	
-	/**
-	 * Supposed to add this to say the class implements Serializable.
-	 */
-	private static final long serialVersionUID = 1L;
-	
+	// essential data about the job
 	public double arrival_time = 0.0;
 	public double completion_time = 0.0;
 	public double departure_time = 0.0;
+	
+	// the job's tasks
 	public int num_tasks = 0;
 	public FJTask[] tasks = null;
+	
+	// index to keep track of which tasks have been pulled out for service
 	private int task_index = 0;
+	
+	// set to true when a worker finishes a job
 	public boolean completed = false;
+	
+	// in a multi-stage system, set to true when 
 	public boolean fully_serviced = false;
+	
+	// set to true if the job's statistics should be sampled when it departs
 	public boolean sample = false;
-	public boolean pathlog = false;
+	
+	// this is assigned and used by FJPathLogger to keep track of the sequence of job arrivals
+	public int path_log_id = -1;
 		
 	/**
 	 * Constructor
@@ -47,16 +54,6 @@ public class FJJob implements Comparable<FJJob>, Serializable {
 	}
 	
 	/**
-	 * Set a flag that records whether or not this job is
-	 * being saved to record the experiment path.
-	 * 
-	 * @param s
-	 */
-	public void setPatlog(boolean s) {
-		this.pathlog = s;
-	}
-	
-	/**
 	 * 
 	 * @return
 	 */
@@ -75,12 +72,10 @@ public class FJJob implements Comparable<FJJob>, Serializable {
 	 * Having pathlog set prevents this from doing anything.
 	 */
 	public void dispose() {
-		if (! this.pathlog) {
-			for (FJTask t : this.tasks) {
-				t.job = null;
-			}
-			this.tasks = null;
+		for (FJTask t : this.tasks) {
+			t.job = null;
 		}
+		this.tasks = null;
 	}
 	
 	
