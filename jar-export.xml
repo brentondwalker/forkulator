@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse.ant.import?>
+<project basedir="." default="build" name="forkulator">
+  <property name="projectHome" location="." />
+  <property name="dist" location="${projectHome}/dist"/>
+  <target name="jar" depends="build">
+    <jar destfile="${dist}/forkulator.jar" basedir="${projectHome}/bin" />
+    <jar destfile="${projectHome}/spark/lib/forkulator.jar" basedir="${projectHome}/bin" />
+  </target>
+</project>
