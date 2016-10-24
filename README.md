@@ -126,21 +126,24 @@ replot 'testrun_w_path.dat' using 1:6 with line title "job departure"
 
 ## Run Faster
 
-This simulator can be run on a [Spark](http://spark.apache.org/) cluster (version less than 2.0).  Check out the `forkulator-sbt` branch.  This branch uses sbt instead of ant to build, and requires the sbt-assembly plugin.  This mode of running is new and not yet well tested or documented.
+This simulator can be run on a [Spark](http://spark.apache.org/) cluster (version less than 2.0).  The necessary code is now in the master branch as an sbt project in the `spark/` subdirectory.  In order to package its dependencies and be run on a cluster, it requires the sbt-assembly plugin.
+
+The sb project depends on having a jar containing the main forgulator project in its `lib` directory.  Running `ant jar` will do this.
 
 ```
-git checkout forkulator-sbt
+ant jar
+cd spark
 sbt assembly
 ```
 
-The resulting jar will be put in `target/forkulator-assembly-1.0.jar`.
+The resulting jar will be put in `spark/target/forkulator-assembly-1.0.jar`.
 
 This version adds the `-s` option to specify the number of slices to divide the simulation into.  An example of using spark-submit to run the simulation, generating 1,000,000 samples at intervals of 100 iterations, with _k=100_, divided into 500 slices:
 ```
 ./bin/spark-submit --master spark://1.2.3.4:7077  \
                    --executor-memory 40g \
                    --class forkulator.FJSparkSimulator \
-                   <path-to-forkulator>/target/forkulator-assembly-1.0.jar \
+                   <path-to-forkulator>/spark/target/forkulator-assembly-1.0.jar \
                    -q w -A x 0.5 -S x 1.0 -w 100 -t 100 -i 100 -n 1000000 -o testrun -s 500
 ```
 
