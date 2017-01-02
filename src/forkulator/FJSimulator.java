@@ -441,7 +441,7 @@ public class FJSimulator {
 		
 		// optional path logger
 		if (options.hasOption("p")) {
-			data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")), num_tasks);
+			data_aggregator.path_logger = new FJPathLogger((int)(1 + num_jobs/sampling_interval), num_tasks);
 		}
 		
 		// simulator

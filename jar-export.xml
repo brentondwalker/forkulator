@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?eclipse.ant.import?>
-<project basedir="." default="build" name="forkulator">
+<project basedir="." default="build" name="forkulator-jar-export">
   <property name="projectHome" location="." />
   <property name="dist" location="${projectHome}/dist"/>
   <target name="jar" depends="build">

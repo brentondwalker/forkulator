@@ -66,7 +66,7 @@ public class FJSplitMergeServer extends FJServer {
 		// if all the workers are idle it means we have completed the current
 		// batch of tasks.  Grab the next job and enqueue it
 		if (all_idle) {
-			enqueJobOnWorkers(this.job_queue.poll());
+			ServiceJob(this.job_queue.poll(), time);
 		}
 	}
 	
@@ -79,10 +79,9 @@ public class FJSplitMergeServer extends FJServer {
 	 * 
 	 * @param job
 	 */
-	public void enqueJobOnWorkers(FJJob job) {
+	public void ServiceJob(FJJob job, double time) {
 		if (job == null) return;
-		
-		if (FJSimulator.DEBUG) System.out.println("enqueJob() "+job.arrival_time);
+		if (FJSimulator.DEBUG) System.out.println("begin service on job: "+job.path_log_id+"    "+time);
 		
 		FJTask t = null;
 		while ((t = job.nextTask()) != null) {
@@ -92,7 +91,7 @@ public class FJSplitMergeServer extends FJServer {
 		
 		// this just added the tasks to the queues.  Check if any
 		// workers were idle, and put them to work.
-		feedWorkers(job.arrival_time);
+		feedWorkers(time);
 	}
 
 	
@@ -106,14 +105,14 @@ public class FJSplitMergeServer extends FJServer {
 	 * @param sample
 	 */
 	public void enqueJob(FJJob job, boolean sample) {
-		if (FJSimulator.DEBUG) System.out.println("enqueJob() "+job.arrival_time);
-
+		if (FJSimulator.DEBUG) System.out.println("enqueJob("+job.path_log_id+") "+job.arrival_time);
+		
 		// only keep a reference to the job if the simulator tells us to
 		job.setSample(sample);
 		
 		job_queue.add(job);
 		feedWorkers(job.arrival_time);
-		if (FJSimulator.DEBUG) System.out.println("  queued a job");
+		if (FJSimulator.DEBUG) System.out.println("  queued a job.    New queue length: "+job_queue.size());
 	}
 	
 	
@@ -129,6 +128,7 @@ public class FJSplitMergeServer extends FJServer {
 		FJTask task = worker.current_task;
 		task.completion_time = time;
 		task.completed = true;
+		worker.current_task = null;
 		
 		// check if this task was the last one of a job
 		//TODO: this could be more efficient
@@ -146,13 +146,11 @@ public class FJSplitMergeServer extends FJServer {
 			task.job.departure_time = time;
 			
 			// sample and dispose of the job
+			if (FJSimulator.DEBUG) System.out.println("job departing: "+task.job.path_log_id);
 			jobDepart(task.job);
 			
 			// service the next job, if any
 			feedWorkers(time);
-			
-		} else {		
-			serviceTask(worker, worker.queue.poll(), time);
 		}
 	}
 
