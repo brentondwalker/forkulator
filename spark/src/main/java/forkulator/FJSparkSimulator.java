@@ -140,9 +140,7 @@ public class FJSparkSimulator {
 		// distribute the simulation segments to workers
 		ArrayList<Integer> ar = new ArrayList<Integer>(num_slices);
 		for (int i=0; i<num_slices; i++) { ar.add(i); }
-		JavaRDD<FJDataAggregator> rdd = spark.parallelize(ar, num_slices)
-		    .map(s -> doSimulation(foptions,s))
-		  .cache();
+		JavaRDD<FJDataAggregator> rdd = spark.parallelize(ar, num_slices).map(s -> doSimulation(foptions,s)).cache();
 		List<FJDataAggregator> dl = rdd.collect();
 		//System.out.println("rdd = "+rdd);
 		//System.out.println("dl = "+dl);
