@@ -90,6 +90,9 @@ public class FJPathLogger implements Serializable {
 	public void addJob(FJJob job) {
 		if (job_index < numjobs) {
 			job.path_log_id = job_index++;
+			for (FJTask task : job.tasks) {
+				task.path_log_id = task_index++;
+			}
 		}
 	}
 	
@@ -105,16 +108,16 @@ public class FJPathLogger implements Serializable {
 				job_start_time = Math.min(job_start_time, job.tasks[i].start_time);
 			}
 			for (int i=0; i<job.num_tasks; i++) {
-				task_data[task_index] = new TaskDatum();
-				task_data[task_index].task_id = task_index;
-				task_data[task_index].job_id = job.path_log_id;
-				task_data[task_index].job_arrival_time = job.arrival_time;
-				task_data[task_index].job_start_time = job_start_time;
-				task_data[task_index].job_completion_time = job.completion_time;
-				task_data[task_index].job_departure_time = job.departure_time;
-				task_data[task_index].task_completion_time = job.tasks[i].completion_time;
-				task_data[task_index].task_start_time = job.tasks[i].start_time;
-				task_index++;
+				int ti = job.tasks[i].path_log_id;
+				task_data[ti] = new TaskDatum();
+				task_data[ti].task_id = ti;
+				task_data[ti].job_id = job.path_log_id;
+				task_data[ti].job_arrival_time = job.arrival_time;
+				task_data[ti].job_start_time = job_start_time;
+				task_data[ti].job_completion_time = job.completion_time;
+				task_data[ti].job_departure_time = job.departure_time;
+				task_data[ti].task_completion_time = job.tasks[i].completion_time;
+				task_data[ti].task_start_time = job.tasks[i].start_time;
 			}
 		}
 	}

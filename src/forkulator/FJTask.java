@@ -12,6 +12,9 @@ public class FJTask {
 	public FJJob job = null;
 	public IntertimeProcess service_process = null;
 	
+	// this is assigned and used by FJPathLogger to keep track of the sequence of task arrivals
+	public int path_log_id = -1;
+	
 	/**
 	 * Constuctor
 	 * 
