@@ -77,7 +77,9 @@ public class FJSimulator {
 		if (server_queue_type.toLowerCase().equals("s")) {
 			this.server = new FJSingleQueueServer(num_workers);
 		} else if (server_queue_type.toLowerCase().equals("w")) {
-			this.server = new FJWorkerQueueServer(num_workers);
+			this.server = new FJWorkerQueueServer(num_workers); 
+		} else if (server_queue_type.toLowerCase().equals("sm")) {
+			this.server = new FJSplitMergeServer(num_workers);
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
@@ -447,7 +449,7 @@ public class FJSimulator {
 		
 		// optional path logger
 		if (options.hasOption("p")) {
-			data_aggregator.path_logger = new FJPathLogger(Integer.parseInt(options.getOptionValue("p")), num_tasks);
+			data_aggregator.path_logger = new FJPathLogger((int)(1 + num_jobs/sampling_interval), num_tasks);
 		}
 		
 		// simulator
