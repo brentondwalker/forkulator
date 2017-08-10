@@ -1,6 +1,9 @@
 package forkulator;
 
 import org.apache.spark.api.java.JavaSparkContext;
+
+import forkulator.randomprocess.IntertimeProcess;
+
 import org.apache.spark.api.java.JavaRDD;
 import java.io.BufferedWriter;
 import java.io.File;

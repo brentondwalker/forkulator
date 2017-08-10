@@ -6,6 +6,14 @@ import java.util.LinkedList;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.PosixParser;
+
+import forkulator.randomprocess.ConstantIntertimeProcess;
+import forkulator.randomprocess.ErlangIntertimeProcess;
+import forkulator.randomprocess.ExponentialIntertimeProcess;
+import forkulator.randomprocess.FullNormalIntertimeProcess;
+import forkulator.randomprocess.IntertimeProcess;
+import forkulator.randomprocess.WeibullIntertimeProcess;
+
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;

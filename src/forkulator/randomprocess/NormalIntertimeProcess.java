@@ -1,4 +1,4 @@
-package forkulator;
+package forkulator.randomprocess;
 
 public class NormalIntertimeProcess extends IntertimeProcess {
 	

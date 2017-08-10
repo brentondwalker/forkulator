@@ -1,16 +1,16 @@
-package forkulator;
+package forkulator.randomprocess;
 
-public class ExponentialIntertimeProcess extends IntertimeProcess {
+public class ConstantIntertimeProcess  extends IntertimeProcess {
 
 	public double rate = 1.0;
 	
-	public ExponentialIntertimeProcess(double rate) {
+	public ConstantIntertimeProcess(double rate) {
 		this.rate = rate;
 	}
 	
 	@Override
 	public double nextInterval(int jobSize) {
-		return -Math.log(rand.nextDouble())/rate;
+		return 1.0/rate;
 	}
 
 	@Override
@@ -20,7 +20,7 @@ public class ExponentialIntertimeProcess extends IntertimeProcess {
 
 	@Override
 	public IntertimeProcess clone() {
-		return new ExponentialIntertimeProcess(rate);
+		return new ConstantIntertimeProcess(rate);
 	}
 
 	@Override

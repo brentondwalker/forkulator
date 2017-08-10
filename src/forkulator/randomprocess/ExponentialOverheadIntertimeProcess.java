@@ -1,4 +1,4 @@
-package forkulator;
+package forkulator.randomprocess;
 
 /**
  * This is like an exponential intertime process, but it allows you to add

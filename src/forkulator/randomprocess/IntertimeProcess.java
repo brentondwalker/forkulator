@@ -1,4 +1,4 @@
-package forkulator;
+package forkulator.randomprocess;
 
 import java.util.Random;
 

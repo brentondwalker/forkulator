@@ -1,5 +1,6 @@
 package forkulator;
 
+import forkulator.randomprocess.IntertimeProcess;
 
 public class FJTask {
 	
