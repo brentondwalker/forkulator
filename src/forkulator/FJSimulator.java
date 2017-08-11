@@ -122,6 +122,9 @@ public class FJSimulator {
 				int num_stages = Integer.parseInt(server_queue_spec[1]);
 				this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages, false);
 			}
+		} else if (server_queue_type.toLowerCase().equals("sdl")) {
+		    double data_location_penalty = Double.parseDouble(server_queue_spec[1]);
+		    this.server = new FJSingleQueueDataLocationServer(num_workers, data_location_penalty);
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);

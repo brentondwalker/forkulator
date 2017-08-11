@@ -16,6 +16,11 @@ public class FJTask {
 	// this is assigned and used by FJPathLogger to keep track of the sequence of task arrivals
 	public int path_log_id = -1;
 	
+	// if we add data location awareness to the tasks, this will represent
+	// which worker holds the data needed for this task
+	// for now assume there is no redundancy in the placement of data.
+	public int data_host = -1;
+	
 	/**
 	 * Constuctor
 	 * 
