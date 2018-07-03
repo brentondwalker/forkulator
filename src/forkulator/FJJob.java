@@ -65,6 +65,26 @@ public class FJJob implements Comparable<FJJob> {
 	}
 	
 	/**
+	 * Adds up the service times of all k tasks and sets all the service times to sum/k.
+	 * The total work required by the job is preserved, but now  all tasks are identical.
+	 * When num_workers==num_tasks another way to do this is to use k=1 and set the service
+	 * intertime process to be the sum of k independent samples of whatever other process you want
+	 * divided by k.  The case of exponential/Erlang is the only example where we know what that
+	 * would be, though.
+	 */
+	public void equalizeTasks() {
+		double s = 0.0;
+		for (FJTask t : this.tasks) {
+			s += t.service_time;
+		}
+		double equal_service_time = s/this.tasks.length;
+		for (FJTask t : this.tasks) {
+			t.service_time = equal_service_time;
+		}
+	}
+
+	
+	/**
 	 * Clean up the object to hopefully make things easier for the garbage collector.
 	 * 
 	 * This also feeds the sampled jobs to the data_aggregator before destroying the job.

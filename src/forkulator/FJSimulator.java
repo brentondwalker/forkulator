@@ -45,7 +45,9 @@ public class FJSimulator {
 	public double quanile_epsilon = 1e-6;
 	
 	public FJDataAggregator data_aggregator = null;
-
+	
+	public boolean equalize_tasks = false;
+	
 	/**
 	 * constructor
 	 * 
@@ -57,7 +59,11 @@ public class FJSimulator {
 	 * @param data_aggregator
 	 * @param path_logger
 	 */
-	public FJSimulator(String[] server_queue_spec, int num_workers, int num_tasks, IntertimeProcess arrival_process, IntertimeProcess service_process, FJDataAggregator data_aggregator) {
+	public FJSimulator(String[] server_queue_spec,
+			int num_workers, int num_tasks,
+			IntertimeProcess arrival_process,
+			IntertimeProcess service_process,
+			FJDataAggregator data_aggregator) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
@@ -396,6 +402,7 @@ public class FJSimulator {
 		cli_options.addOption("n", "numsamples", true, "number of samples to produce.  Multiply this by the sampling interval to get the number of jobs that will be run");
 		cli_options.addOption("i", "samplinginterval", true, "samplig interval");
 		cli_options.addOption("p", "savepath", true, "save some iterations of the simulation path (arrival time, service time etc...)");
+		cli_options.addOption("e", "equal", false, "equally divide the work of each job between the tasks");
 		cli_options.addOption(OptionBuilder.withLongOpt("queuetype").hasArgs().isRequired().withDescription("queue type and arguments").create("q"));
 		cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().isRequired().withDescription("the base name of the output files").create("o"));
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
@@ -420,6 +427,7 @@ public class FJSimulator {
 		long num_samples = Long.parseLong(options.getOptionValue("n"));
 		int sampling_interval = Integer.parseInt(options.getOptionValue("i"));
 		String outfile_base = options.getOptionValue("o");
+		boolean equalize_tasks = options.hasOption("e");
 
 		// compute the number of jobs necessary to get the desired samples
 		long num_jobs = num_samples * sampling_interval;

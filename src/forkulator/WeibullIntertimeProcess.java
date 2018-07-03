@@ -23,14 +23,15 @@ public class WeibullIntertimeProcess extends IntertimeProcess {
 	public WeibullDistribution f = null;
 	
 	/**
-	 * Constructor where you set both shape and scale.
+	 * Constructor where you set both shape and rate.
+	 * The constructor will solve for the correct scale param to give the desired rate.
 	 * 
 	 * @param shape
-	 * @param scale
+	 * @param rate
 	 */
-	public WeibullIntertimeProcess(double shape, double scale) {
+	public WeibullIntertimeProcess(double shape, double rate) {
 		this.shape = shape;
-		this.scale = scale;
+		this.scale = 1.0/(rate*Gamma.gamma(1.0 + 1.0/shape));
 		this.f = new WeibullDistribution(shape, scale);
 	}
 	
