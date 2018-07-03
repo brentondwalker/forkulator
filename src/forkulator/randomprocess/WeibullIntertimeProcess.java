@@ -1,4 +1,4 @@
-package forkulator;
+package forkulator.randomprocess;
 
 import org.apache.commons.math3.special.Gamma;
 import org.apache.commons.math3.distribution.WeibullDistribution;

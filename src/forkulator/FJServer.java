@@ -96,7 +96,10 @@ public abstract class FJServer {
 	 * @param time
 	 */
 	public void serviceTask(FJWorker worker, FJTask task, double time) {
-		//if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task.ID);
+		if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task);
+	    assert(worker.current_task == null);
+	    assert(! task.processing);
+	    assert(! task.completed);
 		worker.current_task = task;
 		if (task != null) {
 			task.worker = worker;

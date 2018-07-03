@@ -6,6 +6,14 @@ import java.util.LinkedList;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.PosixParser;
+
+import forkulator.randomprocess.ConstantIntertimeProcess;
+import forkulator.randomprocess.ErlangIntertimeProcess;
+import forkulator.randomprocess.ExponentialIntertimeProcess;
+import forkulator.randomprocess.FullNormalIntertimeProcess;
+import forkulator.randomprocess.IntertimeProcess;
+import forkulator.randomprocess.WeibullIntertimeProcess;
+
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
@@ -120,6 +128,9 @@ public class FJSimulator {
 				int num_stages = Integer.parseInt(server_queue_spec[1]);
 				this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages, false);
 			}
+		} else if (server_queue_type.toLowerCase().equals("sdl")) {
+		    double data_location_penalty = Double.parseDouble(server_queue_spec[1]);
+		    this.server = new FJSingleQueueDataLocationServer(num_workers, data_location_penalty);
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);
