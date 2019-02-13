@@ -48,65 +48,101 @@ public class FJSingleQueueDataLocationServer extends FJServer {
      * Since this server is data location aware, we first check if
      * there's a task whose data is located on the vacant worker.
      * 
+     * Ensure that: All tasks of current job must get serviced before the next job.
+     * This complicates things if there are multiple idle servers.  Suppose there are
+     * two idle servers, 1, 2, and the current job only has a task that wants to run
+     * on server 2.  Ideally we would assign that task to server 2, and a task from the
+     * next job to server 1.  But if we assign tasks to servers in order, then we
+     * assign that task to server 1, and a task from the next job to server 2.   
+     * 
+     * The solution is to loop over the waiting tasks and see if they can find a home.
+     * If not, assign them to any idle server.
+     * This will work under the assumption that each job contains at least one task
+     * for each server.  In that case the next job in line has at least enough tasks
+     * to feed every server, and the stipulation above means that we can never look
+     * more than one job deep into the queue.
+     * 
+     * In the single-queue system, if there are tasks waiting, then only one server
+     * can become idle at a time.  If the task queue is empty, then when a new job
+     * arrives we can safely iterate over the idle workers and see if the job
+     * contains any tasks for them.  In the normal situation each job will contain
+     * one task for each worker.
+     * 
      * @param time
      */
     public void feedWorkers(double time) {
-        // check for idle workers
+        // if there is no current job, just return
+        if (current_job == null && job_queue.isEmpty()) return;
+        if (current_job.fully_serviced) {
+            //if (FJSimulator.DEBUG) System.out.println("feedWorkers() grab a new job");
+            current_job = job_queue.poll();
+        }
+        
+        int num_idle_workers = 0;
         for (int i=0; i<num_workers; i++) {
+            if (workers[0][i].current_task == null) num_idle_workers++;
+        }
+        
+        while (num_idle_workers > 0 && current_job!=null) {
+        
+            boolean task_assigned = false;
+            boolean tasks_remaining = false;
 
-            if (workers[0][i].current_task == null) {
-                //if (FJSimulator.DEBUG) System.out.println("feedWorkers() worker is vacant: "+i);
+            // first pass: try to match a task to a worker holding its data
+            for (int j=0; j<current_job.tasks.length; j++) {
+                FJTask tt = current_job.tasks[j];
+                
+                if (!tt.processing && !tt.completed) {
+                    tasks_remaining = true;
 
-                while (workers[0][i].current_task == null) {
+                    // try and find an idle server hosting the data for this task
+                    // check for idle workers
+                    for (int i=0; i<num_workers; i++) {
 
-                    // if there is no current job, just return
-                    if (current_job == null) return;
-
-                    // check if this job has an unserviced task whose data is on this worker
-                    // TODO: this logic would be more consistent to put in FJJob
-                    for (int j=0; j<current_job.tasks.length; j++) {
-                        FJTask tt = current_job.tasks[j];
-                        if (tt.data_host == i) {
-                            if ((! tt.processing) && (! tt.completed)) {
-                                //if (FJSimulator.DEBUG) System.out.println("feedWorkers() found a macthed spot on worker "+i);
+                        if (workers[0][i].current_task == null) {
+                            //if (FJSimulator.DEBUG) System.out.println("feedWorkers() worker is vacant: "+i);
+                            if (tt.data_host == i) {
+                                task_assigned = true;
+                                if (FJSimulator.DEBUG) System.out.println("feedWorkers() assigning task "+j+" to worker "+i+" holding its data");
                                 serviceTask(workers[0][i], tt, time);
+                                num_idle_workers--;
+                                break;
                             }
                         }
-                    }
-
-                    // otherwise service the next task
-                    // TODO: if multiple workers can be free at the same time,
-                    // then this is not optimal.  We might pick a task that would be better
-                    // to run on another vacant worker.
-                    // Might be better to loop over the remaining tasks and pick the best worker??
-                    // no, not really.  Neither way is foolproof.
-                    if (workers[0][i].current_task == null) {
-                        for (int j=0; j<current_job.tasks.length; j++) {
-                            FJTask tt = current_job.tasks[j];
-                            if ((! tt.processing) && (! tt.completed)) {
-                                // since this isn't the task's data location, there's a penalty in service time
-                                // for starters, assume the penalty is equal to the service time
-                                //if (FJSimulator.DEBUG) System.out.println("feedWorkers() settled for a spot on worker "+i);
-                                tt.service_time *= data_location_penalty;
-                                serviceTask(workers[0][i], tt, time);
-                                 break;
-                            }
-                        }
-                    }
-
-                    // if there were no tasks left, mark the job as serviced and dequeue
-                    if (workers[0][i].current_task == null) {
-                        //if (FJSimulator.DEBUG) System.out.println("feedWorkers() job is fully serviced");
-                        current_job.fully_serviced = true;
-                    }
-
-                    // if the current job is exhausted, grab a new one (or null)
-                    if (current_job.fully_serviced) {
-                        //if (FJSimulator.DEBUG) System.out.println("feedWorkers() grab a new job");
-                        current_job = job_queue.poll();
                     }
                 }
-                //if (FJSimulator.DEBUG) System.out.println("feedWorkers() done with worker "+i);
+            }
+            
+            // optional pass 2: we iterated all tasks and all idle workers and didn't
+            // find a match.  just assign the first task to the first available worker.
+            if (tasks_remaining && !task_assigned) {
+                for (int j=0; j<current_job.tasks.length; j++) {
+                    FJTask tt = current_job.tasks[j];
+                    if (!tt.processing && !tt.completed) {
+                        for (int i=0; i<num_workers; i++) {
+                            if (workers[0][i].current_task == null) {
+                                task_assigned = true;
+                                if (FJSimulator.DEBUG) System.out.println("feedWorkers() assigning task "+j+" to worker "+i+"");
+                                tt.service_time *= (1.0 + data_location_penalty);
+                                serviceTask(workers[0][i], tt, time);
+                                num_idle_workers--;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // if there were no tasks left, mark the job as serviced and dequeue
+            if (! tasks_remaining) {
+                //if (FJSimulator.DEBUG) System.out.println("feedWorkers() job is fully serviced");
+                current_job.fully_serviced = true;
+            }
+            
+            // if the current job is exhausted, grab a new one (or null)
+            if (current_job.fully_serviced) {
+                //if (FJSimulator.DEBUG) System.out.println("feedWorkers() grab a new job");
+                current_job = job_queue.poll();
             }
         }
     }

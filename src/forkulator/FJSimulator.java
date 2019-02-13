@@ -129,6 +129,10 @@ public class FJSimulator {
 				this.server = new FJMultiStageWorkerQueueServer(num_workers, num_stages, false);
 			}
 		} else if (server_queue_type.toLowerCase().equals("sdl")) {
+		    if (server_queue_spec.length != 2) {
+                System.err.println("ERROR: sdl queue requires a numeric data_location_penalty parameter");
+                System.exit(0);
+            }
 		    double data_location_penalty = Double.parseDouble(server_queue_spec[1]);
 		    this.server = new FJSingleQueueDataLocationServer(num_workers, data_location_penalty);
 		} else {
@@ -169,7 +173,7 @@ public class FJSimulator {
 				if (((jobs_processed*100)%num_jobs)==0)
 					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%");
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
-				FJJob job = new FJJob(num_tasks, service_process, e.time);
+				FJJob job = new FJJob(num_tasks, server.num_workers, service_process, e.time);
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
 					if (data_aggregator.path_logger != null) {

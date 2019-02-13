@@ -1,6 +1,8 @@
 package forkulator;
 
 import forkulator.randomprocess.IntertimeProcess;
+import java.util.Random;
+
 
 public class FJJob implements Comparable<FJJob> {
 
@@ -27,6 +29,9 @@ public class FJJob implements Comparable<FJJob> {
 
     // this is assigned and used by FJPathLogger to keep track of the sequence of job arrivals
     public int path_log_id = -1;
+    
+    private Random rand = new Random();
+    
 
     /**
      * Constructor
@@ -35,14 +40,15 @@ public class FJJob implements Comparable<FJJob> {
      * @param service_process
      * @param arrival_time
      */
-    public FJJob(int num_tasks, IntertimeProcess service_process, double arrival_time) {
+    public FJJob(int num_tasks, int num_workers, IntertimeProcess service_process, double arrival_time) {
         this.num_tasks = num_tasks;
 
         tasks = new FJTask[this.num_tasks];
         for (int i=0; i<this.num_tasks; i++) {
             tasks[i] = new FJTask(service_process, arrival_time, this);
             // TODO: this assumes the number of tasks equals the number of servers
-            tasks[i].data_host = i;
+            //tasks[i].data_host = i;
+            tasks[i].data_host = rand.nextInt(num_workers);
         }
     }
 
