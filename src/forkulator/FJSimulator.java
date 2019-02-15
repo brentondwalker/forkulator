@@ -8,10 +8,13 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.PosixParser;
 
 import forkulator.randomprocess.ConstantIntertimeProcess;
+import forkulator.randomprocess.ConstantIntervalPartition;
 import forkulator.randomprocess.ErlangIntertimeProcess;
 import forkulator.randomprocess.ExponentialIntertimeProcess;
 import forkulator.randomprocess.FullNormalIntertimeProcess;
 import forkulator.randomprocess.IntertimeProcess;
+import forkulator.randomprocess.IntervalPartition;
+import forkulator.randomprocess.UniformRandomIntervalPartition;
 import forkulator.randomprocess.WeibullIntertimeProcess;
 
 import org.apache.commons.cli.OptionBuilder;
@@ -47,6 +50,7 @@ public class FJSimulator {
 	public int num_tasks;
 	public IntertimeProcess arrival_process;
 	public IntertimeProcess service_process;
+    public IntervalPartition job_partition_process = null;
 	public FJServer server = null;
 	
 	public double binwidth = 0.1;
@@ -54,7 +58,6 @@ public class FJSimulator {
 	
 	public FJDataAggregator data_aggregator = null;
 	
-	public boolean equalize_tasks = false;
 	
 	/**
 	 * constructor
@@ -71,12 +74,14 @@ public class FJSimulator {
 			int num_workers, int num_tasks,
 			IntertimeProcess arrival_process,
 			IntertimeProcess service_process,
+			IntervalPartition job_partition_process,
 			FJDataAggregator data_aggregator) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
 		this.data_aggregator = data_aggregator;
+		this.job_partition_process = job_partition_process;
 		
 		String server_queue_type = server_queue_spec[0];
 		
@@ -173,7 +178,12 @@ public class FJSimulator {
 				if (((jobs_processed*100)%num_jobs)==0)
 					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%");
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
-				FJJob job = new FJJob(num_tasks, server.num_workers, service_process, e.time);
+				FJJob job;
+				if (this.job_partition_process != null) {
+				    job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
+				} else {
+				    job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
+				}
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
 					if (data_aggregator.path_logger != null) {
@@ -400,6 +410,28 @@ public class FJSimulator {
 		return process;
 	}
 	
+	/**
+     * Parse the arguments given for either the arrival or service process, and
+     * return an appropriately configured IntertimeProcess.
+     * 
+     * @param process_spec
+     * @return
+     */
+    public static IntervalPartition parseJobDivisionSpec(String[] process_spec) {
+        IntervalPartition process = null;
+        if (process_spec[0].equals("u")) {
+            // uniform
+            process = new UniformRandomIntervalPartition(1.0, 1);
+        } else if (process_spec[0].equals("c")) {
+            process = new ConstantIntervalPartition(1.0, 1);
+        } else {
+            System.err.println("ERROR: unable to parse job division spec!");
+            System.exit(1);
+        }
+        
+        return process;
+    }
+
 	
 	
 	/**
@@ -417,11 +449,12 @@ public class FJSimulator {
 		cli_options.addOption("n", "numsamples", true, "number of samples to produce.  Multiply this by the sampling interval to get the number of jobs that will be run");
 		cli_options.addOption("i", "samplinginterval", true, "samplig interval");
 		cli_options.addOption("p", "savepath", true, "save some iterations of the simulation path (arrival time, service time etc...)");
-		cli_options.addOption("e", "equal", false, "equally divide the work of each job between the tasks");
 		cli_options.addOption(OptionBuilder.withLongOpt("queuetype").hasArgs().isRequired().withDescription("queue type and arguments").create("q"));
 		cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().isRequired().withDescription("the base name of the output files").create("o"));
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
+        cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
+
 		// TODO: add options for leaky bucket process filters
 		
 		//CommandLineParser parser = new DefaultParser();
@@ -442,7 +475,6 @@ public class FJSimulator {
 		long num_samples = Long.parseLong(options.getOptionValue("n"));
 		int sampling_interval = Integer.parseInt(options.getOptionValue("i"));
 		String outfile_base = options.getOptionValue("o");
-		boolean equalize_tasks = options.hasOption("e");
 
 		// compute the number of jobs necessary to get the desired samples
 		long num_jobs = num_samples * sampling_interval;
@@ -459,6 +491,15 @@ public class FJSimulator {
 		String[] service_process_spec = options.getOptionValues("S");
 		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
 		
+		//
+        // if we are in job-partitioning mode, figure out the partitioning type
+        //
+        IntervalPartition job_partition_process = null;
+        if (options.hasOption("J")) {
+            String[] job_partition_spec = options.getOptionValues("J");
+            job_partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
+        }
+		
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator((int)(1 + num_jobs/sampling_interval));
 		
@@ -468,7 +509,7 @@ public class FJSimulator {
 		}
 		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
 		
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);

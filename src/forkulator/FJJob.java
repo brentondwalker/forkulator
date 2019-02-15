@@ -3,8 +3,18 @@ package forkulator;
 import forkulator.randomprocess.IntertimeProcess;
 import java.util.Random;
 
-
-public class FJJob implements Comparable<FJJob> {
+/**
+ * In order to support jobs with iid tasks and also jobs where the service
+ * time applies to the job, and the service times of the tasks are subdivisions
+ * of the service time of the job (and other non-iid cases), we make the FJJob
+ * an abstract class.  I am not making it an interface, because there is still
+ * common functionality between FJJob types that will be convenient to implement
+ * here, such as the Comparable interface.
+ * 
+ * @author brenton
+ *
+ */
+public abstract class FJJob implements Comparable<FJJob> {
 
     // essential data about the job
     public double arrival_time = 0.0;
@@ -30,27 +40,19 @@ public class FJJob implements Comparable<FJJob> {
     // this is assigned and used by FJPathLogger to keep track of the sequence of job arrivals
     public int path_log_id = -1;
     
-    private Random rand = new Random();
+    // the random process giving service times of jobs
+    // this would be used in models where the job service times are a random process and
+    // the tasks service times are a subdivision of the job service time
+    public IntertimeProcess job_service_process = null;
+    public double job_service_time = 0;
     
-
-    /**
-     * Constructor
-     * 
-     * @param num_tasks
-     * @param service_process
-     * @param arrival_time
-     */
-    public FJJob(int num_tasks, int num_workers, IntertimeProcess service_process, double arrival_time) {
-        this.num_tasks = num_tasks;
-
-        tasks = new FJTask[this.num_tasks];
-        for (int i=0; i<this.num_tasks; i++) {
-            tasks[i] = new FJTask(service_process, arrival_time, this);
-            // TODO: this assumes the number of tasks equals the number of servers
-            //tasks[i].data_host = i;
-            tasks[i].data_host = rand.nextInt(num_workers);
-        }
-    }
+    // the random process giving service times to this job's tasks
+    // this is passed to the FJTask constructor.
+    public IntertimeProcess task_service_process = null;
+    
+    // at the moment this is only used to assign the data hosts of the tasks
+    protected static Random rand = new Random();
+    
 
     /**
      * Set a flag that records whether or not this job is
