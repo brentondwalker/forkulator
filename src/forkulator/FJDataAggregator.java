@@ -41,12 +41,14 @@ public class FJDataAggregator implements Serializable {
 	public double job_start_time[] = null;
 	public double job_completion_time[] = null;
 	public double job_departure_time[] = null;
+	public double job_cpu_time[] = null;
 	
 	// structures to hold results at the end of the experiment
 	double binwidth = 0.1;
 	int[] job_sojourn_d = null;
 	int[] job_waiting_d = null;
 	int[] job_service_d = null;
+	int[] job_cputime_d = null;
 	
 	// optionally this object can contain a FJPathLogger
 	public FJPathLogger path_logger = null;
@@ -62,6 +64,7 @@ public class FJDataAggregator implements Serializable {
 		job_start_time = new double[max_samples];
 		job_completion_time = new double[max_samples];
 		job_departure_time = new double[max_samples];
+		job_cpu_time = new double[max_samples];
 	}
 	
 	
@@ -80,6 +83,10 @@ public class FJDataAggregator implements Serializable {
 			job_start_time[num_samples] = jst;
 			job_completion_time[num_samples] = job.completion_time;
 			job_departure_time[num_samples] = job.departure_time;
+			job_cpu_time[num_samples] = 0.0;
+			for (FJTask t : job.tasks) {
+			    job_cpu_time[num_samples] += t.service_time;
+			}
 			num_samples++;
 		}
 		
@@ -108,6 +115,7 @@ public class FJDataAggregator implements Serializable {
 		job_sojourn_d = new int[max_bin];
 		job_waiting_d = new int[max_bin];
 		job_service_d = new int[max_bin];
+		job_cputime_d = new int[max_bin];
 		
 		// compute the distributions
 		for (int i=0; i<num_samples; i++) {
@@ -117,6 +125,7 @@ public class FJDataAggregator implements Serializable {
 			job_sojourn_d[(int)(job_sojourn_time/binwidth)]++;
 			job_waiting_d[(int)(job_waiting_time/binwidth)]++;
 			job_service_d[(int)(job_service_time/binwidth)]++;
+			job_cputime_d[(int)(job_cpu_time[i]/binwidth)]++;
 		}
 	}
 	
@@ -139,11 +148,13 @@ public class FJDataAggregator implements Serializable {
 			double sojourn_cdf = 0.0;
 			double waiting_cdf = 0.0;
 			double service_cdf = 0.0;
+			double cputime_cdf = 0.0;
 			int total = num_samples;
 			for (int i=0; i<job_sojourn_d.length; i++) {
 				sojourn_cdf += (1.0*job_sojourn_d[i])/total;
 				waiting_cdf += (1.0*job_waiting_d[i])/total;
 				service_cdf += (1.0*job_service_d[i])/total;
+				cputime_cdf += (1.0*job_cputime_d[i])/total;
 				writer.write(i
 						+"\t"+(i*binwidth)
 						+"\t"+(1.0*job_sojourn_d[i])/(total*binwidth)
@@ -152,6 +163,8 @@ public class FJDataAggregator implements Serializable {
 						+"\t"+waiting_cdf
 						+"\t"+(1.0*job_service_d[i])/(total*binwidth)
 						+"\t"+service_cdf
+						+"\t"+(1.0*job_cputime_d[i])/(total*binwidth)
+                        +"\t"+cputime_cdf
 						+"\n");
 			}
 		} catch (Exception e) {
@@ -188,7 +201,8 @@ public class FJDataAggregator implements Serializable {
 				writer.write(i
 						+"\t"+job_sojourn_time
 						+"\t"+job_waiting_time
-						+"\t"+job_service_time+"\n");
+						+"\t"+job_service_time
+						+"\t"+job_cpu_time[i]+"\n");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -220,7 +234,8 @@ public class FJDataAggregator implements Serializable {
 				writer.write(i
 						+"\t"+job_sojourn_time
 						+"\t"+job_waiting_time
-						+"\t"+job_service_time+"\n");
+						+"\t"+job_service_time
+						+"\t"+job_cpu_time[i]+"\n");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -239,18 +254,21 @@ public class FJDataAggregator implements Serializable {
 		
 		double sojourn_sum = 0.0;
 		double waiting_sum = 0.0;
-		double service_sum = 0.0;
+        double service_sum = 0.0;
+        double cputime_sum = 0.0;
 		for (int i=0; i<num_samples; i++) {
 			waiting_sum += job_start_time[i] - job_arrival_time[i];
 			sojourn_sum += job_departure_time[i] - job_arrival_time[i];
 			service_sum += job_completion_time[i] - job_start_time[i];
+			cputime_sum += job_cpu_time[i];
 		}
 		
 		double total = num_samples;
-		ArrayList<Double> result = new ArrayList<Double>(9 + 1);
+		ArrayList<Double> result = new ArrayList<Double>(12 + 1);
 		result.add(sojourn_sum/total);
 		result.add(waiting_sum/total);
 		result.add(service_sum/total);
+		result.add(cputime_sum/total);
 		result.add(total * 1.0);
 		
 		// also throw in the 10^-6 quantiles
@@ -260,11 +278,13 @@ public class FJDataAggregator implements Serializable {
 		result.add(quantile(job_sojourn_d, num_samples, 1.0e-6, binwidth));
 		result.add(quantile(job_waiting_d, num_samples, 1.0e-6, binwidth));
 		result.add(quantile(job_service_d, num_samples, 1.0e-6, binwidth));
+		result.add(quantile(job_cputime_d, num_samples, 1.0e-6, binwidth));
 
 		// also add 10^-3 quantiles
 		result.add(quantile(job_sojourn_d, num_samples, 1.0e-3, binwidth));
 		result.add(quantile(job_waiting_d, num_samples, 1.0e-3, binwidth));
-		result.add(quantile(job_service_d, num_samples, 1.0e-3, binwidth));
+        result.add(quantile(job_service_d, num_samples, 1.0e-3, binwidth));
+        result.add(quantile(job_cputime_d, num_samples, 1.0e-3, binwidth));
 		
 		return result;
 	}
