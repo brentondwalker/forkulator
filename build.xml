@@ -44,7 +44,8 @@
       <attribute name="Manifest-Version" value="1.0"/>
       <attribute name="Class-Path" value="bin"/>
     </manifest>
-    <jar destfile="forkulator.jar" basedir="bin" includes="forkulator/**.class" manifest="MANIFEST.MF"/>
+    <jar destfile="forkulator.jar" basedir="bin" includes="**/**.class" manifest="MANIFEST.MF"/>
+  	<copy file="forkulator.jar" todir="spark/lib/"/>
   </target>
   
   <target name="doc">

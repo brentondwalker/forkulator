@@ -3,6 +3,7 @@ package forkulator;
 import org.apache.spark.api.java.JavaSparkContext;
 
 import forkulator.randomprocess.IntertimeProcess;
+import forkulator.randomprocess.IntervalPartition;
 
 import org.apache.spark.api.java.JavaRDD;
 import java.io.BufferedWriter;
@@ -79,6 +80,15 @@ public class FJSparkSimulator {
 		String[] service_process_spec = options.getOptionValues("S");
 		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
 		
+		//
+        // if we are in job-partitioning mode, figure out the partitioning type
+        //
+        IntervalPartition job_partition_process = null;
+        if (options.hasOption("J")) {
+            String[] job_partition_spec = options.getOptionValues("J");
+            job_partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
+        }
+
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator(samples_per_slice);
 
@@ -90,7 +100,8 @@ public class FJSparkSimulator {
 		
 		// simulator
 		String[] server_queue_spec = options.getOptionValues("q");
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
+
 
 		// start the simulator running...
 		sim.run(jobs_per_slice, sampling_interval);
@@ -114,6 +125,8 @@ public class FJSparkSimulator {
 		cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().isRequired().withDescription("the base name of the output files").create("o"));
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
+        cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
+
 		
 		CommandLineParser parser = new PosixParser();
 		CommandLine options = null;
