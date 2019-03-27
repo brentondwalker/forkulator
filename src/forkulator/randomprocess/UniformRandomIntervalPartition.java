@@ -72,8 +72,8 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
     
     
     @Override
-    public IntervalPartition getNewPartiton(double size, int num_partitons) {
-        return new UniformRandomIntervalPartition(size, num_partitons);
+    public IntervalPartition getNewPartiton(double size, int num_partitions) {
+        return new UniformRandomIntervalPartition(size, num_partitions);
     }
     
 }
