@@ -130,7 +130,7 @@ public class FJPathLogger implements Serializable {
 	 */
 	public void writePathlog(String outfile_base, boolean compress) {
 		String outfile = outfile_base+"_path.dat";
-		
+
 		if (task_data == null) {
 			System.err.println("WARNING: tried to save a pathlog, but none was recorded");
 			return;

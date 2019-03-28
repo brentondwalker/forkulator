@@ -56,7 +56,7 @@ public class ConstantIntervalPartition extends IntervalPartition {
     
 
     @Override
-    public IntervalPartition getNewPartiton(double size, int num_partitions) {
+    public IntervalPartition getNewPartition(double size, int num_partitions) {
         return new ConstantIntervalPartition(size, num_partitions);
     }
     

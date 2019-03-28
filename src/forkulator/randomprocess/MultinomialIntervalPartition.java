@@ -1,30 +1,28 @@
 package forkulator.randomprocess;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import forkulator.helpers.DistributionHelper;
+
 import java.util.Arrays;
 
 /**
  * Produces service times that are a random sub-division of a larger
  * service time with uniformly random interval boundaries.
  * 
- * @author brenton
+ * @author stefan
  *
  */
-public class UniformRandomIntervalPartition extends IntervalPartition {
-    
-    
+public class MultinomialIntervalPartition extends IntervalPartition {
+
+
     /**
      * Constructor
-     * 
-     * The interval is [0,size], and it will be divided by (num_partitions-1)
-     * boundaries placed uniformly randomly.
-     * 
+     *
+     * The interval is [0,size] and the boundaries are multinomial distributed.
+     *
      * @param size
      * @param num_partitions
      */
-    public UniformRandomIntervalPartition(double size, int num_partitions) {
+    public MultinomialIntervalPartition(double size, int num_partitions) {
         this.num_partitions = num_partitions;
         this.size = size;
         boundaries = new double[this.num_partitions + 1];
@@ -34,16 +32,16 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
     }
 
     /**
-     * Pick (num_partitons-1) uniformly random partition boundaries
-     * in the interval [0,size], and then sort them.
+     * Creates  multinomial distributed partition boundaries.
      */
     protected void setBoundaries() {
-        boundaries[0] = 0.0;
-        boundaries[num_partitions] = size;
-        for (int i=1; i<num_partitions; i++) {
-            boundaries[i] = rand.nextDouble() * size;
+        double[] probabilities = new double[num_partitions + 1];
+        Arrays.fill(probabilities, 1d/num_partitions);
+        int[] partitionSizes = DistributionHelper.multinomial((int)size, probabilities);
+        for (int i = 0; i < partitionSizes.length; i++) {
+            boundaries[i] =
+                    (i > 0) ? (partitionSizes[i] + partitionSizes[i - 1]) : partitionSizes[i];
         }
-        Arrays.sort(boundaries);
     }
     
     /**
@@ -73,7 +71,7 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
     
     @Override
     public IntervalPartition getNewPartition(double size, int num_partitions) {
-        return new UniformRandomIntervalPartition(size, num_partitions);
+        return new MultinomialIntervalPartition(size, num_partitions);
     }
     
 }

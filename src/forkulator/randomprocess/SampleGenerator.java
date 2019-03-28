@@ -3,7 +3,6 @@ package forkulator.randomprocess;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Arrays;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -103,7 +102,7 @@ public class SampleGenerator {
             int batch_num = -1;
             for (int i=0; i<num_samples; i++) {
                 if ((i % num_tasks) == 0) {
-                    p = job_partition_process.getNewPartiton(service_process.nextInterval()*num_workers, num_tasks);
+                    p = job_partition_process.getNewPartition(service_process.nextInterval()*num_workers, num_tasks);
                     batch_num++;
                 }
                 try {

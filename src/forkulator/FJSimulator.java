@@ -3,19 +3,10 @@ package forkulator;
 import java.util.ArrayList;
 import java.util.LinkedList;
 
+import forkulator.randomprocess.*;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.PosixParser;
-
-import forkulator.randomprocess.ConstantIntertimeProcess;
-import forkulator.randomprocess.ConstantIntervalPartition;
-import forkulator.randomprocess.ErlangIntertimeProcess;
-import forkulator.randomprocess.ExponentialIntertimeProcess;
-import forkulator.randomprocess.FullNormalIntertimeProcess;
-import forkulator.randomprocess.IntertimeProcess;
-import forkulator.randomprocess.IntervalPartition;
-import forkulator.randomprocess.UniformRandomIntervalPartition;
-import forkulator.randomprocess.WeibullIntertimeProcess;
 
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.HelpFormatter;
@@ -170,9 +161,8 @@ public class FJSimulator {
 				System.err.println("ERROR: queue exceeded threshold.  The system is unstable.");
 				System.exit(0);
 			}
-			
 			QEvent e = event_queue.removeFirst();
-			
+
 			if (e instanceof QJobArrivalEvent) {
 				jobs_processed++;
 				if (((jobs_processed*100)%num_jobs)==0)
@@ -180,9 +170,9 @@ public class FJSimulator {
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
 				FJJob job;
 				if (this.job_partition_process != null) {
-				    job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
+					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
 				} else {
-				    job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
+					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
 				}
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
@@ -198,7 +188,7 @@ public class FJSimulator {
 					sampling_countdown--;
 				}
 
-				
+
 				// schedule the next job arrival
 				if (jobs_processed < num_jobs) {
 					double interval = arrival_process.nextInterval();
@@ -423,8 +413,10 @@ public class FJSimulator {
             // uniform
             process = new UniformRandomIntervalPartition(1.0, 1);
         } else if (process_spec[0].equals("c")) {
-            process = new ConstantIntervalPartition(1.0, 1);
-        } else {
+			process = new ConstantIntervalPartition(1.0, 1);
+		} else if (process_spec[0].equals("m")) {
+			process = new MultinomialIntervalPartition(1.0, 1);
+		} else {
             System.err.println("ERROR: unable to parse job division spec!");
             System.exit(1);
         }
@@ -510,18 +502,18 @@ public class FJSimulator {
 		
 		// simulator
 		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
-		
+
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
-		
+
 		if (sim.data_aggregator.path_logger != null) {
 			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
 		}
 		
 		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
-		
+
 		data_aggregator.printRawJobData(outfile_base);
-		
+
 		ArrayList<Double> means = data_aggregator.experimentMeans();
 		System.out.println(
 				num_workers
@@ -541,7 +533,7 @@ public class FJSimulator {
 				+"\t"+means.get(9) // service quantile 2
 				);
 		
-		//sim.jobAutocorrelation(outfile_base, 5000);
+//		sim.jobAutocorrelation(outfile_base, 5000);
 	}
 
 }

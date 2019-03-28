@@ -34,12 +34,12 @@ public abstract class IntervalPartition extends IntertimeProcess {
     
     /**
      * Get a new IntervalPartition of the same type as this one, but possibly
-     * with different size and num_partitons parameters.
+     * with different size and num_partitions parameters.
      * 
      * @param size
-     * @param num_partitons
+     * @param num_partitions
      * @return
      */
-    public abstract IntervalPartition getNewPartiton(double size, int num_partitons);
+    public abstract IntervalPartition getNewPartition(double size, int num_partitions);
     
 }
