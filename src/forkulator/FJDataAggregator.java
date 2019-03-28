@@ -108,20 +108,23 @@ public class FJDataAggregator implements Serializable {
 		double max_value = 0.0;
 		for (int i=0; i<num_samples; i++) {
 			max_value = Math.max(max_value, job_departure_time[i] - job_arrival_time[i]);
+			// TODO is there a better way to calculate necessary array size.
+			max_value = Math.max(max_value, job_cpu_time[i]);
 		}
-		
+
 		// initialize the distributions
 		int max_bin = (int)(max_value/binwidth) + 1;
 		job_sojourn_d = new int[max_bin];
 		job_waiting_d = new int[max_bin];
 		job_service_d = new int[max_bin];
 		job_cputime_d = new int[max_bin];
-		
+
 		// compute the distributions
 		for (int i=0; i<num_samples; i++) {
 			double job_waiting_time = job_start_time[i] - job_arrival_time[i];
 			double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
 			double job_service_time = job_completion_time[i] - job_start_time[i];
+
 			job_sojourn_d[(int)(job_sojourn_time/binwidth)]++;
 			job_waiting_d[(int)(job_waiting_time/binwidth)]++;
 			job_service_d[(int)(job_service_time/binwidth)]++;
@@ -139,7 +142,7 @@ public class FJDataAggregator implements Serializable {
 	public void printExperimentDistributions(String outfile_base, double binwidth) {
 		if (job_sojourn_d == null || binwidth != this.binwidth)
 			computeExperimentDistributions(binwidth);
-		
+
 		// print out the distributions
 		// plot filename using 2:(log($3)) with lines title "sojourn", filename using 2:(log($4)) with lines title "waiting", filename using 2:(log($5)) with lines title "service"
 		BufferedWriter writer = null;
