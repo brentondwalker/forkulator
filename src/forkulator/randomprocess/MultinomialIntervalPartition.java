@@ -35,13 +35,19 @@ public class MultinomialIntervalPartition extends IntervalPartition {
      * Creates  multinomial distributed partition boundaries.
      */
     protected void setBoundaries() {
-        double[] probabilities = new double[num_partitions + 1];
+        int numOfExp = 100;
+        double[] probabilities = new double[num_partitions];
         Arrays.fill(probabilities, 1d/num_partitions);
-        int[] partitionSizes = DistributionHelper.multinomial((int)size, probabilities);
+        int[] partitionSizes = DistributionHelper.multinomial(numOfExp, probabilities);
         for (int i = 0; i < partitionSizes.length; i++) {
-            boundaries[i] =
-                    (i > 0) ? (partitionSizes[i] + partitionSizes[i - 1]) : partitionSizes[i];
+            if (i > 0) {
+                double bound = ((double)partitionSizes[i-1]) / numOfExp * size;
+                boundaries[i] = bound + boundaries[i - 1];
+            } else {
+                boundaries[i] = 0;
+            }
         }
+        boundaries[num_partitions] = size;
     }
     
     /**
