@@ -109,6 +109,7 @@ public class FJSingleQueueServer extends FJServer {
 			
 			// sample and dispose of the job
 			jobDepart(task.job);
+			current_job = null;
 		}
 		
 		// if there is no current job, just clear the worker

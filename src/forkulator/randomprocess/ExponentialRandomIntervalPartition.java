@@ -1,57 +1,54 @@
 package forkulator.randomprocess;
 
-import forkulator.helpers.DistributionHelper;
-
 import java.util.Arrays;
 
 /**
  * Produces service times that are a random sub-division of a larger
- * service time with uniformly random interval boundaries.
+ * service time with exponential random interval boundaries.
  * 
- * @author stefan
+ * @author brenton
  *
  */
-public class MultinomialIntervalPartition extends IntervalPartition {
-
+public class ExponentialRandomIntervalPartition extends IntervalPartition {
+    private double rate = 0.;
 
     /**
      * Constructor
      *
-     * The interval is [0,size] and the boundaries are multinomial distributed.
+     * The interval is [0,size], and it will be divided by (num_partitions-1)
+     * boundaries placed uniformly randomly.
      *
      * @param size
      * @param num_partitions
      */
-    public MultinomialIntervalPartition(double size, int num_partitions) {
+    public ExponentialRandomIntervalPartition(double size, int num_partitions, double rate) {
         this.num_partitions = num_partitions;
         this.size = size;
+        this.rate = rate;
         boundaries = new double[this.num_partitions + 1];
         setBoundaries();
         current_sample = 0;
+        //System.out.println("partitioned [0,"+size+"] : "+" "+Arrays.toString(boundaries));
     }
 
     /**
-     * Creates  multinomial distributed partition boundaries.
+     * Pick (num_partitons-1) uniformly random partition boundaries
+     * in the interval [0,size], and then sort them.
      */
     protected void setBoundaries() {
-        if (num_partitions == 1) {
-            boundaries[0] = 0;
-            boundaries[1] = size;
-        } else {
-            int numOfExp = 10 * num_partitions;
-            double[] probabilities = new double[num_partitions];
-            Arrays.fill(probabilities, 1d / num_partitions);
-            int[] partitionSizes = DistributionHelper.multinomial(numOfExp, probabilities);
-            for (int i = 0; i < partitionSizes.length; i++) {
-                if (i > 0) {
-                    double bound = ((double) partitionSizes[i - 1]) / numOfExp * size;
-                    boundaries[i] = bound + boundaries[i - 1];
-                } else {
-                    boundaries[i] = 0;
-                }
-            }
-            boundaries[num_partitions] = size;
+        boundaries[0] = 0.0;
+        boundaries[num_partitions] = size;
+        double[] partitionSizes = new double[num_partitions];
+        double sum = 0.;
+        for (int i=0; i<num_partitions; i++) {
+            partitionSizes[i] = -Math.log(rand.nextDouble())/rate;
+            sum += partitionSizes[i];
         }
+        double factor = size / sum;
+        for (int i=0; i<(num_partitions-1); i++) {
+            boundaries[i+1] = (partitionSizes[i] * factor + boundaries[i]);
+        }
+        Arrays.sort(boundaries);
     }
     
     /**
@@ -81,7 +78,7 @@ public class MultinomialIntervalPartition extends IntervalPartition {
     
     @Override
     public IntervalPartition getNewPartition(double size, int num_partitions) {
-        return new MultinomialIntervalPartition(size, num_partitions);
+        return new ExponentialRandomIntervalPartition(size, num_partitions, this.rate);
     }
     
 }

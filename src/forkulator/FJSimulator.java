@@ -1,6 +1,7 @@
 package forkulator;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 
 import forkulator.randomprocess.*;
@@ -152,7 +153,6 @@ public class FJSimulator {
 		// before we generated all the job arrivals at once
 		// now to save space we only have one job arrival in the queue at a time
 		event_queue.add(new QJobArrivalEvent(arrival_process.nextInterval()));
-		
 		// start processing events
 		int sampling_countdown = sampling_interval;
 		long jobs_processed = -warmup_interval;
@@ -416,8 +416,37 @@ public class FJSimulator {
 			process = new ConstantIntervalPartition(1.0, 1);
 		} else if (process_spec[0].equals("m")) {
 			process = new MultinomialIntervalPartition(1.0, 1);
-		} else {
-            System.err.println("ERROR: unable to parse job division spec!");
+		} else if (process_spec[0].equals("m2")) {
+			process = new MultinomialIntervalPartitionSingleWell(1.0, 1);
+		} else if (process_spec[0].equals("x")) {
+			if (process_spec.length < 2) {
+				System.err.println("ERROR: Not enough arguments for exponential partitioning!");
+				System.exit(1);
+			}
+			process = new ExponentialRandomIntervalPartition(1.0, 1,
+					Double.parseDouble(process_spec[1]));
+		} else if (process_spec[0].equals("t")) {
+        	if (process_spec.length < 4) {
+				System.err.println("ERROR: Not enough arguments for twice split partition!");
+				System.exit(1);
+			}
+			int partDiv = Integer.parseInt(process_spec[1]);
+			IntervalPartition first =
+					FJSimulator.parseJobDivisionSpec(Arrays.copyOfRange(process_spec, 2,
+							process_spec.length));
+			IntervalPartition second = null;
+			if(process_spec[2].equals("x")) {
+				second =
+						FJSimulator.parseJobDivisionSpec(Arrays.copyOfRange(process_spec, 4,
+								process_spec.length));
+			} else {
+				second =
+						FJSimulator.parseJobDivisionSpec(Arrays.copyOfRange(process_spec, 3,
+								process_spec.length));
+			}
+			process = new TwiceSplitIntervalPartition(partDiv, first, second);
+		}  else {
+            System.err.println("ERROR: unable to parse job division spec!" + Arrays.toString(process_spec));
             System.exit(1);
         }
         
@@ -509,7 +538,7 @@ public class FJSimulator {
 		if (sim.data_aggregator.path_logger != null) {
 			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
 		}
-		
+
 		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 
 		data_aggregator.printRawJobData(outfile_base);
@@ -524,13 +553,14 @@ public class FJSimulator {
 				+"\t"+means.get(0) // sojourn mean
 				+"\t"+means.get(1) // waiting mean
 				+"\t"+means.get(2) // service mean
-				+"\t"+means.get(3) // total
-				+"\t"+means.get(4) // sojourn quantile
-				+"\t"+means.get(5) // waiting quantile
-				+"\t"+means.get(6) // service quanile
-				+"\t"+means.get(7) // sojourn quantile 2
-				+"\t"+means.get(8) // waiting quantile 2
-				+"\t"+means.get(9) // service quantile 2
+				+"\t"+means.get(3) // cpu mean
+				+"\t"+means.get(4) // total
+				+"\t"+means.get(5) // sojourn quantile
+				+"\t"+means.get(6) // waiting quantile
+				+"\t"+means.get(7) // service quanile
+				+"\t"+means.get(8) // sojourn quantile 2
+				+"\t"+means.get(9) // waiting quantile 2
+				+"\t"+means.get(10) // service quantile 2
 				);
 		
 //		sim.jobAutocorrelation(outfile_base, 5000);

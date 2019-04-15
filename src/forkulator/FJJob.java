@@ -23,6 +23,11 @@ public abstract class FJJob implements Comparable<FJJob> {
 
     // the job's tasks
     public int num_tasks = 0;
+    // makes it unnecessary to iterate through the tasks to get this number.
+    // could be merged with (@link completed)
+    public int num_tasks_completed = 0;
+    // prevent iterating through tasks to check if tasks are running.
+    public int num_tasks_running = 0;
     public FJTask[] tasks = null;
 
     // index to keep track of which tasks have been pulled out for service
