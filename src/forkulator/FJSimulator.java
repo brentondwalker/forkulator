@@ -3,6 +3,7 @@ package forkulator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.PriorityQueue;
 
 import forkulator.randomprocess.*;
 import org.apache.commons.cli.CommandLine;
@@ -36,7 +37,7 @@ public class FJSimulator {
 	public static boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
 	
-	public LinkedList<QEvent> event_queue = new LinkedList<QEvent>();
+	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
 	
 	public int num_workers;
 	public int num_tasks;
@@ -161,7 +162,7 @@ public class FJSimulator {
 				System.err.println("ERROR: queue exceeded threshold.  The system is unstable.");
 				System.exit(0);
 			}
-			QEvent e = event_queue.removeFirst();
+			QEvent e = event_queue.poll();
 
 			if (e instanceof QJobArrivalEvent) {
 				jobs_processed++;
@@ -212,39 +213,7 @@ public class FJSimulator {
 	 * @param e
 	 */
 	public void addEvent(QEvent e) {
-		int queue_len = this.event_queue.size();
-		if (event_queue.isEmpty()) {
-			event_queue.add(e);
-		} else if (e.time > this.event_queue.getLast().time) {
-			event_queue.add(e);
-		} else {
-			int i = 0;
-			for (QEvent le : this.event_queue) {
-				if (le.time >= e.time) {
-					event_queue.add(i, e);
-					if (DEBUG) System.out.println("inserting event with time "+e.time+" before event "+i+" with time "+le.time);
-					break;
-				}
-				i++;
-			}
-		}
-		
-		// do a sanity check
-		if ((this.event_queue.size() - queue_len) != 1) {
-			System.err.println("ERROR: adding one thing resulted in wrong change to queue len: "+this.event_queue.size()+"  "+queue_len);
-			System.err.println("new event time: "+e.time);
-			for (QEvent le : this.event_queue) {
-				System.err.println(le.time);
-			}
-		}
-		double last_time = 0.0;
-		for (QEvent le : this.event_queue) {
-			if (le.time < last_time) {
-				System.err.println("ERROR: events in queue out of order!");
-				System.exit(1);
-			}
-			last_time = le.time;
-		}
+	    event_queue.add(e);
 	}
 	
 	
