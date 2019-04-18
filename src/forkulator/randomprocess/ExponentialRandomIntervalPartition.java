@@ -1,32 +1,30 @@
 package forkulator.randomprocess;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.Arrays;
 
 /**
  * Produces service times that are a random sub-division of a larger
- * service time with uniformly random interval boundaries.
+ * service time with exponential random interval boundaries.
  * 
  * @author brenton
  *
  */
-public class UniformRandomIntervalPartition extends IntervalPartition {
-    
-    
+public class ExponentialRandomIntervalPartition extends IntervalPartition {
+    private double rate = 0.;
+
     /**
      * Constructor
-     * 
+     *
      * The interval is [0,size], and it will be divided by (num_partitions-1)
      * boundaries placed uniformly randomly.
-     * 
+     *
      * @param size
      * @param num_partitions
      */
-    public UniformRandomIntervalPartition(double size, int num_partitions) {
+    public ExponentialRandomIntervalPartition(double size, int num_partitions, double rate) {
         this.num_partitions = num_partitions;
         this.size = size;
+        this.rate = rate;
         boundaries = new double[this.num_partitions + 1];
         setBoundaries();
         current_sample = 0;
@@ -40,8 +38,15 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
     protected void setBoundaries() {
         boundaries[0] = 0.0;
         boundaries[num_partitions] = size;
-        for (int i=1; i<num_partitions; i++) {
-            boundaries[i] = rand.nextDouble() * size;
+        double[] partitionSizes = new double[num_partitions];
+        double sum = 0.;
+        for (int i=0; i<num_partitions; i++) {
+            partitionSizes[i] = -Math.log(rand.nextDouble())/rate;
+            sum += partitionSizes[i];
+        }
+        double factor = size / sum;
+        for (int i=0; i<(num_partitions-1); i++) {
+            boundaries[i+1] = (partitionSizes[i] * factor + boundaries[i]);
         }
         Arrays.sort(boundaries);
     }
@@ -73,7 +78,7 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
     
     @Override
     public IntervalPartition getNewPartition(double size, int num_partitions) {
-        return new UniformRandomIntervalPartition(size, num_partitions);
+        return new ExponentialRandomIntervalPartition(size, num_partitions, this.rate);
     }
     
 }

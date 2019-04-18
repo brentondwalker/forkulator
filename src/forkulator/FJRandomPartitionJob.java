@@ -1,7 +1,5 @@
 package forkulator;
 
-import java.util.Arrays;
-
 import forkulator.randomprocess.IntertimeProcess;
 import forkulator.randomprocess.IntervalPartition;
 
@@ -32,7 +30,7 @@ public class FJRandomPartitionJob extends FJJob {
         tasks = new FJTask[this.num_tasks];
         this.num_tasks = num_tasks;
         this.job_service_time = service_process.nextInterval();
-        this.task_service_process = job_partition_process.getNewPartiton(job_service_time*num_workers, this.num_tasks);
+        this.task_service_process = job_partition_process.getNewPartition(job_service_time*num_workers, this.num_tasks);
 
         //double[] tstmp = new double[this.num_tasks];
         //double service_sum = 0.0;

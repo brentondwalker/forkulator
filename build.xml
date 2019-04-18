@@ -30,7 +30,7 @@
   
   <target name="build" description="Compile the classes">
     <mkdir dir="bin"/>
-    <javac srcdir="src/" destdir="bin" deprecation="on" includeantruntime="false">
+    <javac srcdir="src/" destdir="bin" deprecation="on" includeantruntime="false"  debug="on">
         <classpath>
         	<path refid="commons.classpath"/>
         </classpath>

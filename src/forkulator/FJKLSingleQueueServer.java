@@ -53,12 +53,11 @@ public class FJKLSingleQueueServer extends FJServer {
 	 * @param time
 	 */
 	public void feedWorkers(double time) {
+
+		// if there is no current job, just return
+		if (current_job == null) return;
 		// check for idle workers
 		for (int i=0; i<num_workers; i++) {
-
-			// if there is no current job, just return
-			if (current_job == null) return;
-			
 			if (workers[0][i].current_task == null) {
 				// service the next task
 				serviceTask(workers[0][i], current_job.nextTask(), time);
@@ -115,16 +114,18 @@ public class FJKLSingleQueueServer extends FJServer {
 	public void taskCompleted(FJWorker worker, double time) {
 		//if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
 		FJTask task = worker.current_task;
+		worker.current_task = null; // Task completed. Remove it from worker.
 		task.completion_time = time;
 		task.completed = true;
-		
+		task.job.num_tasks_running--;
+
 		if (! task.job.completed) {
 			// check if this task is the l'th of the job.
 			//TODO: this could be more efficient
-			int num_completed = 0;
-			for (FJTask t : task.job.tasks) {
-				num_completed += t.completed ? 1 : 0;
-			}
+			int num_completed = ++task.job.num_tasks_completed;
+//			for (FJTask t : task.job.tasks) {
+//				num_completed += t.completed ? 1 : 0;
+//			}
 			
 			if (num_completed == this.l) {
 				task.job.completed = true;
@@ -137,20 +138,20 @@ public class FJKLSingleQueueServer extends FJServer {
 		// if the job is already complete, check if this was the last task
 		// so we can dispose the job object
 		if (task.job.completed) {
-			boolean total_complete = true;
-			for (FJTask t : task.job.tasks) {
-				total_complete = total_complete && t.completed;
-			}
-			if (total_complete) {
+//			boolean total_complete = true;
+//			for (FJTask t : task.job.tasks) {
+//				total_complete = total_complete && t.completed;
+//			}
+//			if (total_complete) {
+			if (task.job.num_tasks_running == 0) {
 				// sample and dispose of the job
 				jobDepart(task.job);
 			}
 		}
-		
+
 		// if there is no current job, just clear the worker
 		if (current_job == null) {
 			if (FJSimulator.DEBUG) System.out.println("  no current_job");
-			worker.current_task = null;
 			return;
 		}
 		

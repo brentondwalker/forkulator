@@ -81,9 +81,10 @@ public class FJWorkerQueueServer extends FJServer {
 	public void taskCompleted(FJWorker worker, double time) {
 		//if (FJSimulator.DEBUG) System.out.println("task "+worker.current_task.ID+" completed "+time);
 		FJTask task = worker.current_task;
+		worker.current_task = null;
 		task.completion_time = time;
 		task.completed = true;
-		
+
 		// check if this task was the last one of a job
 		//TODO: this could be more efficient
 		boolean compl = true;
@@ -91,14 +92,14 @@ public class FJWorkerQueueServer extends FJServer {
 			compl = compl && t.completed;
 		}
 		task.job.completed = compl;
-		
+
 		if (task.job.completed) {
 			// it is the last, record the completion time
 			task.job.completion_time = time;
-			
+
 			// for this type of server it is also the departure time
 			task.job.departure_time = time;
-			
+
 			// sample and dispose of the job
 			jobDepart(task.job);
 		}

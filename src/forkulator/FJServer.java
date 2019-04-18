@@ -96,17 +96,17 @@ public abstract class FJServer {
 	 * @param time
 	 */
 	public void serviceTask(FJWorker worker, FJTask task, double time) {
-		if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task);
 	    assert(worker.current_task == null);
-	    assert(! task.processing);
-	    assert(! task.completed);
-		worker.current_task = task;
 		if (task != null) {
+			assert(task.job != null);
+			if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task);
+			worker.current_task = task;
+			task.job.num_tasks_running++;
 			task.worker = worker;
 			task.start_time = time;
 			task.processing = true;
-
-			// schedule the task's completion
+//
+//			// schedule the task's completion
 			QTaskCompletionEvent e = new QTaskCompletionEvent(task, time + task.service_time);
 			simulator.addEvent(e);
 		}

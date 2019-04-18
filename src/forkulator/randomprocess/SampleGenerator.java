@@ -3,8 +3,6 @@ package forkulator.randomprocess;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.util.Arrays;
 
 import org.apache.commons.cli.CommandLine;

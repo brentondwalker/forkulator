@@ -18,7 +18,7 @@ autoScalaLibrary := false
 crossPaths := false
 
 // if you are using sbt-eclipse, tell it that this is a java project
-EclipseKeys.projectFlavor := EclipseProjectFlavor.Java
+//EclipseKeys.projectFlavor := EclipseProjectFlavor.Java
 
 assemblyMergeStrategy in assembly := {
  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
