@@ -66,6 +66,50 @@ public class DistributionHelper {
         return outcome;
     }
 
+
+
+    static double worstRuntime(double[] times, int workers) {
+        Arrays.sort(times);
+        return bucketRuntime(times, workers);
+    }
+
+    static double smallestRuntime(double[] times, int workers) {
+        Arrays.sort(times);
+        for (int i = 0; i < times.length / 2; i++) {
+            double temp = times[i];
+            times[i] = times[times.length - 1 - i];
+            times[times.length - 1 - i] = temp;
+        }
+        return bucketRuntime(times, workers);
+    }
+
+    static double bucketRuntime(double[] times, int workers) {
+        if (workers == 0) return 0;
+        double[] buckets = new double[workers];
+        double runtime = 0;
+        for (int i = 0; i < times.length; i++) {
+            double currSmallest = Integer.MAX_VALUE;
+            int smallestIdx = 0;
+            for (int j = 0; j < buckets.length; j++) {
+                if (buckets[j] <= 0) {
+                    smallestIdx = j;
+                    break;
+                } else if (buckets[j] < currSmallest) {
+                    currSmallest = buckets[j];
+                    smallestIdx = j;
+                }
+            }
+            buckets[smallestIdx] += times[i];
+        }
+        double biggestBucket = buckets[0];
+        for (int i = 1; i < buckets.length; i++) {
+            if (buckets[i] > biggestBucket) {
+                biggestBucket = buckets[i];
+            }
+        }
+        return biggestBucket;
+    }
+
     public static void main(String[] args) {
 //        IntertimeProcess e = new ConstantIntertimeProcess(0.1);
 //        for (int i = 0; i < 100; i++)
@@ -83,25 +127,65 @@ public class DistributionHelper {
 //            DistributionHelper.multinomialS(400, probabilities);
 //            IntervalPartition intervalPartition = new MultinomialIntervalPartition(1.0, 40);
 //        }
-        int numPartitions = 16;
+        int[] partitions = new int[]{4,8,12,16,20,24,28,32,48,64};
+        int workers = 4;
+//        double[] smallestRuntime = new double[partitions.length];
+//        double[] normalRuntime = new double[partitions.length];
+//        double[] worstRuntime = new double[partitions.length];
 //        IntervalPartition tmpPartition = new TwiceSplitIntervalPartition(2,
 //                new UniformRandomIntervalPartition(1,1),
 //                new ConstantIntervalPartition(1,1));
-        IntervalPartition tmpPartition = new ExponentialRandomIntervalPartition(1,16, 0.7);
-        for (int c = 0; c < 1;c++) {
-            double[] probabilities = new double[numPartitions];
-            Arrays.fill(probabilities, 1d / numPartitions);
-    //        MultinomialDistribution distribution =
-    //                new MultinomialDistribution(10*numPartitions, probabilities);
+        for (int partitionIdx = 0; partitionIdx < partitions.length; partitionIdx++) {
+            int []distributionBuckets = new int[100];
+            int numPartitions = partitions[partitionIdx];
+//            IntervalPartition tmpPartition = new ConstantIntervalPartition(1,1);
+            IntervalPartition tmpPartition = new WeibullIntervalPartition(1, 5);
+//            IntervalPartition tmpPartition = new ExponentialRandomIntervalPartition(1,1, 0.7);
+//            IntervalPartition tmpPartition = new UniformRandomIntervalPartition(1,16);
+            double accSmallestRuntime = 0;
+            double accNormalRuntime = 0;
+            double accWorstRuntime = 0;
+            int numTests = 1000000;
+            for (int c = 0; c < numTests;c++) {
+                double[] probabilities = new double[numPartitions];
+                Arrays.fill(probabilities, 1d / numPartitions);
+                //        MultinomialDistribution distribution =
+                //                new MultinomialDistribution(10*numPartitions, probabilities);
 //            IntervalPartition intervalPartition = new MultinomialIntervalPartition(1.0, numPartitions);
-            IntervalPartition intervalPartition = tmpPartition.getNewPartition(10, numPartitions);
-            double sum = 0;
-            for (int i = 0; i < numPartitions; i++) {
-                probabilities[i] = intervalPartition.nextInterval();
-                sum += probabilities[i];
+                IntervalPartition intervalPartition = tmpPartition.getNewPartition(workers,
+                        numPartitions);
+                double sum = 0;
+//                System.out.print("|");
+                for (int i = 0; i < numPartitions; i++) {
+                    probabilities[i] = intervalPartition.nextInterval();
+                    distributionBuckets[(int)(probabilities[i]*distributionBuckets.length/workers)]++;
+//                    for (int pr = 0; pr < probabilities[i]*100; pr++)
+//                        System.out.print(" ");
+//                    System.out.print("|");
+                    sum += probabilities[i];
+                }
+//                System.out.println("");
+//            System.out.println(Arrays.toString(probabilities));
+//            System.out.println(sum);
+//            System.out.println("Smallest runtime " + DistributionHelper.smallestRuntime(probabilities, 4));
+                accNormalRuntime += DistributionHelper.bucketRuntime(probabilities, workers);
+                accWorstRuntime += DistributionHelper.worstRuntime(probabilities, workers);
+                accSmallestRuntime += DistributionHelper.smallestRuntime(probabilities, workers);
+
             }
-            System.out.println(Arrays.toString(probabilities));
-            System.out.println(sum);
+//            smallestRuntime[partitionIdx] = accSmallestRuntime/numTests;
+//            normalRuntime[partitionIdx] = accNormalRuntime/numTests;
+//            worstRuntime[partitionIdx] = accWorstRuntime/numTests;
+            System.out.print("w5_"+numPartitions);
+            for(int i = 0; i < distributionBuckets.length; i++) {
+                System.out.print(" " + distributionBuckets[i]);
+            }
+            System.out.println("");
+//            System.out.println(partitions[partitionIdx] + " " + (accSmallestRuntime/numTests) +
+//                    " " + (accNormalRuntime/numTests) + " " + (accWorstRuntime/numTests));
+//            System.out.println("Normal runtime " + accNormalRuntime/numTests);
+//            System.out.println("Smallest runtime " + accSmallestRuntime/numTests);
+//            System.out.println("Worst runtime " + accWorstRuntime/numTests);
         }
     }
 }

@@ -535,11 +535,11 @@ public class FJSimulator {
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 
-		if (sim.data_aggregator.path_logger != null) {
-			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
-		}
+//		if (sim.data_aggregator.path_logger != null) {
+//			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
+//		}
 
-		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
+//		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 
 		data_aggregator.printRawJobData(outfile_base);
 
