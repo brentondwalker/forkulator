@@ -151,6 +151,8 @@ public class FJSplitMergeServer extends FJServer {
 			
 			// service the next job, if any
 			feedWorkers(time);
+		} else {
+			serviceTask(worker, worker.queue.poll(), time);
 		}
 	}
 
