@@ -94,6 +94,17 @@ public class FJDataAggregator implements Serializable {
 			path_logger.recordJob(job);
 		}
 	}
+
+	public void appendDataAggregator(FJDataAggregator dataAggregator) {
+		for (int i = 0; i < dataAggregator.num_samples; i++) {
+			job_arrival_time[num_samples] = dataAggregator.job_arrival_time[i];
+			job_start_time[num_samples] = dataAggregator.job_start_time[i];
+			job_completion_time[num_samples] = dataAggregator.job_completion_time[i];
+			job_departure_time[num_samples] = dataAggregator.job_departure_time[i];
+			job_cpu_time[num_samples] = dataAggregator.job_cpu_time[i];
+			num_samples++;
+		}
+	}
 	
 	
 	/**

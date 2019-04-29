@@ -1,66 +1,65 @@
 package forkulator.randomprocess;
 
-import java.util.Arrays;
+import org.apache.commons.math3.distribution.WeibullDistribution;
 
 /**
- * Produces service times that are a random sub-division of a larger
- * service time with exponential random interval boundaries.
+ * Produces service times that are a sub-division of a larger
+ * service time which is split twice.
  * 
- * @author brenton
+ * @author stefan
  *
  */
-public class ExponentialRandomIntervalPartition extends IntervalPartition {
-    private double rate = 0.;
+public class WeibullIntervalPartition extends IntervalPartition {
+    public double shape = 0.25;   // alpha  // 1/k
+    public double scale = 1.0;    // beta   // lambda
+    public WeibullDistribution f = null;
+
 
     /**
      * Constructor
      *
-     * The interval is [0,size], and it will be divided by (num_partitions-1)
-     * boundaries placed uniformly randomly.
+     * The interval is [0,size] and the boundaries are multinomial distributed.
      *
-     * @param size
-     * @param num_partitions
+     * @param partDiv
+     * @param firstPartitionSplitter
+     * @param secondPartitionSplitter
      */
-    public ExponentialRandomIntervalPartition(double size, int num_partitions, double rate) {
-        this.num_partitions = num_partitions;
-        this.size = size;
-        this.rate = rate;
+    public WeibullIntervalPartition(double shape, double scale) {
+        this.num_partitions = 1;
+        this.size = 0;
+        this.shape = shape;
+        this.scale = scale;
         boundaries = new double[this.num_partitions + 1];
-        setBoundaries();
         current_sample = 0;
-        //System.out.println("partitioned [0,"+size+"] : "+" "+Arrays.toString(boundaries));
+        this.f = new WeibullDistribution(scale, shape);
+        this.setBoundaries();
     }
 
-    /**
-     * Pick (num_partitons-1) uniformly random partition boundaries
-     * in the interval [0,size], and then sort them.
-     */
-//    protected void setBoundaries() {
-//        boundaries[0] = 0.0;
-//        boundaries[num_partitions] = size;
-//        for (int i=1; i<num_partitions; i++) {
-//            boundaries[i] = getSingleVal();
-//        }
-//        Arrays.sort(boundaries);
-//    }
+    public WeibullIntervalPartition(double size, int num_partitions, double shape, double scale) {
+        this.size = size;
+        this.num_partitions = num_partitions;
+        this.shape = shape;
+        this.scale = scale;
+        boundaries = new double[this.num_partitions + 1];
+        current_sample = 0;
+        this.f = new WeibullDistribution(scale, shape);
+        this.setBoundaries();
+    }
+
+
     protected void setBoundaries() {
         boundaries[0] = 0.0;
         boundaries[num_partitions] = size;
         double[] partitionSizes = new double[num_partitions];
         double sum = 0.;
         for (int i=0; i<num_partitions; i++) {
-            partitionSizes[i] = -Math.log(rand.nextDouble())/rate;
+            partitionSizes[i] = f.sample();
             sum += partitionSizes[i];
         }
         double factor = size / sum;
         for (int i=0; i<(num_partitions-1); i++) {
             boundaries[i+1] = (partitionSizes[i] * factor + boundaries[i]);
         }
-//        Arrays.sort(boundaries);
-    }
-
-    private double getSingleVal() {
-        return -Math.log(rand.nextDouble()) * size;
     }
     
     /**
@@ -90,7 +89,7 @@ public class ExponentialRandomIntervalPartition extends IntervalPartition {
     
     @Override
     public IntervalPartition getNewPartition(double size, int num_partitions) {
-        return new ExponentialRandomIntervalPartition(size, num_partitions, this.rate);
+        return new WeibullIntervalPartition(size, num_partitions, this.shape, this.scale);
     }
     
 }

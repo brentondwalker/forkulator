@@ -37,6 +37,21 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
      * Pick (num_partitons-1) uniformly random partition boundaries
      * in the interval [0,size], and then sort them.
      */
+//    protected void setBoundaries() {
+//        boundaries[0] = 0.0;
+//        boundaries[num_partitions] = size;
+//        double[] partitionSizes = new double[num_partitions];
+//        double sum = 0.;
+//        for (int i=0; i<num_partitions; i++) {
+//            partitionSizes[i] = rand.nextDouble() * size;
+//            sum += partitionSizes[i];
+//        }
+//        double factor = size / sum;
+//        for (int i=0; i<(num_partitions-1); i++) {
+//            boundaries[i+1] = (partitionSizes[i] * factor + boundaries[i]);
+//        }
+////        Arrays.sort(boundaries);
+//    }
     protected void setBoundaries() {
         boundaries[0] = 0.0;
         boundaries[num_partitions] = size;
