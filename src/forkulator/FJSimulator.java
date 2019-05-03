@@ -83,7 +83,7 @@ public class FJSimulator {
 		} else if (server_queue_type.toLowerCase().equals("w")) {
 			this.server = new FJWorkerQueueServer(num_workers); 
 		} else if (server_queue_type.toLowerCase().equals("sm")) {
-			this.server = new FJSplitMergeServer(num_workers);
+			this.server = new FJKLSingleQueueSplitMergeServer(num_workers);
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
@@ -172,7 +172,8 @@ public class FJSimulator {
 
 				FJJob job;
 				if (this.job_partition_process != null) {
-					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
+					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process,
+							job_partition_process, e.time);
 				} else {
 					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
 				}
@@ -505,11 +506,11 @@ public class FJSimulator {
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 
-		if (sim.data_aggregator.path_logger != null) {
-			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
-		}
+//		if (sim.data_aggregator.path_logger != null) {
+//			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
+//		}
 
-		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
+//		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 
 		data_aggregator.printRawJobData(outfile_base);
 
