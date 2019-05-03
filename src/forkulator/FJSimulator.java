@@ -167,8 +167,9 @@ public class FJSimulator {
 			if (e instanceof QJobArrivalEvent) {
 				jobs_processed++;
 				if (((jobs_processed*100)%num_jobs)==0)
-					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%");
+					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%\tqueuesize="+server.queueLength());
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
+
 				FJJob job;
 				if (this.job_partition_process != null) {
 					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);

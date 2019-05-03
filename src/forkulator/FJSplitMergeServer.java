@@ -161,11 +161,7 @@ public class FJSplitMergeServer extends FJServer {
 	 */
 	@Override
 	public int queueLength() {
-		int lsum = 0;
-		for (FJWorker w : workers[0])
-			lsum += w.queue.size();
-
-		return (lsum / num_workers);
+	    return this.job_queue.size();
 	}
 	
 	
