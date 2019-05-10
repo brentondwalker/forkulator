@@ -130,7 +130,7 @@ public class SampleGenerator {
             IntertimeProcess p = null;
             int batch_num = -1;
             for (int i=0; i<num_samples; i++) {
-                if ((i % num_tasks) == 0) {
+                if ((i % num_tasks) == 0 || job_partition_process.independent_samples) {
                     p = job_partition_process.getNewPartition(service_process.nextInterval()*num_workers, num_tasks);
                     batch_num++;
                 }
