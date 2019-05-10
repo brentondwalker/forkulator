@@ -16,6 +16,13 @@ import forkulator.randomprocess.IntervalPartition;
  */
 public class FJRandomPartitionJob extends FJJob {
 
+    /*
+     * Instead of keeping track of a task_service_process, this class treats the
+     * task_service_process as generating job service times, and also holds a 
+     * IntervalPartition process that divides up the job service times.
+     */
+    IntervalPartition job_partition_process = null;
+    
     /**
      * Constructor
      * 
@@ -30,13 +37,18 @@ public class FJRandomPartitionJob extends FJJob {
         tasks = new FJTask[this.num_tasks];
         this.num_tasks = num_tasks;
         this.job_service_time = service_process.nextInterval();
+        this.job_partition_process = job_partition_process;
         this.task_service_process = job_partition_process.getNewPartition(job_service_time*num_workers, this.num_tasks);
 
         //double[] tstmp = new double[this.num_tasks];
         //double service_sum = 0.0;
         
         for (int i=0; i<this.num_tasks; i++) {
-            tasks[i] = new FJTask(task_service_process, arrival_time, this);
+            if (job_partition_process.independentSamples()) {
+                tasks[i] = new FJTask(job_partition_process.getNewPartition(job_service_time*num_workers, this.num_tasks), arrival_time, this);
+            } else {
+                tasks[i] = new FJTask(task_service_process, arrival_time, this);
+            }
             // TODO: this assumes the number of tasks equals the number of servers
             //tasks[i].data_host = i;
             tasks[i].data_host = rand.nextInt(num_workers);

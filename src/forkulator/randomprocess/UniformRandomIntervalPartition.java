@@ -23,15 +23,18 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
      * 
      * @param size
      * @param num_partitions
+     * @param independent_samples
      */
-    public UniformRandomIntervalPartition(double size, int num_partitions) {
+    public UniformRandomIntervalPartition(double size, int num_partitions, boolean independent_samples) {
         this.num_partitions = num_partitions;
         this.size = size;
+        this.independent_samples = independent_samples;
         boundaries = new double[this.num_partitions + 1];
         setBoundaries();
         current_sample = 0;
         //System.out.println("partitioned [0,"+size+"] : "+" "+Arrays.toString(boundaries));
     }
+
 
     /**
      * Pick (num_partitons-1) uniformly random partition boundaries
@@ -73,7 +76,7 @@ public class UniformRandomIntervalPartition extends IntervalPartition {
     
     @Override
     public IntervalPartition getNewPartition(double size, int num_partitions) {
-        return new UniformRandomIntervalPartition(size, num_partitions);
+        return new UniformRandomIntervalPartition(size, num_partitions, independent_samples);
     }
     
 }

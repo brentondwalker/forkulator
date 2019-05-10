@@ -21,6 +21,8 @@ public abstract class IntervalPartition extends IntertimeProcess {
     
     protected int current_sample = 0;
     
+    protected boolean independent_samples = false;
+    
     /**
      * This method should be called for getting service times.
      */
@@ -30,6 +32,20 @@ public abstract class IntervalPartition extends IntertimeProcess {
     
     public double nextInterval(double curentTime) {
         return nextInterval();
+    }
+    
+    /**
+     * In some cases we want to get the service time distribution produced by dividing
+     * jobs into tasks, but we still want the tasks to be i.i.d.  We use this method to
+     * indicate that.
+     * XXX: The use of IntervalPartition should be completely revised.  It should have
+     *      a reference to its corresponding service process and we should only pass
+     *      one service process to the FJRandomPartitionJob constructor.
+     * 
+     * @return
+     */
+    public boolean independentSamples() {
+        return this.independent_samples;
     }
     
     /**

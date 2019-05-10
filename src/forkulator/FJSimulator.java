@@ -172,8 +172,7 @@ public class FJSimulator {
 
 				FJJob job;
 				if (this.job_partition_process != null) {
-					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process,
-							job_partition_process, e.time);
+					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
 				} else {
 					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
 				}
@@ -382,7 +381,10 @@ public class FJSimulator {
         IntervalPartition process = null;
         if (process_spec[0].equals("u")) {
             // uniform
-            process = new UniformRandomIntervalPartition(1.0, 1);
+            process = new UniformRandomIntervalPartition(1.0, 1, false);
+        } else if (process_spec[0].equals("ui")) {
+            // uniform with independent samples
+            process = new UniformRandomIntervalPartition(1.0, 1, true);
         } else if (process_spec[0].equals("c")) {
 			process = new ConstantIntervalPartition(1.0, 1);
 		} else if (process_spec[0].equals("m")) {
@@ -510,7 +512,7 @@ public class FJSimulator {
 //			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
 //		}
 
-//		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
+		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 
 		data_aggregator.printRawJobData(outfile_base);
 
