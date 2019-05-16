@@ -363,6 +363,14 @@ public class FJSimulator {
 			// constant inter-arrival times
 			double rate = Double.parseDouble(process_spec[1]);
 			process = new ConstantIntertimeProcess(rate);
+		} else if (process_spec[0].equals("xr")) {
+			// correlated exponential
+			// requires three args: rate, batch_size, rho
+			System.out.println(Arrays.toString(process_spec));
+			double rate = Double.parseDouble(process_spec[1]);
+			int k = Integer.parseInt(process_spec[2]);
+			double rho = Double.parseDouble(process_spec[3]);
+			process = new CorrelatedExponentialIntertimeProcess(rate, k, rho);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);

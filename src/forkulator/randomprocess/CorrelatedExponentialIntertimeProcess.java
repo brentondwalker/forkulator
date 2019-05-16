@@ -80,7 +80,7 @@ public class CorrelatedExponentialIntertimeProcess extends IntertimeProcess {
     /**
      * Get the next sample.
      */
-	public double nextInterval(int unused) {
+	public double nextInterval() {
 	    if ((sample_index % batch_size) == 0) {
 	        sample_index = 0;
 	        generateSamples();
@@ -88,6 +88,13 @@ public class CorrelatedExponentialIntertimeProcess extends IntertimeProcess {
 	    return (rate * samples[sample_index++]);
 	}
 	
+	public double nextInterval(double unused) {
+		return nextInterval();
+	}
+	
+	public double nextInterval(int unused) {
+		return nextInterval();
+	}
 	
 	/**
 	 * XXX
