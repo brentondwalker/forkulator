@@ -2,6 +2,7 @@ package forkulator.randomprocess;
 
 import java.util.Arrays;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Children of this abstract class model different ways of dividing an interval.
@@ -11,7 +12,7 @@ import java.util.Random;
  */
 public abstract class IntervalPartition extends IntertimeProcess {
     
-    protected static Random rand = new Random();
+    protected Random rand = ThreadLocalRandom.current();
     
     protected int num_partitions;
     

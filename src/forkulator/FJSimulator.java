@@ -34,7 +34,7 @@ import org.apache.commons.cli.ParseException;
  */
 public class FJSimulator {
 	
-	public static boolean DEBUG = false;
+	public static final boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
 	
 	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
@@ -147,6 +147,7 @@ public class FJSimulator {
 	 * @param num_jobs
 	 */
 	public void run(long num_jobs, int sampling_interval) {
+	    System.err.println("running a simulation for "+num_jobs+" jobs with samp interval "+sampling_interval);
 		// compute the warmup period.
 		// Let's say sampling_interval*10*num_stages
 		int warmup_interval = sampling_interval * 10 * server.num_stages;
@@ -433,7 +434,6 @@ public class FJSimulator {
 	 * 
 	 * @param args
 	 */
-	@SuppressWarnings("static-access")
 	public static void main(String[] args) {
 		
 		Options cli_options = new Options();
