@@ -1,7 +1,5 @@
 package forkulator.randomprocess;
 
-import java.util.Arrays;
-
 import org.apache.commons.math3.linear.Array2DRowRealMatrix;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.random.CorrelatedRandomVectorGenerator;

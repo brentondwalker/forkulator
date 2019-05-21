@@ -371,6 +371,15 @@ public class FJSimulator {
 			int k = Integer.parseInt(process_spec[2]);
 			double rho = Double.parseDouble(process_spec[3]);
 			process = new CorrelatedExponentialIntertimeProcess(rate, k, rho);
+		} else if (process_spec[0].equals("xrs")) {
+		    // sum of correlated exponentials
+		    // meant to be used with -J option
+		    // requires three args: rate, batch_size, rho
+		    System.out.println(Arrays.toString(process_spec));
+		    double rate = Double.parseDouble(process_spec[1]);
+		    int k = Integer.parseInt(process_spec[2]);
+		    double rho = Double.parseDouble(process_spec[3]);
+		    process = new CorrelatedExponentialSumIntertimeProcess(rate, k, rho);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);
