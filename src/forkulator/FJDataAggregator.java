@@ -42,6 +42,7 @@ public class FJDataAggregator implements Serializable {
 	public double job_lasttask_time[] = null;
 	public double job_completion_time[] = null;
 	public double job_departure_time[] = null;
+	public double job_inorder_departure_time[] = null;
 	public double job_cpu_time[] = null;
 	
 	// structures to hold results at the end of the experiment
@@ -50,6 +51,7 @@ public class FJDataAggregator implements Serializable {
 	int[] job_waiting_d = null;
 	int[] job_lasttask_d = null;
 	int[] job_service_d = null;
+	int[] job_inorder_sojourn_d = null;
 	int[] job_cputime_d = null;
 	
 	// optionally this object can contain a FJPathLogger
@@ -66,7 +68,8 @@ public class FJDataAggregator implements Serializable {
 		job_start_time = new double[max_samples];
 		job_lasttask_time = new double[max_samples];
 		job_completion_time = new double[max_samples];
-		job_departure_time = new double[max_samples];
+        job_departure_time = new double[max_samples];
+        job_inorder_departure_time = new double[max_samples];
 		job_cpu_time = new double[max_samples];
 	}
 	
@@ -89,11 +92,26 @@ public class FJDataAggregator implements Serializable {
 			job_lasttask_time[num_samples] = jlt;
 			job_completion_time[num_samples] = job.completion_time;
 			job_departure_time[num_samples] = job.departure_time;
+			job_inorder_departure_time[num_samples] = job.departure_time;
 			job_cpu_time[num_samples] = 0.0;
 			for (FJTask t : job.tasks) {
 			    job_cpu_time[num_samples] += t.service_time;
 			}
 			num_samples++;
+		}
+		
+		// even if a job is not flagged for sampling, in order to record in-order
+		// departure times, we may have to go back and adjust the departure times
+		// of past samples.
+		int i = num_samples;
+		while (i > 0) {
+		    i--;
+		    // jobs are sampled on departure, so the departure times in our log are monotonic
+		    if (job_departure_time[i] < job.arrival_time) break;
+		    if ( (job.arrival_time < job_arrival_time[i]) && (job.departure_time > job_inorder_departure_time[i]) ) {
+                //System.out.println("Adjust in-order departure: job_inorder_departure_time["+i+"] "+job_inorder_departure_time[i]+" --> "+job.departure_time);
+		        job_inorder_departure_time[i] = job.departure_time;
+		    }
 		}
 		
 		if (this.path_logger != null) {
@@ -120,7 +138,8 @@ public class FJDataAggregator implements Serializable {
 
 		// initialize the distributions
 		int max_bin = (int)(max_value/binwidth) + 1;
-		job_sojourn_d = new int[max_bin];
+        job_sojourn_d = new int[max_bin];
+        job_inorder_sojourn_d = new int[max_bin];
         job_waiting_d = new int[max_bin];
         job_lasttask_d = new int[max_bin];
 		job_service_d = new int[max_bin];
@@ -130,10 +149,12 @@ public class FJDataAggregator implements Serializable {
 		for (int i=0; i<num_samples; i++) {
             double job_waiting_time = job_start_time[i] - job_arrival_time[i];
             double job_lt_waiting_time = job_lasttask_time[i] - job_arrival_time[i];
-			double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
+            double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
+            double job_inorder_sojourn_time = job_inorder_departure_time[i] - job_arrival_time[i];
 			double job_service_time = job_completion_time[i] - job_start_time[i];
 
-			job_sojourn_d[(int)(job_sojourn_time/binwidth)]++;
+            job_sojourn_d[(int)(job_sojourn_time/binwidth)]++;
+            job_inorder_sojourn_d[(int)(job_inorder_sojourn_time/binwidth)]++;
             job_waiting_d[(int)(job_waiting_time/binwidth)]++;
             job_lasttask_d[(int)(job_lt_waiting_time/binwidth)]++;
 			job_service_d[(int)(job_service_time/binwidth)]++;
@@ -157,22 +178,24 @@ public class FJDataAggregator implements Serializable {
 		BufferedWriter writer = null;
 		try {
 			writer = new BufferedWriter(new FileWriter(outfile_base+"_dist.dat"));
-			double sojourn_cdf = 0.0;
+            double sojourn_cdf = 0.0;
+            double inorder_sojourn_cdf = 0.0;
             double waiting_cdf = 0.0;
             double lasttask_cdf = 0.0;
 			double service_cdf = 0.0;
 			double cputime_cdf = 0.0;
 			int total = num_samples;
 			for (int i=0; i<job_sojourn_d.length; i++) {
-				sojourn_cdf += (1.0*job_sojourn_d[i])/total;
+                sojourn_cdf += (1.0*job_sojourn_d[i])/total;
+                inorder_sojourn_cdf += (1.0*job_sojourn_d[i])/total;
                 waiting_cdf += (1.0*job_waiting_d[i])/total;
                 lasttask_cdf += (1.0*job_lasttask_d[i])/total;
 				service_cdf += (1.0*job_service_d[i])/total;
 				cputime_cdf += (1.0*job_cputime_d[i])/total;
 				writer.write(i
 						+"\t"+(i*binwidth)
-						+"\t"+(1.0*job_sojourn_d[i])/(total*binwidth)
-						+"\t"+sojourn_cdf
+                        +"\t"+(1.0*job_sojourn_d[i])/(total*binwidth)
+                        +"\t"+sojourn_cdf
 						+"\t"+(1.0*job_waiting_d[i])/(total*binwidth)
 						+"\t"+waiting_cdf
 						+"\t"+(1.0*job_service_d[i])/(total*binwidth)
@@ -181,6 +204,8 @@ public class FJDataAggregator implements Serializable {
                         +"\t"+cputime_cdf
                         +"\t"+(1.0*job_lasttask_d[i])/(total*binwidth)
                         +"\t"+lasttask_cdf
+                        +"\t"+(1.0*job_inorder_sojourn_d[i])/(total*binwidth)
+                        +"\t"+inorder_sojourn_cdf
 						+"\n");
 			}
 		} catch (Exception e) {
@@ -215,12 +240,17 @@ public class FJDataAggregator implements Serializable {
                 double job_lt_waiting_time = job_lasttask_time[i] - job_arrival_time[i];
 				double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
 				double job_service_time = job_completion_time[i] - job_start_time[i];
-				writer.write(i
-						+"\t"+job_sojourn_time
+                double job_inorder_sojourn_time = job_inorder_departure_time[i] - job_arrival_time[i];
+                writer.write(i
+                        +"\t"+job_sojourn_time
                         +"\t"+job_waiting_time
-						+"\t"+job_service_time
-						+"\t"+job_cpu_time[i]
-		                +"\t"+job_lt_waiting_time+"\n");
+                        +"\t"+job_service_time
+                        +"\t"+job_cpu_time[i]
+                        +"\t"+job_lt_waiting_time
+                        +"\t"+job_arrival_time[i]
+                        +"\t"+job_departure_time[i]
+                        +"\t"+job_inorder_departure_time[i]
+                        +"\t"+job_inorder_sojourn_time+"\n");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -250,12 +280,17 @@ public class FJDataAggregator implements Serializable {
 				double job_lt_waiting_time = job_lasttask_time[i] - job_arrival_time[i];
 				double job_sojourn_time = job_departure_time[i] - job_arrival_time[i];
 				double job_service_time = job_completion_time[i] - job_start_time[i];
-				writer.write(i
-						+"\t"+job_sojourn_time
-						+"\t"+job_waiting_time
-						+"\t"+job_service_time
-						+"\t"+job_cpu_time[i]
-						+"\t"+job_lt_waiting_time+"\n");
+                double job_inorder_sojourn_time = job_inorder_departure_time[i] - job_arrival_time[i];
+                writer.write(i
+                        +"\t"+job_sojourn_time
+                        +"\t"+job_waiting_time
+                        +"\t"+job_service_time
+                        +"\t"+job_cpu_time[i]
+                        +"\t"+job_lt_waiting_time
+                        +"\t"+job_arrival_time[i]
+                        +"\t"+job_departure_time[i]
+                        +"\t"+job_inorder_departure_time[i]
+                        +"\t"+job_inorder_sojourn_time+"\n");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
