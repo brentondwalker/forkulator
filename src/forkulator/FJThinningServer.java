@@ -4,6 +4,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Random;
 import java.util.TreeSet;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class FJThinningServer extends FJServer {
 	
@@ -32,7 +33,7 @@ public class FJThinningServer extends FJServer {
 	 * The assignment of jobs to servers can be random or deterministic.
 	 */
 	boolean random_thinning = false;
-	protected static Random rand = new Random();
+	protected Random rand = ThreadLocalRandom.current();
 	
 	/**
 	 * We optionally can require resequencing of jobs before they depart.

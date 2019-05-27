@@ -34,7 +34,7 @@ import org.apache.commons.cli.ParseException;
  */
 public class FJSimulator {
 	
-	public static boolean DEBUG = false;
+	public static final boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
 	
 	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
@@ -83,7 +83,7 @@ public class FJSimulator {
 		} else if (server_queue_type.toLowerCase().equals("w")) {
 			this.server = new FJWorkerQueueServer(num_workers); 
 		} else if (server_queue_type.toLowerCase().equals("sm")) {
-			this.server = new FJSplitMergeServer(num_workers);
+			this.server = new FJKLSingleQueueSplitMergeServer(num_workers);
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
@@ -147,6 +147,7 @@ public class FJSimulator {
 	 * @param num_jobs
 	 */
 	public void run(long num_jobs, int sampling_interval) {
+	    System.err.println("running a simulation for "+num_jobs+" jobs with samp interval "+sampling_interval);
 		// compute the warmup period.
 		// Let's say sampling_interval*10*num_stages
 		int warmup_interval = sampling_interval * 10 * server.num_stages;
@@ -167,8 +168,9 @@ public class FJSimulator {
 			if (e instanceof QJobArrivalEvent) {
 				jobs_processed++;
 				if (((jobs_processed*100)%num_jobs)==0)
-					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%");
+					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%\tqueuesize="+server.queueLength());
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
+
 				FJJob job;
 				if (this.job_partition_process != null) {
 					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
@@ -361,6 +363,23 @@ public class FJSimulator {
 			// constant inter-arrival times
 			double rate = Double.parseDouble(process_spec[1]);
 			process = new ConstantIntertimeProcess(rate);
+		} else if (process_spec[0].equals("xr")) {
+			// correlated exponential
+			// requires three args: rate, batch_size, rho
+			System.out.println(Arrays.toString(process_spec));
+			double rate = Double.parseDouble(process_spec[1]);
+			int k = Integer.parseInt(process_spec[2]);
+			double rho = Double.parseDouble(process_spec[3]);
+			process = new CorrelatedExponentialIntertimeProcess(rate, k, rho);
+		} else if (process_spec[0].equals("xrs")) {
+		    // sum of correlated exponentials
+		    // meant to be used with -J option
+		    // requires three args: rate, batch_size, rho
+		    System.out.println(Arrays.toString(process_spec));
+		    double rate = Double.parseDouble(process_spec[1]);
+		    int k = Integer.parseInt(process_spec[2]);
+		    double rho = Double.parseDouble(process_spec[3]);
+		    process = new CorrelatedExponentialSumIntertimeProcess(rate, k, rho);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);
@@ -380,7 +399,10 @@ public class FJSimulator {
         IntervalPartition process = null;
         if (process_spec[0].equals("u")) {
             // uniform
-            process = new UniformRandomIntervalPartition(1.0, 1);
+            process = new UniformRandomIntervalPartition(1.0, 1, false);
+        } else if (process_spec[0].equals("ui")) {
+            // uniform with independent samples
+            process = new UniformRandomIntervalPartition(1.0, 1, true);
         } else if (process_spec[0].equals("c")) {
 			process = new ConstantIntervalPartition(1.0, 1);
 		} else if (process_spec[0].equals("m")) {
@@ -429,7 +451,6 @@ public class FJSimulator {
 	 * 
 	 * @param args
 	 */
-	@SuppressWarnings("static-access")
 	public static void main(String[] args) {
 		
 		Options cli_options = new Options();

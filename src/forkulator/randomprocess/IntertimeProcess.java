@@ -1,6 +1,7 @@
 package forkulator.randomprocess;
 
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * This interface represents a random process of things arriving or being
@@ -15,8 +16,8 @@ import java.util.Random;
  */
 public abstract class IntertimeProcess {
 	
-	protected static Random rand = new Random();
-	
+    protected Random rand = ThreadLocalRandom.current();
+    
 	/**
 	 * This method should be called for getting inter-arrival times.
 	 * If you omit the jobSize it will default to 1.

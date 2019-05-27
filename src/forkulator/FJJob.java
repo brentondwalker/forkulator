@@ -2,6 +2,7 @@ package forkulator;
 
 import forkulator.randomprocess.IntertimeProcess;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * In order to support jobs with iid tasks and also jobs where the service
@@ -56,8 +57,7 @@ public abstract class FJJob implements Comparable<FJJob> {
     public IntertimeProcess task_service_process = null;
     
     // at the moment this is only used to assign the data hosts of the tasks
-    protected static Random rand = new Random();
-    
+    protected Random rand = ThreadLocalRandom.current();
 
     /**
      * Set a flag that records whether or not this job is
