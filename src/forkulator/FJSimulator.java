@@ -36,7 +36,7 @@ public class FJSimulator {
 	
 	public static final boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
-	
+
 	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
 	
 	public int num_workers;
@@ -49,7 +49,7 @@ public class FJSimulator {
 	public double binwidth = 0.1;
 	public double quanile_epsilon = 1e-6;
 	
-	public FJDataAggregator data_aggregator = null;
+	public FJBaseDataAggregator data_aggregator = null;
 	
 	
 	/**
@@ -68,7 +68,7 @@ public class FJSimulator {
 			IntertimeProcess arrival_process,
 			IntertimeProcess service_process,
 			IntervalPartition job_partition_process,
-			FJDataAggregator data_aggregator) {
+			FJBaseDataAggregator data_aggregator) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
@@ -147,7 +147,8 @@ public class FJSimulator {
 	 * @param num_jobs
 	 */
 	public void run(long num_jobs, int sampling_interval) {
-	    System.err.println("running a simulation for "+num_jobs+" jobs with samp interval "+sampling_interval);
+		System.err.println("running a simulation for "+num_jobs+" jobs with samp interval "+sampling_interval);
+		System.err.println("Arrival value "+arrival_process.processParameters());
 		// compute the warmup period.
 		// Let's say sampling_interval*10*num_stages
 		int warmup_interval = sampling_interval * 10 * server.num_stages;
@@ -159,12 +160,15 @@ public class FJSimulator {
 		int sampling_countdown = sampling_interval;
 		long jobs_processed = -warmup_interval;
 		while (! event_queue.isEmpty()) {
-			if (this.server.queueLength() > FJSimulator.QUEUE_STABILITY_THRESHOLD) {
+			if ((this.server.queueLength() > FJSimulator.QUEUE_STABILITY_THRESHOLD) ||
+					(data_aggregator instanceof FJDataSummerizer &&
+							((FJDataSummerizer) data_aggregator).isUnstable())) {
+				data_aggregator.cancelled = true;
 				System.err.println("ERROR: queue exceeded threshold.  The system is unstable.");
-				System.exit(0);
+				return;
+//				System.exit(0);
 			}
 			QEvent e = event_queue.poll();
-
 			if (e instanceof QJobArrivalEvent) {
 				jobs_processed++;
 				if (((jobs_processed*100)%num_jobs)==0)
@@ -190,7 +194,6 @@ public class FJSimulator {
 					}
 					sampling_countdown--;
 				}
-
 
 				// schedule the next job arrival
 				if (jobs_processed < num_jobs) {

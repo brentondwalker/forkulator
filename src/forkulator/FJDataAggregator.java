@@ -23,18 +23,12 @@ import java.io.Serializable;
  * @author brenton
  *
  */
-public class FJDataAggregator implements Serializable {
+public class FJDataAggregator extends FJBaseDataAggregator implements Serializable {
 	
 	/**
 	 * Supposed to add this to say the class implements Serializable.
 	 */
 	private static final long serialVersionUID = 1L;
-
-	// the maximum number of samples we will aggregate
-	public int max_samples = 0;
-	
-	// the current number of samples
-	public int num_samples = 0;
 	
 	// arrays to hold the various data we collect
 	public double job_arrival_time[] = null;
@@ -63,13 +57,24 @@ public class FJDataAggregator implements Serializable {
 	 * @param max_samples
 	 */
 	public FJDataAggregator(int max_samples) {
-		this.max_samples = max_samples;
+		super(max_samples);
 		job_arrival_time = new double[max_samples];
 		job_start_time = new double[max_samples];
 		job_lasttask_time = new double[max_samples];
 		job_completion_time = new double[max_samples];
-        job_departure_time = new double[max_samples];
-        job_inorder_departure_time = new double[max_samples];
+		job_departure_time = new double[max_samples];
+		job_inorder_departure_time = new double[max_samples];
+		job_cpu_time = new double[max_samples];
+	}
+
+	public FJDataAggregator(int max_samples, int batch_size) {
+		super(max_samples, batch_size);
+		job_arrival_time = new double[max_samples];
+		job_start_time = new double[max_samples];
+		job_lasttask_time = new double[max_samples];
+		job_completion_time = new double[max_samples];
+		job_departure_time = new double[max_samples];
+		job_inorder_departure_time = new double[max_samples];
 		job_cpu_time = new double[max_samples];
 	}
 	
@@ -119,18 +124,21 @@ public class FJDataAggregator implements Serializable {
 		}
 	}
 
-	public void appendDataAggregator(FJDataAggregator dataAggregator) {
-		for (int i = 0; i < dataAggregator.num_samples; i++) {
-			job_arrival_time[num_samples] = dataAggregator.job_arrival_time[i];
-			job_start_time[num_samples] = dataAggregator.job_start_time[i];
-			job_completion_time[num_samples] = dataAggregator.job_completion_time[i];
-			job_departure_time[num_samples] = dataAggregator.job_departure_time[i];
-			job_cpu_time[num_samples] = dataAggregator.job_cpu_time[i];
-			num_samples++;
+	@Override
+	public void appendDataAggregator(FJBaseDataAggregator dataAggregator) {
+		if (dataAggregator instanceof FJDataAggregator) {
+			FJDataAggregator aggregator = (FJDataAggregator) dataAggregator;
+			for (int i = 0; i < aggregator.num_samples; i++) {
+				job_arrival_time[num_samples] = aggregator.job_arrival_time[i];
+				job_start_time[num_samples] = aggregator.job_start_time[i];
+				job_completion_time[num_samples] = aggregator.job_completion_time[i];
+				job_departure_time[num_samples] = aggregator.job_departure_time[i];
+				job_cpu_time[num_samples] = aggregator.job_cpu_time[i];
+				num_samples++;
+			}
 		}
 	}
-	
-	
+
 	/**
 	 * Tabulate the distributions for job sojourn, waiting, and service times
 	 * for the sampled jobs.
@@ -394,6 +402,9 @@ public class FJDataAggregator implements Serializable {
 		
 		return 0.0;
 	}
-	
-	
+
+	@Override
+	FJBaseDataAggregator getNewInstance(int max_samples, int batch_size) {
+		return new FJDataAggregator(max_samples, batch_size);
+	}
 }

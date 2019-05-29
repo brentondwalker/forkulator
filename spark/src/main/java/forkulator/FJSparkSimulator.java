@@ -106,7 +106,7 @@ public class FJSparkSimulator {
 		// start the simulator running...
 		sim.run(jobs_per_slice, sampling_interval);
 		
-		return sim.data_aggregator;
+		return (FJDataAggregator) sim.data_aggregator;
 	}
 	
 	public static void main(String[] args) {
