@@ -44,6 +44,8 @@ public class FJSimulator {
 	public IntertimeProcess arrival_process;
 	public IntertimeProcess service_process;
     public IntervalPartition job_partition_process = null;
+    public IntervalPartition task_partition_process = null;
+    public int task_division_factor = 0;
 	public FJServer server = null;
 	
 	public double binwidth = 0.1;
@@ -67,14 +69,20 @@ public class FJSimulator {
 			int num_workers, int num_tasks,
 			IntertimeProcess arrival_process,
 			IntertimeProcess service_process,
-			IntervalPartition job_partition_process,
+            IntervalPartition partition_process,
+            int task_division_factor,
 			FJDataAggregator data_aggregator) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
 		this.data_aggregator = data_aggregator;
-		this.job_partition_process = job_partition_process;
+		if (task_division_factor > 1) {
+		    this.task_partition_process = partition_process;
+		    this.task_division_factor = task_division_factor;
+		} else {
+		    this.job_partition_process = partition_process;
+		}
 		
 		String server_queue_type = server_queue_spec[0];
 		
@@ -174,6 +182,8 @@ public class FJSimulator {
 				FJJob job;
 				if (this.job_partition_process != null) {
 					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
+				} else if (this.task_partition_process != null) {
+				    job = new FJRandomTaskPartitionJob(num_tasks, server.num_workers, task_division_factor, service_process, task_partition_process, e.time);
 				} else {
 					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
 				}
@@ -447,7 +457,7 @@ public class FJSimulator {
 	
 	
 	/**
-	  * main()
+	 * main()
 	 * 
 	 * @param args
 	 */
@@ -465,6 +475,7 @@ public class FJSimulator {
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
+        cli_options.addOption(OptionBuilder.withLongOpt("taskpartition").hasArgs().withDescription("task_partition").create("T"));
 
 		// TODO: add options for leaky bucket process filters
 		
@@ -505,10 +516,29 @@ public class FJSimulator {
 		//
         // if we are in job-partitioning mode, figure out the partitioning type
         //
-        IntervalPartition job_partition_process = null;
+        IntervalPartition partition_process = null;
+        int task_division_factor = 1;
         if (options.hasOption("J")) {
+            if (options.hasOption("T")) {
+                System.err.println("ERROR: cannot use both the -J and -T options together");
+                System.exit(0);
+            }
             String[] job_partition_spec = options.getOptionValues("J");
-            job_partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
+            partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
+        }
+        
+        //
+        // Task partitioning mode is like job partitioning, but there can be many
+        // tasks that are divided into smaller tasks.  Strictly speaking, job-partitioning
+        // mode is a special case of task partitioning mode (take tasks=1), but for now we
+        // configure them differently.
+        //
+        if (options.hasOption("T")) {
+            String[] task_partition_spec = options.getOptionValues("T");
+            // for task division, the arguments are the same as job division, except the
+            // first argument is the number of subtasks to divide each task into.
+            task_division_factor = Integer.parseInt(task_partition_spec[0]);
+            partition_process = FJSimulator.parseJobDivisionSpec(Arrays.copyOfRange(task_partition_spec, 1, task_partition_spec.length));
         }
 		
 		// data aggregator
@@ -520,7 +550,7 @@ public class FJSimulator {
 		}
 		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, partition_process, task_division_factor, data_aggregator);
 
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);

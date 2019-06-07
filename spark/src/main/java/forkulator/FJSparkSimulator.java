@@ -80,14 +80,34 @@ public class FJSparkSimulator {
 		String[] service_process_spec = options.getOptionValues("S");
 		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
 		
-		//
+        //
         // if we are in job-partitioning mode, figure out the partitioning type
         //
-        IntervalPartition job_partition_process = null;
+        IntervalPartition partition_process = null;
+        int task_division_factor = 1;
         if (options.hasOption("J")) {
+            if (options.hasOption("T")) {
+                System.err.println("ERROR: cannot use both the -J and -T options together");
+                System.exit(0);
+            }
             String[] job_partition_spec = options.getOptionValues("J");
-            job_partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
+            partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
         }
+        
+        //
+        // Task partitioning mode is like job partitioning, but there can be many
+        // tasks that are divided into smaller tasks.  Strictly speaking, job-partitioning
+        // mode is a special case of task partitioning mode (take tasks=1), but for now we
+        // configure them differently.
+        //
+        if (options.hasOption("T")) {
+            String[] task_partition_spec = options.getOptionValues("T");
+            // for task division, the arguments are the same as job division, except the
+            // first argument is the number of subtasks to divide each task into.
+            task_division_factor = Integer.parseInt(task_partition_spec[0]);
+            partition_process = FJSimulator.parseJobDivisionSpec(Arrays.copyOfRange(task_partition_spec, 1, task_partition_spec.length));
+        }
+
 
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator(samples_per_slice);
@@ -100,7 +120,7 @@ public class FJSparkSimulator {
 		
 		// simulator
 		String[] server_queue_spec = options.getOptionValues("q");
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, partition_process, task_division_factor, data_aggregator);
 
 
 		// start the simulator running...
@@ -110,8 +130,12 @@ public class FJSparkSimulator {
 	}
 	
 	public static void main(String[] args) {
-		SparkConf conf = new SparkConf().setAppName("forkulator");  //.setMaster(master);
+	    SparkConf conf = new SparkConf().setAppName("forkulator");  //.setMaster(master);
+	    //conf.registerKryoClasses(new Class<?> [ ]{forkulator.FJDataAggregator.class,  
+	    //    forkulator.FJPathLogger.class});
+		//conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
 		JavaSparkContext spark = new JavaSparkContext(conf);
+
 		
 		Options cli_options = new Options();
 		cli_options.addOption("h", "help", false, "print help message");
@@ -126,7 +150,7 @@ public class FJSparkSimulator {
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
-
+        cli_options.addOption(OptionBuilder.withLongOpt("taskpartition").hasArgs().withDescription("task_partition").create("T"));
 		
 		CommandLineParser parser = new PosixParser();
 		CommandLine options = null;
