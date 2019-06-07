@@ -238,9 +238,10 @@ object SparkSimulator {
       do {
         minStability = if (minStability <= 0) currentResolution else minStability
 
+        // Dividing number of executors by 2 to get 2 tasks per executor
         currentResolution = currentResolution.min(
           ((BigDecimal(maxStability)-BigDecimal(minStability))/
-            SparkHelper.currentNumberOfActiveExecutors(sc).max(1)).toDouble)
+            (SparkHelper.currentNumberOfActiveExecutors(sc)*2).max(1)).toDouble)
         currentResolution = currentResolution.max(stabilityResolution)
 //        // begin with a big resolution and make it smaller when smaller bounds are found
         println(s"Simulating min:$minStability, max:$maxStability, reso:$currentResolution")
