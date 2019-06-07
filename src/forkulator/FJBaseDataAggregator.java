@@ -49,6 +49,7 @@ abstract public class FJBaseDataAggregator implements Serializable {
 	}
 
 	public FJBaseDataAggregator(int max_samples, int batch_size) {
+	    batch_size = Math.max(batch_size, 1);
 		this.max_samples = max_samples/batch_size;
 		this.batch_size = batch_size;
 	}

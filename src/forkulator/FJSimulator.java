@@ -35,7 +35,7 @@ import org.apache.commons.cli.ParseException;
 public class FJSimulator {
 	
 	public static final boolean DEBUG = false;
-	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
+	public static final int QUEUE_STABILITY_THRESHOLD = 200000;
 
 	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
 	

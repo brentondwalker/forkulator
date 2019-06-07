@@ -30,15 +30,21 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 	private static final int STABILITY_SOJOURN_THRESHOLD = 10;
 
 	// Number of samples in current batch
-	private int samples_in_batch = 0;
+	public int samples_in_batch = 0;
 
 	// structures to hold results at the end of the experiment
 	private double binwidth = 0.1;
 	public double[] job_sojourn_d = null;
+	// to get the variance σ² this value must be devided by the number of samples
+	public double[] job_sojourn_v = null;
 	public double[] job_waiting_d = null;
+	// to get the variance σ² this value must be devided by the number of samples
+	public double[] job_waiting_v = null;
 	public double[] job_lt_waiting_d = null;
 	public double[] job_lasttask_d = null;
 	public double[] job_service_d = null;
+	// to get the variance σ² this value must be devided by the number of samples
+	public double[] job_service_v = null;
 	public double[] job_inorder_sojourn_d = null;
 	public double[] job_cputime_d = null;
 
@@ -49,6 +55,10 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 	public FJPathLogger path_logger = null;
 
 	public String[] params = null;
+
+	public boolean variance_calculated = false;
+
+	private int replication_count = 1;
 
 	/**
 	 * Constructor
@@ -69,9 +79,12 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 		super(max_samples, batch_size);
 //		int numOfSamples = max_samples/batch_size;
 		job_sojourn_d = new double[max_samples];
+		job_sojourn_v = new double[max_samples];
 		job_waiting_d = new double[max_samples];
+		job_waiting_v = new double[max_samples];
 		job_lasttask_d = new double[max_samples];
 		job_service_d = new double[max_samples];
+		job_service_v = new double[max_samples];
 		job_inorder_sojourn_d = new double[max_samples];
 		job_cputime_d = new double[max_samples];
 		job_lt_waiting_d = new double[max_samples];
@@ -88,9 +101,12 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 		this.params = params;
 //		int numOfSamples = max_samples/batch_size;
 		job_sojourn_d = new double[max_samples];
+		job_sojourn_v = new double[max_samples];
 		job_waiting_d = new double[max_samples];
+		job_waiting_v = new double[max_samples];
 		job_lasttask_d = new double[max_samples];
 		job_service_d = new double[max_samples];
+		job_service_v = new double[max_samples];
 		job_inorder_sojourn_d = new double[max_samples];
 		job_cputime_d = new double[max_samples];
 		job_lt_waiting_d = new double[max_samples];
@@ -115,7 +131,7 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 					maxSojournTimeIncreasing = Math.max(maxSojournTimeIncreasing,
 							sojournTimeIncreasing);
 				}
-
+//				samples_in_batch++;
 				num_samples++;
 			}
 			double jst = job.tasks[0].start_time;
@@ -125,7 +141,7 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 				jlt = Math.max(jlt, task.start_time);
 			}
 			double sojourn_time = job.departure_time - job.arrival_time;
-			double arrival_time = jst - job.arrival_time;
+			double waiting_time = jst - job.arrival_time;
 			double job_lt_waiting_time = jlt - job.arrival_time;
 			double job_lasttask = job.departure_time - job.arrival_time;
 			double job_service = job.departure_time - job.arrival_time;
@@ -133,7 +149,7 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 			double cputime = job.departure_time - job.arrival_time;
 			if (samples_in_batch == 0) {
 				job_sojourn_d[num_samples] = sojourn_time;
-				job_waiting_d[num_samples] = arrival_time;
+				job_waiting_d[num_samples] = waiting_time;
 				job_lt_waiting_d[num_samples] = job_lt_waiting_time;
 				job_lasttask_d[num_samples] = job_lasttask;
 				job_service_d[num_samples] = job_service;
@@ -141,22 +157,33 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 				job_cputime_d[num_samples] = cputime;
 				samples_in_batch++;
 			} else {
-				samples_in_batch++;
 				// Calculate means
+				double old_job_sojourn_mean = job_sojourn_d[num_samples];
 				job_sojourn_d[num_samples] =
 						job_sojourn_d[num_samples] + (sojourn_time-job_sojourn_d[num_samples])/samples_in_batch;
+				double old_job_waiting_mean = job_waiting_d[num_samples];
 				job_waiting_d[num_samples] =
-						job_waiting_d[num_samples] + (sojourn_time-job_waiting_d[num_samples])/samples_in_batch;
+						job_waiting_d[num_samples] + (waiting_time-job_waiting_d[num_samples])/samples_in_batch;
 				job_lt_waiting_d[num_samples] =
 						job_lt_waiting_d[num_samples] + (sojourn_time-job_lt_waiting_d[num_samples])/samples_in_batch;
 				job_lasttask_d[num_samples] =
-						job_lasttask_d[num_samples] + (sojourn_time-job_lasttask_d[num_samples])/samples_in_batch;
+						job_lasttask_d[num_samples] + (job_lt_waiting_time-job_lasttask_d[num_samples])/samples_in_batch;
+				double old_job_service_mean = job_service_d[num_samples];
 				job_service_d[num_samples] =
-						job_service_d[num_samples] + (sojourn_time-job_service_d[num_samples])/samples_in_batch;
+						job_service_d[num_samples] + (job_service-job_service_d[num_samples])/samples_in_batch;
 				job_inorder_sojourn_d[num_samples] =
-						job_inorder_sojourn_d[num_samples] + (sojourn_time-job_inorder_sojourn_d[num_samples])/samples_in_batch;
+						job_inorder_sojourn_d[num_samples] + (job_inorder_sojourn-job_inorder_sojourn_d[num_samples])/samples_in_batch;
 				job_cputime_d[num_samples] =
-						job_cputime_d[num_samples] + (sojourn_time-job_cputime_d[num_samples])/samples_in_batch;
+						job_cputime_d[num_samples] + (cputime-job_cputime_d[num_samples])/samples_in_batch;
+
+				// Calculate variance
+				job_sojourn_v[num_samples] +=
+						(sojourn_time-old_job_sojourn_mean)*(sojourn_time-job_sojourn_d[num_samples]);
+				job_waiting_v[num_samples] +=
+						(waiting_time-old_job_waiting_mean)*(waiting_time-job_sojourn_d[num_samples]);
+				job_service_v[num_samples] +=
+						(job_service-old_job_service_mean)*(sojourn_time-job_service_d[num_samples]);
+				samples_in_batch++;
 			}
 		}
 		
@@ -168,11 +195,13 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 	@Override
 	public void appendDataAggregator(FJBaseDataAggregator dataAggregator) {
 		if (dataAggregator instanceof FJDataSummerizer) {
+			this.calcVariance();
 			FJDataSummerizer aggregator = (FJDataSummerizer) dataAggregator;
-			for (int i = 0; i < aggregator.num_samples; i++) {
-				if (num_samples >= max_samples) {
-					System.err.println("ERROR: Not enough free values in data aggregator to merge.");
-					return;
+			((FJDataSummerizer) dataAggregator).calcVariance();
+			for (int i = 0; i < Math.min(aggregator.num_samples, num_samples); i++) {
+				if (aggregator.num_samples >= num_samples) {
+					System.err.println("WARNING: Data aggregators haven't the same size so" +
+							"not all samples has the same number of replications.");
 				}
 				job_sojourn_d[num_samples] = aggregator.job_sojourn_d[i];
 				job_waiting_d[num_samples] = aggregator.job_waiting_d[i];
@@ -183,6 +212,7 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 				job_cputime_d[num_samples] = aggregator.job_cputime_d[i];
 				num_samples++;
 			}
+			replication_count++;
 		}
 	}
 
@@ -293,4 +323,18 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 	public boolean isUnstable() {
 	    return (maxSojournTimeIncreasing >= STABILITY_SOJOURN_THRESHOLD) || cancelled;
     }
+
+	/**
+	 * Calculates variances by dividing the calculated variance by its number of samples
+	 */
+	public void calcVariance() {
+		if (!variance_calculated)
+			for (int i = 0; i < num_samples; i++) {
+				int divider = (i == num_samples-1) ? samples_in_batch : batch_size;
+				job_sojourn_v[num_samples] /= divider;
+				job_waiting_v[num_samples] /= divider;
+				job_service_v[num_samples] /= divider;
+			}
+		variance_calculated = true;
+	}
 }

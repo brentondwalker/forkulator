@@ -1,6 +1,6 @@
 package forkulator
 
-import java.io.{File, PrintWriter}
+import java.io.{BufferedWriter, File, FileWriter, PrintWriter}
 
 import org.apache.log4j.{Level, LogManager, Logger, PropertyConfigurator}
 import java.util
@@ -13,11 +13,12 @@ import org.apache.spark.api.java.{JavaRDD, JavaSparkContext}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.{Row, SQLContext, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType, StructField, StructType}
-
 import org.apache.hadoop.fs.{FileSystem, Path}
 import java.net.URI
-import java.io.File
+
+import forkulator.Helper.{DataAggregatorHelper, SparkHelper}
 import org.apache.hadoop.conf.Configuration
+import org.apache.spark.storage.StorageLevel
 
 
 
@@ -30,18 +31,7 @@ class SparkSimulator {
 }
 
 object SparkSimulator {
-  val metricType = StructType(
-    Seq(
-      StructField(name = "sliceNum", dataType = LongType, nullable = false),
-      StructField(name = "sampleNum", dataType = IntegerType, nullable = false),
-      StructField(name = "waitingTime", dataType = DoubleType, nullable = false),
-      StructField(name = "sojournTime", dataType = DoubleType, nullable = false),
-      StructField(name = "serviceTime", dataType = DoubleType, nullable = false),
-      StructField(name = "cpuTime", dataType = DoubleType, nullable = false),
-      StructField(name = "maxSojournTimeIncreasing", dataType = IntegerType, nullable = false),
-      StructField(name = "param", dataType = StringType, nullable = false)
-    )
-  )
+  val REPLICATIONS = 50
 
   def getCliOptions: Options = {
     val cli_options = new Options
@@ -106,7 +96,7 @@ object SparkSimulator {
     val server_queue_type = options.getOptionValue("q")
     val num_workers = options.getOptionValue("w").toInt
     val num_tasks = options.getOptionValue("t").toInt
-    val num_samples = (options.getOptionValue("n")).toLong
+    val num_samples = options.getOptionValue("n").toLong
     var num_slices = 1
     if (options.hasOption("s")) num_slices = options.getOptionValue("s").toInt
     val sampling_interval = options.getOptionValue("i").toInt
@@ -142,9 +132,10 @@ object SparkSimulator {
 
 
     val sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process,
-      service_process, job_partition_process.getOrElse(null), data_aggregator)
+      service_process, job_partition_process.orNull, data_aggregator)
     // start the simulator running...
     sim.run(jobs_per_slice, sampling_interval)
+    sim.event_queue.clear() // Should not be necessary. Only for tests
     sim.data_aggregator
   }
 
@@ -157,13 +148,15 @@ object SparkSimulator {
 //    val log = LogManager.getRootLogger
 //    args.map(a => log.warn(a))
 //    args.map(a => println(a))
-    args.foreach(a => println(a))
+    println(args.mkString(" "))
     val conf = new SparkConf().setAppName("forkulator") //.setMaster(master);
     conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     conf.registerKryoClasses(Array[Class[_]](classOf[FJPathLogger], classOf[FJDataAggregator]))
     val spark = new sql.SparkSession.Builder().appName("forkulator").config(conf).getOrCreate()
     val sc = spark.sparkContext
     import spark.implicits._
+    import org.apache.spark.sql.functions._
+
 
     //    cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs.withDescription("job_partition").create("J"))
     val parser = new PosixParser
@@ -202,17 +195,6 @@ object SparkSimulator {
     val outfile_base = options.map(_.getOptionValue("o")).getOrElse("out")
     // distribute the simulation segments to workers
     val ar = new util.ArrayList[Integer](num_slices)
-//    var i = 0
-//    while ( {
-//      i < num_slices
-//    }) {
-//      ar.add(i)
-//
-//      {
-//        i += 1; i - 1
-//      }
-//    }
-//    println(args)
     if (checkStability.equals("")) {
       val rdd = spark.createDataFrame(sc.parallelize(0 until num_slices, num_slices)
         .map(s => SparkSimulator.doSimulation(options.get, s, new FJDataAggregator(num_slices)))
@@ -224,14 +206,21 @@ object SparkSimulator {
             f.job_start_time(i) - f.job_arrival_time(i),
             f.job_departure_time(i) - f.job_arrival_time(i),
             f.job_completion_time(i) - f.job_start_time(i),
-            f.job_cpu_time(i)
+            f.job_cpu_time(i),
+            0,
+            ""
           )
 //          case _ => Row()
         }
       })
-      }, metricType)//.toDF().cache
+      }, DataAggregatorHelper.metricType)//.toDF().cache
       rdd.write.parquet(outfile_base)
     } else {
+      val outPath = new Path(outfile_base)
+      val fs = FileSystem.get(URI.create(outfile_base), new Configuration())
+      if (fs.exists(outPath)) {
+        fs.delete(outPath, true)
+      }
       println(checkStability)
       val arrivalSpec = options.get.getOptionValues("A")
       val serviceSpec = options.get.getOptionValues("S")
@@ -243,11 +232,16 @@ object SparkSimulator {
       var currentResolution = if (stabilityResolution > 0.1) stabilityResolution else 0.1
       var minStability = parametersToChange(1).toDouble - stabilityRegion
       var maxStability = parametersToChange(1).toDouble + stabilityRegion
+      var allStable = true
       // Must be a positive number
       var found = false
       do {
-
         minStability = if (minStability <= 0) currentResolution else minStability
+
+        currentResolution = currentResolution.min(
+          ((BigDecimal(maxStability)-BigDecimal(minStability))/
+            SparkHelper.currentNumberOfActiveExecutors(sc).max(1)).toDouble)
+        currentResolution = currentResolution.max(stabilityResolution)
 //        // begin with a big resolution and make it smaller when smaller bounds are found
         println(s"Simulating min:$minStability, max:$maxStability, reso:$currentResolution")
 //         In the first the simulations aren't split instead different parameters are parallelized.
@@ -269,9 +263,10 @@ object SparkSimulator {
 //            arrivalSpec.foreach(a => System.err.println(s"arrival + $a"))
             SparkSimulator.doSimulation(options.get, 1, new FJDataSummerizer(1,
             1000, parametersToChange),arrival,service)
-          })
+          }).persist(StorageLevel.MEMORY_AND_DISK_SER)
         val dataSummerizer = rdd.collect()
-        var allStable = true
+        rdd.unpersist()
+        allStable = true
         for (summerizer <- dataSummerizer) summerizer match {
           case summerizer: FJDataSummerizer => {
             println(s"summerizer reso:$currentResolution ${summerizer.params.mkString(" ")}, " +
@@ -288,29 +283,6 @@ object SparkSimulator {
         }
 
         if (currentResolution == stabilityResolution || allStable) {
-          val outPath = new Path(outfile_base)
-          val fs = FileSystem.get(URI.create(outfile_base), new Configuration())
-          if (fs.exists(outPath)) {
-            fs.delete(outPath, true)
-          }
-          spark.createDataFrame(rdd.zipWithIndex().flatMap{
-            case (f, sliceIdx) => (0 until f.num_samples).map(i => {
-                      f match {
-                        case f: FJDataSummerizer => {
-                          Row(
-                            sliceIdx,
-                            i,
-                            f.job_waiting_d(i),
-                            f.job_sojourn_d(i),
-                            f.job_service_d(i),
-                            f.job_cputime_d(i),
-                            f.maxSojournTimeIncreasing,
-                            parametersToChange(1)
-                          )}
-                        //          case _ => Row()
-                      }
-                    })
-                    }, metricType).write.csv(outfile_base) // metricType
           found = true
           println(s"The stability region is between [$minStability, $maxStability], " +
             s"allStable: $allStable")
@@ -319,6 +291,96 @@ object SparkSimulator {
         // for
         // testing
       } while (!found)
+      do {
+        found = true
+        // To be sure that the results are right, repeat the found bounds multiple times.
+        val rdd = sc.parallelize(0 until REPLICATIONS * 2)
+          .map(replication => {
+            // parametersToChange should be unique on each worker so it should possible to change
+            // it here
+            parametersToChange = parametersToChange.zipWithIndex.map {
+              case (str, idx) => if (idx == 0) str else if ((replication / REPLICATIONS) == 0)
+                minStability.toString else maxStability.toString
+            }
+            var arrival = arrivalSpec
+            var service = serviceSpec
+            checkStability match {
+              case "S" => service = parametersToChange
+              case "A" => arrival = parametersToChange
+            }
+            (replication / REPLICATIONS, SparkSimulator.doSimulation(options.get, 1, new
+                FJDataSummerizer(1,
+                  1000, parametersToChange), arrival, service))
+          }).persist(StorageLevel.MEMORY_AND_DISK_SER)
+
+        val df =
+          spark.createDataFrame(rdd.flatMap{
+            f => (0 until f._2.num_samples).map(i => {
+              f._2 match {
+                case summerizer: FJDataSummerizer => {
+                  Row(
+                    f._1.toLong,
+                    i,
+                    summerizer.job_waiting_d(i),
+                    summerizer.job_sojourn_d(i),
+                    summerizer.job_service_d(i),
+                    summerizer.job_cputime_d(i),
+                    summerizer.maxSojournTimeIncreasing,
+                    summerizer.params(1)
+                  )}
+                //          case _ => Row()
+              }
+            })
+          }, DataAggregatorHelper.metricType).persist(StorageLevel.MEMORY_AND_DISK_SER)
+        val dfMeans = DataAggregatorHelper.avgMetricType(df)
+
+
+        val minT = DataAggregatorHelper.countIncr(dfMeans.get, "sliceNum == 0")
+        val maxT = DataAggregatorHelper.countIncr(dfMeans.get, "sliceNum == 1")
+        if (minT._2 >= 10) {
+          found = false
+          println(s"It seems that the value $minStability is unstable. Lowering it.")
+          maxStability = minStability
+          minStability -= currentResolution
+        } else if (maxT._2 < 10) {
+          found = false
+          println(s"It seems that the value $maxStability is stable. Rising it.")
+          minStability = maxStability
+          maxStability += currentResolution
+        }
+        // Check here if found and set the variable
+        if (found) {
+          //.write.csv(outfile_base) // metricType
+          df.write.csv(outfile_base)
+          // TODO Don't use static value
+          val outCsv = new BufferedWriter(new FileWriter("/mnt/out/stability.csv", true))
+          outCsv.write(s"${outfile_base.split("/").last},${minT._1},${maxT._1}\n")
+          outCsv.close()
+        }
+      } while (!found)
+
+
+//      print(rdd.flatMap{
+//        f => (0 until f._2.num_samples).map(i => {
+//          f._2 match {
+//            case summerizer: FJDataSummerizer => {
+//              Row(
+//                0, //f._1,
+//                0, //i,
+//                summerizer.job_waiting_d(i),
+//                summerizer.job_sojourn_d(i),
+//                summerizer.job_service_d(i),
+//                summerizer.job_cputime_d(i),
+//                0, //summerizer.maxSojournTimeIncreasing,
+//                summerizer.params(1)
+//              )}
+//            //          case _ => Row()
+//          }
+//        })
+//      }.collect()(0)) //.collect.map(a => a.schema))
+//      println(df.collect()(0))
+//      df.groupBy('sliceNum).agg(avg(struct('waitingTime, 'sojournTime, 'serviceTime,
+//        'cpuTime))).select($"*")
       //.toDF().cache
 //      rdd.write.parquet(outfile_base)
     }
