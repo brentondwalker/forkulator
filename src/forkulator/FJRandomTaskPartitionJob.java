@@ -52,11 +52,11 @@ public class FJRandomTaskPartitionJob extends FJJob {
         //double service_sum = 0.0;
         
         for (int ti=0; ti<num_big_tasks; ti++) {
-            this.task_service_process = task_partition_process.getNewPartition(service_process.nextInterval()*num_workers, this.task_division_factor);
+            this.task_service_process = task_partition_process.getNewPartition(service_process.nextInterval()*num_workers/num_big_tasks, this.task_division_factor);
 
             for (int i=0; i<task_division_factor; i++) {
                 if (task_partition_process.independentSamples()) {
-                    tasks[ti*task_division_factor + i] = new FJTask(task_partition_process.getNewPartition(service_process.nextInterval()*num_workers, this.task_division_factor), arrival_time, this);
+                    tasks[ti*task_division_factor + i] = new FJTask(task_partition_process.getNewPartition(service_process.nextInterval()*num_workers/num_big_tasks, this.task_division_factor), arrival_time, this);
                 } else {
                     tasks[ti*task_division_factor + i] = new FJTask(task_service_process, arrival_time, this);
                 }
