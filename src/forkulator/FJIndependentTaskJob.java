@@ -1,6 +1,7 @@
 package forkulator;
 
 import forkulator.randomprocess.IntertimeProcess;
+import forkulator.randomprocess.IntervalPartition;
 
 
 /**
@@ -14,7 +15,9 @@ import forkulator.randomprocess.IntertimeProcess;
  * @author brenton
  *
  */
-public class FJIndependentTaskJob extends FJJob {
+public class FJIndependentTaskJob extends FJPartitionJob {
+
+    FJIndependentTaskJob(){}
 
     /**
      * Constructor
@@ -36,4 +39,10 @@ public class FJIndependentTaskJob extends FJJob {
         }
     }
 
+    @Override
+    FJPartitionJob createNewInstance(int num_tasks, int num_workers,
+                                     IntertimeProcess service_process,
+                                     IntervalPartition job_partition_process,double arrival_time) {
+        return new FJIndependentTaskJob(num_tasks, num_workers, service_process, arrival_time);
+    }
 }

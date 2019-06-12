@@ -132,4 +132,6 @@ public abstract class FJServer {
 		j.dispose();
 	}
 
+	abstract int numJobsInQueue();
+
 }

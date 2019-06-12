@@ -85,7 +85,7 @@ public class FJDataAggregator extends FJBaseDataAggregator implements Serializab
 	 * @param job
 	 */
 	public void sample(FJJob job) {
-		if (job.sample) {
+		if (job.sample && num_samples < max_samples) {
 			job_arrival_time[num_samples] = job.arrival_time;
 			double jst = job.tasks[0].start_time;
 			double jlt = job.tasks[0].start_time;

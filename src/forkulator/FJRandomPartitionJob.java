@@ -14,7 +14,7 @@ import forkulator.randomprocess.IntervalPartition;
  * @author brenton
  *
  */
-public class FJRandomPartitionJob extends FJJob {
+public class FJRandomPartitionJob extends FJPartitionJob {
 
     /*
      * Instead of keeping track of a task_service_process, this class treats the
@@ -22,7 +22,8 @@ public class FJRandomPartitionJob extends FJJob {
      * IntervalPartition process that divides up the job service times.
      */
     IntervalPartition job_partition_process = null;
-    
+
+    FJRandomPartitionJob() {}
     /**
      * Constructor
      * 
@@ -59,4 +60,11 @@ public class FJRandomPartitionJob extends FJJob {
         //System.out.println("task service times: "+Arrays.toString(tstmp)+"  "+service_sum);
     }
 
+    @Override
+    FJPartitionJob createNewInstance(int num_tasks, int num_workers,
+                                     IntertimeProcess service_process,
+                                     IntervalPartition job_partition_process, double arrival_time) {
+        return new FJRandomPartitionJob(num_tasks, num_workers, service_process,
+                job_partition_process, arrival_time);
+    }
 }

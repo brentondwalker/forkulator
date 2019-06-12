@@ -198,5 +198,10 @@ public class FJThinningServer extends FJServer {
 
 		return (lsum / num_workers);
 	}
+
+	@Override
+	int numJobsInQueue() {
+		return postservice_jobs.size();
+	}
 	
 }

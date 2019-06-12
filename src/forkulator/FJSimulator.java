@@ -1,5 +1,7 @@
 package forkulator;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -44,6 +46,7 @@ public class FJSimulator {
 	public IntertimeProcess arrival_process;
 	public IntertimeProcess service_process;
     public IntervalPartition job_partition_process = null;
+    public FJPartitionJob job_type = null;
 	public FJServer server = null;
 	
 	public double binwidth = 0.1;
@@ -75,7 +78,6 @@ public class FJSimulator {
 		this.service_process = service_process;
 		this.data_aggregator = data_aggregator;
 		this.job_partition_process = job_partition_process;
-		
 		String server_queue_type = server_queue_spec[0];
 		
 		if (server_queue_type.toLowerCase().equals("s")) {
@@ -155,7 +157,9 @@ public class FJSimulator {
 		
 		// before we generated all the job arrivals at once
 		// now to save space we only have one job arrival in the queue at a time
-		event_queue.add(new QJobArrivalEvent(arrival_process.nextInterval()));
+		double lastArrivalTime = arrival_process.nextInterval();
+		event_queue.add(new QJobArrivalEvent(lastArrivalTime));
+		int jobsInQueue = 1;
 		// start processing events
 		int sampling_countdown = sampling_interval;
 		long jobs_processed = -warmup_interval;
@@ -170,16 +174,19 @@ public class FJSimulator {
 			}
 			QEvent e = event_queue.poll();
 			if (e instanceof QJobArrivalEvent) {
+				jobsInQueue--;
 				jobs_processed++;
 				if (((jobs_processed*100)%num_jobs)==0)
 					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%\tqueuesize="+server.queueLength());
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
 
 				FJJob job;
-				if (this.job_partition_process != null) {
-					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
+				if (this.job_partition_process != null && this.job_type != null) {
+					job = job_type.createNewInstance(num_tasks, server.num_workers, service_process,
+							job_partition_process, e.time);
 				} else {
-					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
+					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process,
+							e.time);
 				}
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
@@ -194,19 +201,24 @@ public class FJSimulator {
 					}
 					sampling_countdown--;
 				}
-
-				// schedule the next job arrival
-				if (jobs_processed < num_jobs) {
-					double interval = arrival_process.nextInterval();
-					//if ((interval < 0.0) || (interval>1000)) {
-					//	System.err.println("WARNING: inter-arrival time of "+interval);
-					//}
-					double next_time = et.time + interval;
-					this.addEvent(new QJobArrivalEvent(next_time));
-				}
+				// Old version which fills up the queue
+//				if (jobs_processed < num_jobs) {
+//					jobsInQueue++;
+//					lastArrivalTime += arrival_process.nextInterval();
+//					this.addEvent(new QJobArrivalEvent(lastArrivalTime));
+//				}
 			} else if (e instanceof QTaskCompletionEvent) {
 				QTaskCompletionEvent et = (QTaskCompletionEvent) e;
 				server.taskCompleted(et.task.worker, et.time);
+			}
+
+			// schedule the next job arrival
+			// This prevents the queue getting filled with too much events which can crash the
+			// simulation but the simulation runs slower
+			if (server.numJobsInQueue() < 10 && (jobs_processed + jobsInQueue) < num_jobs) {
+				jobsInQueue++;
+				lastArrivalTime += arrival_process.nextInterval();
+				this.addEvent(new QJobArrivalEvent(lastArrivalTime));
 			}
 		}
 	}
@@ -447,6 +459,26 @@ public class FJSimulator {
         return process;
     }
 
+	/**
+	 * Parse the arguments given for either the arrival or service process, and
+	 * return an appropriately configured IntertimeProcess.
+	 *
+	 * @param process_spec
+	 * @return
+	 */
+	public static FJPartitionJob parseJobPartitionTypeSpec(String[] process_spec) {
+		if (process_spec[0].equals("i")) {
+		} else if (process_spec[0].equals("r")) {
+			return new FJRandomPartitionJob();
+		} else if (process_spec[0].equals("rtj")) {
+			return new FJRandomPartitionTasksOfJob();
+		}  else {
+			System.err.println("ERROR: unable to parse job partition spec!" + Arrays.toString(process_spec));
+			System.exit(1);
+		}
+		return null;
+	}
+
 	
 	
 	/**
@@ -468,6 +500,7 @@ public class FJSimulator {
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
+        cli_options.addOption(OptionBuilder.withLongOpt("jobpartitiontype").hasArgs().withDescription("job_partition_type").create("Jp"));
 
 		// TODO: add options for leaky bucket process filters
 		
@@ -513,6 +546,11 @@ public class FJSimulator {
             String[] job_partition_spec = options.getOptionValues("J");
             job_partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
         }
+		FJPartitionJob job_partition_type = null;
+		if (options.hasOption("Jp")) {
+			String[]  job_partition_spec = options.getOptionValues("Jp");
+			job_partition_type = FJSimulator.parseJobPartitionTypeSpec(job_partition_spec);
+		}
 		
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator((int)(1 + num_jobs/sampling_interval));
@@ -524,6 +562,7 @@ public class FJSimulator {
 		
 		// simulator
 		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
+		sim.job_type = job_partition_type;
 
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);

@@ -233,6 +233,10 @@ public class FJInPlaceMultiStageSingleQueueServer extends FJServer {
 		}
 		return (lsum / num_workers);
 	}
-	
-	
+
+
+	@Override
+	int numJobsInQueue() {
+		return job_queue.size();
+	}
 }

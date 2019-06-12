@@ -174,5 +174,9 @@ public class FJKLSingleQueueServer extends FJServer {
 	public int queueLength() {
 		return this.job_queue.size();
 	}
-	
+
+	@Override
+	int numJobsInQueue() {
+		return job_queue.size();
+	}
 }

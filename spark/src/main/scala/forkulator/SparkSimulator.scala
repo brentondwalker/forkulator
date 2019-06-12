@@ -73,30 +73,35 @@ object SparkSimulator {
     OptionBuilder.withDescription("job_partition")
     cli_options.addOption(OptionBuilder.create("J"))
     OptionBuilder.hasArgs
+    OptionBuilder.withLongOpt("jobpartitiontype")
+    OptionBuilder.withDescription("job_partition_type")
+    cli_options.addOption(OptionBuilder.create("Jp"))
+    OptionBuilder.hasArgs
     OptionBuilder.withLongOpt("check_stability")
     OptionBuilder.withDescription("check_stability")
     cli_options.addOption(OptionBuilder.create("cs"))
     cli_options
   }
 
+  /**
+    * Runs the simulation. It might be a better idea to get the simulation as parameter instead of
+    * the CommandLine options and values to alter them
+    * @param options
+    * @param segment_index
+    * @param aggregator
+    * @param arrivalSpec
+    * @param serviceValues
+    * @param numOfSampleDivider Divides the number of sample requested by this value.
+    * @return
+    */
   def doSimulation(options: CommandLine, segment_index: Int, aggregator: FJBaseDataAggregator,
-                   arrivalSpec: Array[String] = Array.empty, serviceValues: Array[String] = Array.empty)
+                   arrivalSpec: Array[String] = Array.empty, serviceValues: Array[String] = Array
+    .empty, numOfSampleDivider: Int = 1)
   : FJBaseDataAggregator = {
-//    try
-//      options = Some(parser.parse(SparkSimulator.getCliOptions, args))
-//    catch {
-//      case e: ParseException =>
-//        val formatter = new HelpFormatter
-//        formatter.printHelp("FJSimulator", SparkSimulator.getCliOptions)
-//        e.printStackTrace()
-//        System.exit(0)
-//    }
-
-
     val server_queue_type = options.getOptionValue("q")
     val num_workers = options.getOptionValue("w").toInt
     val num_tasks = options.getOptionValue("t").toInt
-    val num_samples = options.getOptionValue("n").toLong
+    val num_samples = options.getOptionValue("n").toLong / numOfSampleDivider
     var num_slices = 1
     if (options.hasOption("s")) num_slices = options.getOptionValue("s").toInt
     val sampling_interval = options.getOptionValue("i").toInt
@@ -104,11 +109,7 @@ object SparkSimulator {
     // compute how many samples, and how many jobs are needed from each slice (round up)
     val samples_per_slice = Math.ceil(num_samples.toDouble / num_slices).toInt
     val jobs_per_slice = samples_per_slice.toLong * sampling_interval.toLong
-    //
-    // figure out the arrival process
-//    val arrival_process_spec = a
-//    if (arrival_process_spec.isEmpty)
-//      arrival_process_spec = options.getOptionValues("A")
+
     val arrival_process = FJSimulator.parseProcessSpec(if (arrivalSpec.isEmpty) options
       .getOptionValues("A") else arrivalSpec)
     // figure out the service process
@@ -120,6 +121,11 @@ object SparkSimulator {
     if (options.hasOption("J")) {
       val job_partition_spec = options.getOptionValues("J")
       job_partition_process = Some(FJSimulator.parseJobDivisionSpec(job_partition_spec))
+    }
+    var job_partition_type: Option[FJPartitionJob] = None
+    if (options.hasOption("Jp")) {
+      val job_partition_spec = options.getOptionValues("Jp")
+      job_partition_type = Some(FJSimulator.parseJobPartitionTypeSpec(job_partition_spec))
     }
     // data aggregator
     val data_aggregator: FJBaseDataAggregator = aggregator.getNewInstance(samples_per_slice,
@@ -133,16 +139,12 @@ object SparkSimulator {
 
     val sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process,
       service_process, job_partition_process.orNull, data_aggregator)
+    sim.job_type = job_partition_type.orNull
     // start the simulator running...
     sim.run(jobs_per_slice, sampling_interval)
     sim.event_queue.clear() // Should not be necessary. Only for tests
     sim.data_aggregator
   }
-
-//  def doSimulation(simulation: FJSimulator) = {
-//    simulation.run(jobs_per_slice, sampling_interval)
-////    sim.data_aggregator
-//  }
 
   def main(args: Array[String]): Unit = {
 //    val log = LogManager.getRootLogger
@@ -244,7 +246,7 @@ object SparkSimulator {
             (SparkHelper.currentNumberOfActiveExecutors(sc)*2).max(1)).toDouble)
         currentResolution = currentResolution.max(stabilityResolution)
 //        // begin with a big resolution and make it smaller when smaller bounds are found
-        println(s"Simulating min:$minStability, max:$maxStability, reso:$currentResolution")
+        println(s"Simulating min:$minStability, max:$maxStability, reso:$currentResolution/$stabilityResolution")
 //         In the first the simulations aren't split instead different parameters are parallelized.
         val valuesToTest = BigDecimal(minStability) to BigDecimal(maxStability) by
           BigDecimal(currentResolution)
@@ -262,8 +264,10 @@ object SparkSimulator {
               case "A" => arrival = parametersToChange
             }
 //            arrivalSpec.foreach(a => System.err.println(s"arrival + $a"))
+            // Run a smaller sample set to get the stabilization bounds which speeds up the
+            // simulation.
             SparkSimulator.doSimulation(options.get, 1, new FJDataSummerizer(1,
-            1000, parametersToChange),arrival,service)
+              1000, parametersToChange),arrival,service, 1)
           }).persist(StorageLevel.MEMORY_AND_DISK_SER)
         val dataSummerizer = rdd.collect()
         rdd.unpersist()
@@ -271,7 +275,7 @@ object SparkSimulator {
         for (summerizer <- dataSummerizer) summerizer match {
           case summerizer: FJDataSummerizer => {
             println(s"summerizer reso:$currentResolution ${summerizer.params.mkString(" ")}, " +
-              s"unstable:${summerizer.isUnstable}")
+              s"unstable:${summerizer.isUnstable}, ${(1/currentResolution).toInt}")
             if (summerizer.isUnstable) {
               maxStability = BigDecimal(Math.min(summerizer.params(1).toDouble, maxStability)
               ).setScale((1/currentResolution).toInt, BigDecimal.RoundingMode.UP).toDouble
@@ -283,12 +287,18 @@ object SparkSimulator {
           }
         }
 
-        if (currentResolution == stabilityResolution || allStable) {
+        if (currentResolution == stabilityResolution && !allStable) {
           found = true
           println(s"The stability region is between [$minStability, $maxStability], " +
             s"allStable: $allStable")
         } else
-          currentResolution = Math.max(currentResolution / 2, stabilityResolution) // breaks the loop
+          if (!allStable)
+            currentResolution = Math.max(currentResolution / 2, stabilityResolution) // breaks the loop
+        else {
+          minStability = maxStability
+          maxStability += 0.1 // To work with imprecisely floats
+        }
+
         // for
         // testing
       } while (!found)
@@ -342,12 +352,12 @@ object SparkSimulator {
           found = false
           println(s"It seems that the value $minStability is unstable. Lowering it.")
           maxStability = minStability
-          minStability -= currentResolution
+          minStability -= currentResolution*1.2
         } else if (maxT._2 < 10) {
           found = false
           println(s"It seems that the value $maxStability is stable. Rising it.")
           minStability = maxStability
-          maxStability += currentResolution
+          maxStability += currentResolution*1.2
         }
         // Check here if found and set the variable
         if (found) {
