@@ -77,7 +77,7 @@ public class FJSimulator {
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
 		this.data_aggregator = data_aggregator;
-		if (task_division_factor > 1) {
+		if (task_division_factor > 0) {
 		    this.task_partition_process = partition_process;
 		    this.task_division_factor = task_division_factor;
 		} else {
