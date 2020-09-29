@@ -11,6 +11,8 @@ public class FJKLSingleQueueSplitMergeServer extends FJServer {
 	 *
 	 * The way I implemented this, I put the current "head" job in current_job,
 	 * and the jobs in the queue are the ones not serviced yet.
+	 * 
+	 * XXX: this class is misnamed.  It is not a (k,l) server
 	 */
 	public Queue<FJJob> job_queue = new LinkedList<FJJob>();
 	public FJJob current_job = null;
