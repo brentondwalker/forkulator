@@ -91,7 +91,9 @@ public class FJSimulator {
 		} else if (server_queue_type.toLowerCase().equals("w")) {
 			this.server = new FJWorkerQueueServer(num_workers); 
 		} else if (server_queue_type.toLowerCase().equals("sm")) {
-			this.server = new FJKLSingleQueueSplitMergeServer(num_workers);
+			this.server = new FJSingleQueueSplitMergeServer(num_workers);
+		} else if (server_queue_type.toLowerCase().equals("hsm")) {
+            this.server = new FJHalfwaySplitMergeServer(num_workers);
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
