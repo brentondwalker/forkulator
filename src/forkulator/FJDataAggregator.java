@@ -132,6 +132,7 @@ public class FJDataAggregator implements Serializable {
 		double max_value = 0.0;
 		for (int i=0; i<num_samples; i++) {
 			max_value = Math.max(max_value, job_departure_time[i] - job_arrival_time[i]);
+			max_value = Math.max(max_value, job_inorder_departure_time[i] - job_arrival_time[i]);
 			// TODO is there a better way to calculate necessary array size.
 			max_value = Math.max(max_value, job_cpu_time[i]);
 		}
