@@ -574,34 +574,22 @@ public class FJSimulator {
 				+"\t"+sim.service_process.processParameters()
 				+"\t"+means.get(0) // sojourn mean                 6
 				+"\t"+means.get(1) // waiting mean                 7
-				+"\t"+means.get(2) // service mean                 8
-				+"\t"+means.get(3) // cpu mean                     9
-				+"\t"+means.get(4) // total                        10
-                +"\t"+means.get(5) // job sojourn 1e-6 quantile    11
-                +"\t"+means.get(6) // job waiting 1e-6 quantile    12
-                +"\t"+means.get(7) // job lasttask 1e-6 quantile   13
-                +"\t"+means.get(8) // job service 1e-6 quantile    14
-                +"\t"+means.get(9) // job cputime 1e-6 quantile    15
-                +"\t"+means.get(10) // job sojourn 1e-3 quantile   16
-                +"\t"+means.get(11) // job waiting 1e-3 quantile   17
-                +"\t"+means.get(12) // job lasttask 1e-3 quantile  18
-                +"\t"+means.get(13) // job service 1e-3 quantile   19
-                +"\t"+means.get(14) // job cputime 1e-3 quantile   20
+				+"\t"+means.get(2) // lasttask mean                8				
+				+"\t"+means.get(3) // service mean                 9
+				+"\t"+means.get(4) // cpu mean                     10
+				+"\t"+means.get(5) // total                        11
+                +"\t"+means.get(6) // job sojourn 1e-6 quantile    12
+                +"\t"+means.get(7) // job waiting 1e-6 quantile    13
+                +"\t"+means.get(8) // job lasttask 1e-6 quantile   14
+                +"\t"+means.get(9) // job service 1e-6 quantile    15
+                +"\t"+means.get(10) // job cputime 1e-6 quantile    16
+                +"\t"+means.get(11) // job sojourn 1e-3 quantile   17
+                +"\t"+means.get(12) // job waiting 1e-3 quantile   18
+                +"\t"+means.get(13) // job lasttask 1e-3 quantile  19
+                +"\t"+means.get(14) // job service 1e-3 quantile   20
+                +"\t"+means.get(15) // job cputime 1e-3 quantile   21
 				);
-		/*
-		 *        result.add(quantile(job_sojourn_d, num_samples, 1.0e-6, binwidth));
-        result.add(quantile(job_waiting_d, num_samples, 1.0e-6, binwidth));
-        result.add(quantile(job_lasttask_d, num_samples, 1.0e-6, binwidth));
-        result.add(quantile(job_service_d, num_samples, 1.0e-6, binwidth));
-        result.add(quantile(job_cputime_d, num_samples, 1.0e-6, binwidth));
 
-        // also add 10^-3 quantiles
-        result.add(quantile(job_sojourn_d, num_samples, 1.0e-3, binwidth));
-        result.add(quantile(job_waiting_d, num_samples, 1.0e-3, binwidth));
-        result.add(quantile(job_lasttask_d, num_samples, 1.0e-3, binwidth));
-        result.add(quantile(job_service_d, num_samples, 1.0e-3, binwidth));
-        result.add(quantile(job_cputime_d, num_samples, 1.0e-3, binwidth));
-		 */
 //		sim.jobAutocorrelation(outfile_base, 5000);
 	}
 
