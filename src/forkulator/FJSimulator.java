@@ -92,8 +92,10 @@ public class FJSimulator {
 			this.server = new FJWorkerQueueServer(num_workers); 
 		} else if (server_queue_type.toLowerCase().equals("sm")) {
 			this.server = new FJSingleQueueSplitMergeServer(num_workers);
-		} else if (server_queue_type.toLowerCase().equals("hsm")) {
+        } else if (server_queue_type.toLowerCase().equals("hsm")) {
             this.server = new FJHalfwaySplitMergeServer(num_workers);
+        } else if (server_queue_type.toLowerCase().equals("thsm")) {
+            this.server = new FJTakeHalfSplitMergeServer(num_workers);
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
@@ -567,11 +569,11 @@ public class FJSimulator {
 
 		ArrayList<Double> means = data_aggregator.experimentMeans();
 		System.out.println(
-				num_workers
-				+"\t"+num_tasks
-				+"\t"+sim.server.num_stages
-				+"\t"+sim.arrival_process.processParameters()
-				+"\t"+sim.service_process.processParameters()
+				num_workers                                     // 1
+				+"\t"+num_tasks                                 // 2
+				+"\t"+sim.server.num_stages                     // 3
+				+"\t"+sim.arrival_process.processParameters()   // 4
+				+"\t"+sim.service_process.processParameters()   // 5
 				+"\t"+means.get(0) // sojourn mean                 6
 				+"\t"+means.get(1) // waiting mean                 7
 				+"\t"+means.get(2) // lasttask mean                8				
@@ -582,7 +584,7 @@ public class FJSimulator {
                 +"\t"+means.get(7) // job waiting 1e-6 quantile    13
                 +"\t"+means.get(8) // job lasttask 1e-6 quantile   14
                 +"\t"+means.get(9) // job service 1e-6 quantile    15
-                +"\t"+means.get(10) // job cputime 1e-6 quantile    16
+                +"\t"+means.get(10) // job cputime 1e-6 quantile   16
                 +"\t"+means.get(11) // job sojourn 1e-3 quantile   17
                 +"\t"+means.get(12) // job waiting 1e-3 quantile   18
                 +"\t"+means.get(13) // job lasttask 1e-3 quantile  19
