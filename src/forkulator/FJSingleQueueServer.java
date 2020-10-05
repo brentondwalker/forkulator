@@ -26,6 +26,7 @@ public class FJSingleQueueServer extends FJServer {
 	 */
 	public FJSingleQueueServer(int num_workers) {
 		super(num_workers);
+		System.out.println("FJSingleQueueServer()");
 	}
 	
 	
@@ -45,6 +46,9 @@ public class FJSingleQueueServer extends FJServer {
 				// if the current job is exhausted, grab a new one (or null)
 				if (current_job.fully_serviced) {
 					current_job = job_queue.poll();
+					if (current_job == null) {
+					    break;
+					}
 				}
 			}
 		}
