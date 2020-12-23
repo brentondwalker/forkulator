@@ -96,6 +96,12 @@ public class FJSimulator {
             this.server = new FJHalfwaySplitMergeServer(num_workers);
         } else if (server_queue_type.toLowerCase().equals("thsm")) {
             this.server = new FJTakeHalfSplitMergeServer(num_workers);
+        } else if (server_queue_type.toLowerCase().equals("b")) {
+            this.server = new FJBarrierServer(num_workers);
+            if (num_workers < num_tasks) {
+            	System.err.println("ERROR: FJBarrierServer requires num_workers >= num_tasks");
+            	System.exit(0);
+            }
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
@@ -559,9 +565,9 @@ public class FJSimulator {
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);
 
-//		if (sim.data_aggregator.path_logger != null) {
-//			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
-//		}
+		if (sim.data_aggregator.path_logger != null) {
+			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
+		}
 
 		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 
