@@ -210,6 +210,44 @@ public class FJSparkSimulator {
 			}
 		}
 		
+		// try to merge all the FJDataAggregators into one big one so we can
+		// output convenient experiment stats.
+		FJDataAggregator merged_data = new FJDataAggregator(dl);
+		ArrayList<Double> means = merged_data.experimentMeans();
+		int num_workers = Integer.parseInt(options.getOptionValue("w"));
+		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
+		//
+		// figure out the arrival and service process parameters used
+		//
+		String[] arrival_process_spec = options.getOptionValues("A");
+		IntertimeProcess arrival_process = FJSimulator.parseProcessSpec(arrival_process_spec);
+		String[] service_process_spec = options.getOptionValues("S");
+		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
+		System.out.println(
+				num_workers                                     // 1
+				+"\t"+num_tasks                                 // 2
+				+"\t"+1                     // 3  assume one stage....
+				+"\t"+arrival_process.processParameters()   // 4
+				+"\t"+service_process.processParameters()   // 5
+				+"\t"+means.get(0) // sojourn mean                 6
+				+"\t"+means.get(1) // waiting mean                 7
+				+"\t"+means.get(2) // lasttask mean                8				
+				+"\t"+means.get(3) // service mean                 9
+				+"\t"+means.get(4) // cpu mean                     10
+				+"\t"+means.get(5) // total                        11
+                +"\t"+means.get(6) // job sojourn 1e-6 quantile    12
+                +"\t"+means.get(7) // job waiting 1e-6 quantile    13
+                +"\t"+means.get(8) // job lasttask 1e-6 quantile   14
+                +"\t"+means.get(9) // job service 1e-6 quantile    15
+                +"\t"+means.get(10) // job cputime 1e-6 quantile   16
+                +"\t"+means.get(11) // job sojourn 1e-3 quantile   17
+                +"\t"+means.get(12) // job waiting 1e-3 quantile   18
+                +"\t"+means.get(13) // job lasttask 1e-3 quantile  19
+                +"\t"+means.get(14) // job service 1e-3 quantile   20
+                +"\t"+means.get(15) // job cputime 1e-3 quantile   21
+				);
+
+		
 		try {
 			Thread.sleep(1000);
 		} catch (java.lang.InterruptedException e) {

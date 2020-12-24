@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.GZIPOutputStream;
 import java.io.Serializable;
 
@@ -73,6 +74,52 @@ public class FJDataAggregator implements Serializable {
 		job_cpu_time = new double[max_samples];
 	}
 	
+	/**
+	 * Constructor
+	 * 
+	 * This version builds a new DataAggregator by merging the data of other ones.
+	 * It is intended to be used when simulations are run in parallel in spark, you 
+	 * end up with a list of DataAggregtors from the slices.
+	 * 
+	 * XXX - this is not efficient because you end up collecting two copies of
+	 *       the data at the driver.  It would be better to implement some reduce
+	 *       function on DataAggregators, so this could be done in the cluster.
+	 *       Or some function to compute the experiment stats from the list of
+	 *       DAs.  The complication thre is that the quantile computation is not
+	 *       so easy to implement in that way.  Definitely can do it, but more
+	 *       complicated.
+	 * 
+	 * @param aggregator_list
+	 */
+	public FJDataAggregator(List<FJDataAggregator> aggregator_list) {
+		int max_samples = 0;
+		for (FJDataAggregator da : aggregator_list) {
+			max_samples += da.num_samples;
+		}
+		
+		this.max_samples = max_samples;
+		job_arrival_time = new double[max_samples];
+		job_start_time = new double[max_samples];
+		job_lasttask_time = new double[max_samples];
+		job_completion_time = new double[max_samples];
+        job_departure_time = new double[max_samples];
+        job_inorder_departure_time = new double[max_samples];
+		job_cpu_time = new double[max_samples];
+		
+		num_samples = 0;
+		for (FJDataAggregator da : aggregator_list) {
+			for (int si=0; si<da.num_samples; si++) {
+				job_arrival_time[num_samples] = da.job_arrival_time[si];
+				job_start_time[num_samples] = da.job_start_time[si];
+				job_lasttask_time[num_samples] = da.job_lasttask_time[si];
+				job_completion_time[num_samples] = da.job_completion_time[si];
+		        job_departure_time[num_samples] = da.job_departure_time[si];
+		        job_inorder_departure_time[num_samples] = da.job_inorder_departure_time[si];
+				job_cpu_time[num_samples] = da.job_cpu_time[si];
+				num_samples++;
+			}
+		}
+	}
 	
 	/**
 	 * Grab the data we want from this job.

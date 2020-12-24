@@ -147,12 +147,13 @@ public class FJBarrierServer extends FJServer {
              
              active_jobs.remove(task.job);
              
-             // service the next job, if possible, if any
-             feedWorkers(time);
          } else {
         	 // this server type does not queue tasks on the workers
              //serviceTask(worker, worker.queue.poll(), time);
          }
+         
+         // service the next job, if possible, if any
+         feedWorkers(time);
      }
      
      
