@@ -27,9 +27,6 @@ public class FJBarrierServer extends FJServer {
 
     FJJob next_job = null;
     
-    //XXX - this doesn't serve any purpose.  Remove?
-    private Vector<FJJob> active_jobs;
-	
     
     /**
      * Constructor
@@ -41,12 +38,6 @@ public class FJBarrierServer extends FJServer {
     public FJBarrierServer(int num_workers) {
         super(num_workers);
         System.out.println("FJBarrierServer()");
-        
-        //for (int i=0; i<num_workers; i++) {
-        //    workers[0][i].queue = new LinkedList<FJTask>();
-        //}
-
-        active_jobs = new Vector<FJJob>();
     }
     
     
@@ -81,7 +72,6 @@ public class FJBarrierServer extends FJServer {
     			 nt = next_job.nextTask();
     			 w++;
     		 }
-			 active_jobs.add(next_job);
 			 next_job = job_queue.poll();
     	 }
      }
@@ -144,9 +134,6 @@ public class FJBarrierServer extends FJServer {
              // sample and dispose of the job
              if (FJSimulator.DEBUG) System.out.println("job departing: "+task.job.path_log_id);
              jobDepart(task.job);
-             
-             active_jobs.remove(task.job);
-             
          } else {
         	 // this server type does not queue tasks on the workers
              //serviceTask(worker, worker.queue.poll(), time);
