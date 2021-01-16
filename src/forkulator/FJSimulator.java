@@ -572,8 +572,8 @@ public class FJSimulator {
 				num_workers                                     // 1
 				+"\t"+num_tasks                                 // 2
 				+"\t"+sim.server.num_stages                     // 3
-				+"\t"+sim.arrival_process.processParameters()   // 4
-				+"\t"+sim.service_process.processParameters()   // 5
+				+"\t"+sim.arrival_process.processParameters()   // 4  // this can be more than one value
+				+"\t"+sim.service_process.processParameters()   // 5  // this can be more than one value
 				+"\t"+means.get(0) // sojourn mean                 6
 				+"\t"+means.get(1) // waiting mean                 7
 				+"\t"+means.get(2) // lasttask mean                8				
