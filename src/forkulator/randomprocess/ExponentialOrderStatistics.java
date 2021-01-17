@@ -16,6 +16,7 @@ public class ExponentialOrderStatistics {
 	
 	int orderstat_N = 16;
 	double rate = 1.0;
+	double arrival_rate = 0.5;
 	double pdf_min = 0.0;
 	double pdf_max = 100.0;
 	double binwidth = 0.01;
@@ -29,11 +30,14 @@ public class ExponentialOrderStatistics {
 
 	double[][] exp_orderstat_pdf;
 
-	double theta_min = 0.0;
+	static double theta_min = 0.0;
 	double theta_max = rate;
 	double theta_incr = 0.01;
 	double[][] exp_emp_orderstat_mgf;
 	double[][] exp_anl_orderstat_mgf;
+
+	double[][] rho_a;
+	double[][] rho_s;
 	
 	/**
 	 * 
@@ -122,6 +126,21 @@ public class ExponentialOrderStatistics {
 
 	/**
 	 * 
+	 */
+	public void printRhos() {
+		for (int i=0; i<rho_a[0].length; i++) {
+			double theta = theta_min + i*theta_incr;
+			System.out.print(""+theta+"\t"+rho_a[0][i]);
+			for (int k=0; k<orderstat_N; k++) {
+				System.out.print("\t"+rho_s[k][i]);
+			}
+			System.out.println("");
+		}
+		
+	}
+	
+	/**
+	 * 
 	 * @param rate
 	 * @param num_samples
 	 */
@@ -159,8 +178,8 @@ public class ExponentialOrderStatistics {
 			}
 		}
 		
-		exp_emp_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
-		exp_anl_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
+		exp_emp_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5 + (theta_max-theta_min)/theta_incr)];
+		exp_anl_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5 + (theta_max-theta_min)/theta_incr)];
 		for (int k=1; k<=orderstat_N; k++) {
 			System.err.println("exponentialEmpericalOrderstatMGF k="+k);
 			for (int i=0; i<exp_emp_orderstat_mgf[0].length; i++) {
@@ -169,6 +188,92 @@ public class ExponentialOrderStatistics {
 				exp_anl_orderstat_mgf[k-1][i] = this.exponentialAnalytialOrderstatMGF(k, theta);
 			}
 		}
+		
+		rho_a = new double[orderstat_N][(int)Math.round(0.5 + (theta_max-theta_min)/theta_incr)];
+		rho_s = new double[orderstat_N][(int)Math.round(0.5 + (theta_max-theta_min)/theta_incr)];
+		
+		for (int k=1; k<=orderstat_N; k++) {
+			for (int i=0; i<rho_a[0].length; i++) {
+				double theta = theta_min + i*theta_incr;
+				if (theta > 0.0) {
+					rho_a[k-1][i] = -(1.0/theta) * Math.log(arrival_rate/(arrival_rate + theta));
+					double M = 1.0;
+					for (int j=0; j<k; j++) {
+						M *= (orderstat_N-j)*rate/((orderstat_N-j)*rate - theta);
+					}
+					rho_s[k-1][i] = (1.0/theta) * Math.log(M);
+				} else {
+					rho_a[k-1][i] = 0.0;
+					rho_s[k-1][i] = 0.0;
+				}
+			}
+			
+			double tt = findThetaLimit(orderstat_N, k, arrival_rate, rate, 0.0, rate, 0.000001);
+			if (tt >= 0.0) {
+				double ra = rhoA(arrival_rate, tt);
+				double rs = rhoS(orderstat_N, k, rate, tt);
+				System.err.println("k="+k+"\t max theta="+tt+"\t rhoA="+ra+"\t rhoS="+rs+"\t diff="+(ra-rs));
+			} else {
+				System.err.println("k="+k+"\t max theta="+tt);
+			}
+		}
+	}
+
+	/**
+	 * 
+	 * @param N
+	 * @param k
+	 * @param lambdafindThetaLimit
+	 * @param mu
+	 * @param theta_min
+	 * @param theta_max
+	 * @param tol
+	 * @return
+	 */
+	public static double findThetaLimit(int N, int k, double lambda, double mu, double theta_min, double theta_max, double tol) {
+		// rho_A is a decreasing fuction of theta, and rho_S is increasing, so
+		// start at the lowest value of theta to see if anything is feasible.
+		if (rhoS(N, k, mu, theta_min+tol) > rhoA(lambda, theta_min+tol)) {
+			return -1.0;
+		}
+		
+		if (rhoS(N, k, mu, theta_max) <= rhoA(lambda, theta_max)) {
+			return theta_max;
+		}
+		
+		// There is at least a value of theta for which the system is stable,
+		// but the system becomes unstable for some theta<theta_max.
+		// Do a binary search for the max value of theta.
+		double l_theta = theta_min;
+		double r_theta = theta_max;
+		
+		
+		double last_theta = r_theta;
+		double theta = (r_theta + l_theta)/2.0;
+		while ((r_theta - l_theta) > tol) {
+			if (rhoS(N, k, mu, theta) > rhoA(lambda, theta)) {
+				r_theta = theta;
+			} else {
+				l_theta = theta;
+			}
+			theta = (r_theta + l_theta)/2.0;
+		}
+		
+		return l_theta;
+	}
+	
+	public static double rhoA(double lambda, double theta) {
+		if (theta == 0.0) return 0.0;
+		return -(1.0/theta) * Math.log(lambda/(lambda + theta));
+	}
+	
+	public static double rhoS(int N, int k, double mu, double theta) {
+		if (theta == 0.0) return 0.0;
+		double M = 1.0;
+		for (int j=0; j<k; j++) {
+			M *= (N-j)*mu/((N-j)*mu - theta);
+		}
+		return (1.0/theta) * Math.log(M);
 	}
 	
 	/**
@@ -274,11 +379,15 @@ public class ExponentialOrderStatistics {
 	}
 	
 	
+	
+	
+	
 	/**
 	 * plot [0:7][0:14] 'eosN.dat' using 1:2 w l, 'eosN.dat' using 1:3 w l, 'eosN.dat' using 1:4 w l, 'eosN.dat' using 1:5 w l, 'eosN.dat' using 1:6 w l, 'eosN.dat' using 1:7 w l, 'eosN.dat' using 1:8 w l, 'eosN.dat' using 1:9 w l, 'eosN.dat' using 1:10 w l, 'eosN.dat' using 1:11 w l, 'eosN.dat' using 1:12 w l, 'eosN.dat' using 1:13 w l, 'eosN.dat' using 1:14 w l, 'eosN.dat' using 1:15 w l, 'eosN.dat' using 1:16 w l, 'eosN.dat' using 1:17 w l
 	 * plot [0:7][0:14] 'eosNpdf.dat' using 1:2 w l, 'eosNpdf.dat' using 1:3 w l, 'eosNpdf.dat' using 1:4 w l, 'eosNpdf.dat' using 1:5 w l, 'eosNpdf.dat' using 1:6 w l, 'eosNpdf.dat' using 1:7 w l, 'eosNpdf.dat' using 1:8 w l, 'eosNpdf.dat' using 1:9 w l, 'eosNpdf.dat' using 1:10 w l, 'eosNpdf.dat' using 1:11 w l, 'eosNpdf.dat' using 1:12 w l, 'eosNpdf.dat' using 1:13 w l, 'eosNpdf.dat' using 1:14 w l, 'eosNpdf.dat' using 1:15 w l, 'eosNpdf.dat' using 1:16 w l, 'eosNpdf.dat' using 1:17 w l
 	 * plot 'eosNempMGF.dat' using 1:2 w l, 'eosNempMGF.dat' using 1:3 w l, 'eosNempMGF.dat' using 1:4 w l, 'eosNempMGF.dat' using 1:5 w l, 'eosNempMGF.dat' using 1:6 w l, 'eosNempMGF.dat' using 1:7 w l, 'eosNempMGF.dat' using 1:8 w l, 'eosNempMGF.dat' using 1:9 w l, 'eosNempMGF.dat' using 1:10 w l, 'eosNempMGF.dat' using 1:11 w l, 'eosNempMGF.dat' using 1:12 w l, 'eosNempMGF.dat' using 1:13 w l, 'eosNempMGF.dat' using 1:14 w l, 'eosNempMGF.dat' using 1:15 w l, 'eosNempMGF.dat' using 1:16 w l, 'eosNempMGF.dat' using 1:7 w l
 	 * plot 'eosNanlMGF.dat' using 1:2 w l, 'eosNanlMGF.dat' using 1:3 w l, 'eosNanlMGF.dat' using 1:4 w l, 'eosNanlMGF.dat' using 1:5 w l, 'eosNanlMGF.dat' using 1:6 w l, 'eosNanlMGF.dat' using 1:7 w l, 'eosNanlMGF.dat' using 1:8 w l, 'eosNanlMGF.dat' using 1:9 w l, 'eosNanlMGF.dat' using 1:10 w l, 'eosNanlMGF.dat' using 1:11 w l, 'eosNanlMGF.dat' using 1:12 w l, 'eosNanlMGF.dat' using 1:13 w l, 'eosNanlMGF.dat' using 1:14 w l, 'eosNanlMGF.dat' using 1:15 w l, 'eosNanlMGF.dat' using 1:16 w l, 'eosNanlMGF.dat' using 1:7 w l
+	 * plot 'eosNrho_A05_S10.dat' using 1:2 w l, 'eosNrho_A05_S10.dat' using 1:3 w l, 'eosNrho_A05_S10.dat' using 1:4 w l, 'eosNrho_A05_S10.dat' using 1:5 w l, 'eosNrho_A05_S10.dat' using 1:6 w l, 'eosNrho_A05_S10.dat' using 1:7 w l, 'eosNrho_A05_S10.dat' using 1:8 w l, 'eosNrho_A05_S10.dat' using 1:9 w l, 'eosNrho_A05_S10.dat' using 1:10 w l, 'eosNrho_A05_S10.dat' using 1:11 w l, 'eosNrho_A05_S10.dat' using 1:12 w l, 'eosNrho_A05_S10.dat' using 1:13 w l, 'eosNrho_A05_S10.dat' using 1:14 w l, 'eosNrho_A05_S10.dat' using 1:15 w l, 'eosNrho_A05_S10.dat' using 1:16 w l, 'eosNrho_A05_S10.dat' using 1:17 w l, 'eosNrho_A05_S10.dat' using 1:18 w l
 	 * 
 	 * @param args
 	 */
@@ -287,6 +396,7 @@ public class ExponentialOrderStatistics {
 		//eos.printExpOrderstatData();
 		//eos.printExpOrderstatPDF();
 		//eos.printExpEmpOrderstatMGF();
-		eos.printExpAnlOrderstatMGF();
+		//eos.printExpAnlOrderstatMGF();
+		eos.printRhos();
 	}
 }
