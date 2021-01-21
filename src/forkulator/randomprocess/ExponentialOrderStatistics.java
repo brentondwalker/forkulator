@@ -34,6 +34,7 @@ public class ExponentialOrderStatistics {
 	double theta_incr = 0.01;
 	double[][] exp_emp_orderstat_mgf;
 	double[][] exp_anl_orderstat_mgf;
+	double[][] exp_prod_orderstat_mgf;
 	
 	/**
 	 * 
@@ -106,19 +107,33 @@ public class ExponentialOrderStatistics {
 		}
 	}
 
-	/**
-	 * 
-	 */
-	public void printExpAnlOrderstatMGF() {
-		for (int i=0; i<exp_anl_orderstat_mgf[0].length; i++) {
-			double theta = theta_min + i*theta_incr;
-			System.out.print(""+theta);
-			for (int k=0; k<orderstat_N; k++) {
-				System.out.print("\t"+exp_anl_orderstat_mgf[k][i]);
-			}
-			System.out.println("");
-		}
-	}
+    /**
+     * 
+     */
+    public void printExpAnlOrderstatMGF() {
+        for (int i=0; i<exp_anl_orderstat_mgf[0].length; i++) {
+            double theta = theta_min + i*theta_incr;
+            System.out.print(""+theta);
+            for (int k=0; k<orderstat_N; k++) {
+                System.out.print("\t"+exp_anl_orderstat_mgf[k][i]);
+            }
+            System.out.println("");
+        }
+    }
+
+    /**
+     * 
+     */
+    public void printExpProdOrderstatMGF() {
+        for (int i=0; i<exp_prod_orderstat_mgf[0].length; i++) {
+            double theta = theta_min + i*theta_incr;
+            System.out.print(""+theta);
+            for (int k=0; k<orderstat_N; k++) {
+                System.out.print("\t"+exp_prod_orderstat_mgf[k][i]);
+            }
+            System.out.println("");
+        }
+    }
 
 	/**
 	 * 
@@ -161,12 +176,14 @@ public class ExponentialOrderStatistics {
 		
 		exp_emp_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
 		exp_anl_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
+        exp_prod_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
 		for (int k=1; k<=orderstat_N; k++) {
 			System.err.println("exponentialEmpericalOrderstatMGF k="+k);
 			for (int i=0; i<exp_emp_orderstat_mgf[0].length; i++) {
 				double theta = theta_min + i*theta_incr;
 				//exp_emp_orderstat_mgf[k-1][i] = exponentialEmpericalOrderstatMGF(k, theta);
-				exp_anl_orderstat_mgf[k-1][i] = this.exponentialAnalytialOrderstatMGF(k, theta);
+                exp_anl_orderstat_mgf[k-1][i] = this.exponentialAnalytialOrderstatMGF(k, theta);
+                exp_prod_orderstat_mgf[k-1][i] = this.exponentialAnalytialProductOrderstatMGF(k, theta);
 			}
 		}
 	}
@@ -204,6 +221,21 @@ public class ExponentialOrderStatistics {
 		return M;
 	}
 
+	/**
+     * 
+     * @param k
+     * @param theta
+     * @return
+     */
+    private double exponentialAnalytialProductOrderstatMGF(int k, double theta) {
+        double M = 1.0;
+        for (int j=0; j<k; j++) {
+            M *= (orderstat_N-j)*rate/((orderstat_N-j)*rate - theta);
+        }
+        return M;
+    }
+
+	
 	/**
 	 * 
 	 * @param k
@@ -277,8 +309,9 @@ public class ExponentialOrderStatistics {
 	/**
 	 * plot [0:7][0:14] 'eosN.dat' using 1:2 w l, 'eosN.dat' using 1:3 w l, 'eosN.dat' using 1:4 w l, 'eosN.dat' using 1:5 w l, 'eosN.dat' using 1:6 w l, 'eosN.dat' using 1:7 w l, 'eosN.dat' using 1:8 w l, 'eosN.dat' using 1:9 w l, 'eosN.dat' using 1:10 w l, 'eosN.dat' using 1:11 w l, 'eosN.dat' using 1:12 w l, 'eosN.dat' using 1:13 w l, 'eosN.dat' using 1:14 w l, 'eosN.dat' using 1:15 w l, 'eosN.dat' using 1:16 w l, 'eosN.dat' using 1:17 w l
 	 * plot [0:7][0:14] 'eosNpdf.dat' using 1:2 w l, 'eosNpdf.dat' using 1:3 w l, 'eosNpdf.dat' using 1:4 w l, 'eosNpdf.dat' using 1:5 w l, 'eosNpdf.dat' using 1:6 w l, 'eosNpdf.dat' using 1:7 w l, 'eosNpdf.dat' using 1:8 w l, 'eosNpdf.dat' using 1:9 w l, 'eosNpdf.dat' using 1:10 w l, 'eosNpdf.dat' using 1:11 w l, 'eosNpdf.dat' using 1:12 w l, 'eosNpdf.dat' using 1:13 w l, 'eosNpdf.dat' using 1:14 w l, 'eosNpdf.dat' using 1:15 w l, 'eosNpdf.dat' using 1:16 w l, 'eosNpdf.dat' using 1:17 w l
-	 * plot 'eosNempMGF.dat' using 1:2 w l, 'eosNempMGF.dat' using 1:3 w l, 'eosNempMGF.dat' using 1:4 w l, 'eosNempMGF.dat' using 1:5 w l, 'eosNempMGF.dat' using 1:6 w l, 'eosNempMGF.dat' using 1:7 w l, 'eosNempMGF.dat' using 1:8 w l, 'eosNempMGF.dat' using 1:9 w l, 'eosNempMGF.dat' using 1:10 w l, 'eosNempMGF.dat' using 1:11 w l, 'eosNempMGF.dat' using 1:12 w l, 'eosNempMGF.dat' using 1:13 w l, 'eosNempMGF.dat' using 1:14 w l, 'eosNempMGF.dat' using 1:15 w l, 'eosNempMGF.dat' using 1:16 w l, 'eosNempMGF.dat' using 1:7 w l
-	 * plot 'eosNanlMGF.dat' using 1:2 w l, 'eosNanlMGF.dat' using 1:3 w l, 'eosNanlMGF.dat' using 1:4 w l, 'eosNanlMGF.dat' using 1:5 w l, 'eosNanlMGF.dat' using 1:6 w l, 'eosNanlMGF.dat' using 1:7 w l, 'eosNanlMGF.dat' using 1:8 w l, 'eosNanlMGF.dat' using 1:9 w l, 'eosNanlMGF.dat' using 1:10 w l, 'eosNanlMGF.dat' using 1:11 w l, 'eosNanlMGF.dat' using 1:12 w l, 'eosNanlMGF.dat' using 1:13 w l, 'eosNanlMGF.dat' using 1:14 w l, 'eosNanlMGF.dat' using 1:15 w l, 'eosNanlMGF.dat' using 1:16 w l, 'eosNanlMGF.dat' using 1:7 w l
+	 * plot [0:1][0:16] 'eosNempMGF.dat' using 1:2 w l, 'eosNempMGF.dat' using 1:3 w l, 'eosNempMGF.dat' using 1:4 w l, 'eosNempMGF.dat' using 1:5 w l, 'eosNempMGF.dat' using 1:6 w l, 'eosNempMGF.dat' using 1:7 w l, 'eosNempMGF.dat' using 1:8 w l, 'eosNempMGF.dat' using 1:9 w l, 'eosNempMGF.dat' using 1:10 w l, 'eosNempMGF.dat' using 1:11 w l, 'eosNempMGF.dat' using 1:12 w l, 'eosNempMGF.dat' using 1:13 w l, 'eosNempMGF.dat' using 1:14 w l, 'eosNempMGF.dat' using 1:15 w l, 'eosNempMGF.dat' using 1:16 w l, 'eosNempMGF.dat' using 1:7 w l
+	 * plot [0:1][0:16] 'eosNanlMGF.dat' using 1:2 w l, 'eosNanlMGF.dat' using 1:3 w l, 'eosNanlMGF.dat' using 1:4 w l, 'eosNanlMGF.dat' using 1:5 w l, 'eosNanlMGF.dat' using 1:6 w l, 'eosNanlMGF.dat' using 1:7 w l, 'eosNanlMGF.dat' using 1:8 w l, 'eosNanlMGF.dat' using 1:9 w l, 'eosNanlMGF.dat' using 1:10 w l, 'eosNanlMGF.dat' using 1:11 w l, 'eosNanlMGF.dat' using 1:12 w l, 'eosNanlMGF.dat' using 1:13 w l, 'eosNanlMGF.dat' using 1:14 w l, 'eosNanlMGF.dat' using 1:15 w l, 'eosNanlMGF.dat' using 1:16 w l, 'eosNanlMGF.dat' using 1:7 w l
+	 * plot [0:1][0:16] 'eosNprodMGF.dat' using 1:2 w l, 'eosNprodMGF.dat' using 1:3 w l, 'eosNprodMGF.dat' using 1:4 w l, 'eosNprodMGF.dat' using 1:5 w l, 'eosNprodMGF.dat' using 1:6 w l, 'eosNprodMGF.dat' using 1:7 w l, 'eosNprodMGF.dat' using 1:8 w l, 'eosNprodMGF.dat' using 1:9 w l, 'eosNprodMGF.dat' using 1:10 w l, 'eosNprodMGF.dat' using 1:11 w l, 'eosNprodMGF.dat' using 1:12 w l, 'eosNprodMGF.dat' using 1:13 w l, 'eosNprodMGF.dat' using 1:14 w l, 'eosNprodMGF.dat' using 1:15 w l, 'eosNprodMGF.dat' using 1:16 w l, 'eosNprodMGF.dat' using 1:7 w l
 	 * 
 	 * @param args
 	 */
@@ -287,6 +320,7 @@ public class ExponentialOrderStatistics {
 		//eos.printExpOrderstatData();
 		//eos.printExpOrderstatPDF();
 		//eos.printExpEmpOrderstatMGF();
-		eos.printExpAnlOrderstatMGF();
+		//eos.printExpAnlOrderstatMGF();
+		eos.printExpProdOrderstatMGF();
 	}
 }
