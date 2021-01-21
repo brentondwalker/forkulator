@@ -14,7 +14,7 @@ public class ExponentialOrderStatistics {
 
 	protected Random rand = ThreadLocalRandom.current();
 	
-	int orderstat_N = 16;
+	int orderstat_N = 32;
 	double rate = 1.0;
 	double arrival_rate = 0.5;
 	double pdf_min = 0.0;
