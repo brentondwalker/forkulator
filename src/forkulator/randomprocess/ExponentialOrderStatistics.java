@@ -16,7 +16,7 @@ public class ExponentialOrderStatistics {
 	
 	int orderstat_N = 32;
 	double rate = 1.0;
-	double arrival_rate = 0.5;
+	double arrival_rate = 0.7;
 	double pdf_min = 0.0;
 	double pdf_max = 100.0;
 	double binwidth = 0.01;
@@ -38,7 +38,7 @@ public class ExponentialOrderStatistics {
 	double[][] exp_prod_orderstat_mgf;
 	
     double[][] rho_a;
-	double[][] rho_s
+	double[][] rho_s;
 	/**
 	 * 
 	 * @return
@@ -158,6 +158,7 @@ public class ExponentialOrderStatistics {
 	 * @param rate
 	 * @param num_samples
 	 */
+	@SuppressWarnings("unused")
 	public ExponentialOrderStatistics(double rate, int num_samples) {
 		this.rate = rate;
 		this.theta_max = rate;
@@ -223,16 +224,153 @@ public class ExponentialOrderStatistics {
 					rho_s[k-1][i] = 0.0;
 				}
 			}
-			
-			double tt = findThetaLimit(orderstat_N, k, arrival_rate, rate, 0.0, rate, 0.000001);
+
+			double mu = rate * k / orderstat_N;
+			double thetaeps = 0.000001;
+			double tt = findThetaLimit(orderstat_N, k, arrival_rate, mu, 0.0, mu, thetaeps);
 			if (tt >= 0.0) {
 				double ra = rhoA(arrival_rate, tt);
-				double rs = rhoS(orderstat_N, k, rate, tt);
+				double rs = rhoS(orderstat_N, k, mu, tt);
 				System.err.println("k="+k+"\t max theta="+tt+"\t rhoA="+ra+"\t rhoS="+rs+"\t diff="+(ra-rs));
 			} else {
 				System.err.println("k="+k+"\t max theta="+tt);
 			}
 		}
+		
+		/*
+		 * plot [0:1][0:500] 'sqlb_bound_A05_S10_N8.dat' using 3:8 w lp, 'sqlb_bound_A05_S10_N16.dat' using 3:8 w lp, 'sqlb_bound_A05_S10_N32.dat' using 3:8 w l, 'sqlb_bound_A05_S10_N64.dat' using 3:8 w l, 'sqlb_bound_A05_S10_N128.dat' using 3:8 w l
+		 * plot [0:1][0:300] 'sqlb_bound_A03_S10_N2.dat' using 3:8 w lp,'sqlb_bound_A03_S10_N4.dat' using 3:8 w lp, 'sqlb_bound_A03_S10_N8.dat' using 3:8 w lp, 'sqlb_bound_A03_S10_N16.dat' using 3:8 w lp, 'sqlb_bound_A03_S10_N32.dat' using 3:8 w l, 'sqlb_bound_A03_S10_N64.dat' using 3:8 w l, 'sqlb_bound_A03_S10_N128.dat' using 3:8 w l
+		 * plot [0:1][0:300] 'sqlb_bound_A07_S10_N2.dat' using 3:8 w lp,'sqlb_bound_A07_S10_N4.dat' using 3:8 w lp,'sqlb_bound_A07_S10_N8.dat' using 3:8 w lp, 'sqlb_bound_A07_S10_N16.dat' using 3:8 w lp, 'sqlb_bound_A07_S10_N32.dat' using 3:8 w l, 'sqlb_bound_A07_S10_N64.dat' using 3:8 w l, 'sqlb_bound_A07_S10_N128.dat' using 3:8 w l
+		 */
+		double[] sqlb_W_bound = new double[orderstat_N];
+		double epsilon3 = 1e-3;
+		double epsilon6 = 1e-6;
+		int[] N_vals = { 1, 2, 4, 8, 16, 32, 64, 128 };
+		for (int N : N_vals) {
+			for (int k=1; k<N; k++) {
+				double mu = rate * k / N;
+				double thetaeps = 0.000001;
+				//double tlimit = findThetaLimit(N, k, arrival_rate, mu, 0.0, rate, thetaeps);
+				double tlimit = findThetaLimitUnbounded(N, k, arrival_rate, mu, 0.0, thetaeps);
+				if (tlimit >= 0.0) {
+					double tt = findOptimalTheta(N, k, arrival_rate, mu, theta_min, tlimit, thetaeps);
+					double kdbn = (1.0*k)/N;
+					double ra = rhoA(arrival_rate, tt);
+					double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
+					double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+					double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+					double W_bound_e3 = (-1.0/tt) * Math.log(epsilon3/alpha);
+					double W_bound_e6 = (-1.0/tt) * Math.log(epsilon6/alpha);
+					//sqlb_W_bound[k-1] = (-1.0/tt) * Math.log(epsilon/alpha);
+					System.err.println(""+N+"\t"+k+"\t"+kdbn+"\t"+arrival_rate+"\t"+mu+"\t"+(mu*N/k)+"\t"+tt+"\t"+W_bound_e3+"\t"+W_bound_e6);
+				}
+			}
+			System.err.println("");
+		}
+		
+		// look at the integrands used to compute FT(tau)
+		if (false) {
+			int k = 8;
+			int N = 16;
+			double tau = 100;
+			double mu = rate * k / N;
+			double thetaeps = 0.000001;
+			double tt = findThetaLimit(N, k, arrival_rate, mu, 0.0, mu, thetaeps);
+			double ra = rhoA(arrival_rate, tt);
+			double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
+			double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+			double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+			for (double xx=0.0; xx<=tau; xx+=(tau/1000.0)) {
+				double FWtmx = 1.0 - alpha * Math.exp(-tt*(tau-xx));
+				double fQ = k * mu * Math.exp(-mu*xx) * Math.pow((1.0 - Math.exp(-mu*xx)), k-1);
+				System.out.println(""+xx+"\t"+FWtmx+"\t"+fQ+"\t"+(FWtmx*fQ));
+			}
+		}
+
+		// look at how W quantile bound varies with theta for a particular tau
+		if (true) {
+			int k = 32;
+			int N = 128;
+			double[] tau_list = { 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0 };
+			double mu = rate * k / N;
+			double thetaeps = 0.000001;
+			//double tmax = findThetaLimit(N, k, arrival_rate, mu, 0.0, mu, thetaeps);
+			double tmax = 1.0;
+			double theta_incr = (tmax - theta_min)/1000;
+			for (double tt=theta_min+theta_incr; tt<tmax; tt+= theta_incr) {
+				double ra = rhoA(arrival_rate, tt);
+				double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
+				double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+				double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+				double W_bound_e3 = (-1.0/tt) * Math.log(epsilon3/alpha);
+				double W_bound_e6 = (-1.0/tt) * Math.log(epsilon6/alpha);
+				System.out.println(""+tt+"\t"+ra+"\t"+rs+"\t"+alpha+"\t"+W_bound_e3+"\t"+W_bound_e6);
+			}
+		}
+
+		// look at how FT varies with theta for a particular tau
+		if (false) {
+			int k = 8;
+			int N = 16;
+			double[] tau_list = { 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0 };
+			double mu = rate * k / N;
+			double thetaeps = 0.000001;
+			double tmax = findThetaLimit(N, k, arrival_rate, mu, 0.0, mu, thetaeps);
+			double theta_incr = (tmax - theta_min)/1000;
+			for (double tt=theta_min; tt<tmax; tt+= theta_incr) {
+				double ra = rhoA(arrival_rate, tt);
+				double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
+				double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+				double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+				System.out.print(""+tt+"\t"+ra+"\t"+rs+"\t"+alpha);
+				for (double tau : tau_list) {
+					double Tbound = computeTBound(alpha, k, mu, tt, tau);
+					System.out.print("\t"+Tbound);
+				}
+				System.out.println("");
+			}
+		}
+		
+		/*
+		double taueps = 0.0001;
+		for (double tau=0.0; tau<(1.0-taueps); tau+=taueps) {
+			System.err.print(""+orderstat_N+"\t"+"\t"+arrival_rate+"\t"+tau);
+
+			for (int k=1; k<orderstat_N/2; k++) {
+				double mu = rate * k / orderstat_N;
+				double tt = findThetaLimit(orderstat_N, k, arrival_rate, mu, 0.0, mu, 0.000001);
+				if (tt >= 0.0) {
+					double ra = rhoA(arrival_rate, tt);
+					double rs = rhoS(orderstat_N, k, mu, tt);  // rho_S = rho_Z
+					double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+					double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+					double Tbound = computeTBound(alpha, k, mu, tt, tau);
+					System.err.print("\t"+k+"\t"+Tbound);
+				}
+			}
+			System.err.println("");
+		}
+		*/
+	}
+
+	public static double computeTBoundBad(double alpha, int k, double mu, double theta, double tau) {
+		double FT = 0.0;
+		for (int i=1; i<=k; i++) {
+			FT += Math.pow(-1, i-1) * binomial(k-1, i-1) * ( (1.0 - Math.exp(-i*mu*tau))/(i*mu) + (1.0 - Math.exp((theta-i)*mu*tau))*alpha*Math.exp(-theta*tau)/(theta-i*mu) );
+		}
+		FT *= k*mu;
+		return FT;
+	}
+
+	
+	public static double computeTBound(double alpha, int k, double mu, double theta, double tau) {
+		double FT = 0.0;
+		for (int i=1; i<=k; i++) {
+			FT += Math.pow(-1, i) * binomial(k, i) * ( (1.0 - Math.exp(-(i*mu-theta)*tau))/(i*mu-theta) );
+		}
+		FT *= theta * alpha * Math.exp(-theta*tau);
+		FT += (1-alpha)*Math.pow((1-Math.exp(-mu*tau)), k);
+		return FT;
 	}
 
 	/**
@@ -263,8 +401,6 @@ public class ExponentialOrderStatistics {
 		double l_theta = theta_min;
 		double r_theta = theta_max;
 		
-		
-		double last_theta = r_theta;
 		double theta = (r_theta + l_theta)/2.0;
 		while ((r_theta - l_theta) > tol) {
 			if (rhoS(N, k, mu, theta) > rhoA(lambda, theta)) {
@@ -276,6 +412,85 @@ public class ExponentialOrderStatistics {
 		}
 		
 		return l_theta;
+	}
+
+	/**
+	 * 
+	 * @param N
+	 * @param k
+	 * @param lambdafindThetaLimit
+	 * @param mu
+	 * @param theta_min
+	 * @param theta_max
+	 * @param tol
+	 * @return
+	 */
+	public static double findThetaLimitUnbounded(int N, int k, double lambda, double mu, double theta_min, double tol) {
+		// rho_A is a decreasing fuction of theta, and rho_S is increasing, so
+		// start at the lowest value of theta to see if anything is feasible.
+		if (rhoS(N, k, mu, theta_min+tol) > rhoA(lambda, theta_min+tol)) {
+			return -1.0;
+		}
+
+		// find some big theta that breaks things
+		double max_jump = mu*10000;
+		double theta_jump = tol;
+		while (rhoS(N, k, mu, theta_min+theta_jump) < rhoA(lambda, theta_min+theta_jump)) {
+			theta_jump *= 2;
+			if (theta_jump > max_jump) {
+				System.err.println("WARNING: theta_jump got too big: "+theta_jump);
+				break;
+			}
+		}
+		double theta_max = theta_min + theta_jump;
+				
+		// There is at least a value of theta for which the system is stable,
+		// but the system becomes unstable for some theta<theta_max.
+		// Do a binary search for the max value of theta.
+		double l_theta = theta_min;
+		double r_theta = theta_max;
+		
+		double theta = (r_theta + l_theta)/2.0;
+		while ((r_theta - l_theta) > tol) {
+			if (rhoS(N, k, mu, theta) > rhoA(lambda, theta)) {
+				r_theta = theta;
+			} else {
+				l_theta = theta;
+			}
+			theta = (r_theta + l_theta)/2.0;
+		}
+		
+		return l_theta;
+	}
+
+	public static double computeWBound(int N, int k, double lambda, double mu, double theta, double epsilon) {
+		double ra = rhoA(lambda, theta);
+		double rs = rhoS(N, k, mu, theta);  // rho_S = rho_Z
+		double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+		double alpha = Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
+		double W_bound = (-1.0/theta) * Math.log(epsilon/alpha);
+		return W_bound;
+	}
+	
+	public static double findOptimalTheta(int N, int k, double lambda, double mu, double theta_min, double theta_max, double tol) {
+		double epsilon3 = 1e-3;
+		
+		double l_theta = theta_min + tol;
+		double r_theta = theta_max;
+		double theta = (r_theta + l_theta)/2.0;
+
+		while ((r_theta - l_theta) > tol) {
+			double b1 = computeWBound(N, k, lambda, mu, theta, epsilon3);
+			double b2 = computeWBound(N, k, lambda, mu, theta+tol, epsilon3);
+			if (b1 < b2) {
+				// bound is increasing at this theta
+				r_theta = theta;
+			} else {
+				l_theta = theta;
+			}
+			theta = (r_theta + l_theta)/2.0;
+		}
+		return theta;
 	}
 	
 	public static double rhoA(double lambda, double theta) {
@@ -291,7 +506,7 @@ public class ExponentialOrderStatistics {
 		}
 		return (1.0/theta) * Math.log(M);
 	}
-	
+
 	/**
 	 * 
 	 * @param n
@@ -427,6 +642,6 @@ public class ExponentialOrderStatistics {
 		//eos.printExpEmpOrderstatMGF();
 		//eos.printExpAnlOrderstatMGF();
 		//eos.printExpProdOrderstatMGF();
-		eos.printRhos();
+		//eos.printRhos();
 	}
 }
