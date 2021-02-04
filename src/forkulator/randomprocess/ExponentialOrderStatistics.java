@@ -196,6 +196,7 @@ public class ExponentialOrderStatistics {
 		exp_emp_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
 		exp_anl_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
         exp_prod_orderstat_mgf = new double[orderstat_N][(int)Math.round(0.5+ (theta_max-theta_min)/theta_incr)];
+        /*
 		for (int k=1; k<=orderstat_N; k++) {
 			System.err.println("exponentialEmpericalOrderstatMGF k="+k);
 			for (int i=0; i<exp_emp_orderstat_mgf[0].length; i++) {
@@ -205,6 +206,7 @@ public class ExponentialOrderStatistics {
                 exp_prod_orderstat_mgf[k-1][i] = this.exponentialAnalytialProductOrderstatMGF(k, theta);
 			}
 		}
+		*/
 		
 		rho_a = new double[orderstat_N][(int)Math.round(0.5 + (theta_max-theta_min)/theta_incr)];
 		rho_s = new double[orderstat_N][(int)Math.round(0.5 + (theta_max-theta_min)/theta_incr)];
@@ -231,9 +233,9 @@ public class ExponentialOrderStatistics {
 			if (tt >= 0.0) {
 				double ra = rhoA(arrival_rate, tt);
 				double rs = rhoS(orderstat_N, k, mu, tt);
-				System.err.println("k="+k+"\t max theta="+tt+"\t rhoA="+ra+"\t rhoS="+rs+"\t diff="+(ra-rs));
+				//System.err.println("k="+k+"\t max theta="+tt+"\t rhoA="+ra+"\t rhoS="+rs+"\t diff="+(ra-rs));
 			} else {
-				System.err.println("k="+k+"\t max theta="+tt);
+				//System.err.println("k="+k+"\t max theta="+tt);
 			}
 		}
 		
@@ -262,10 +264,10 @@ public class ExponentialOrderStatistics {
 					double W_bound_e3 = (-1.0/tt) * Math.log(epsilon3/alpha);
 					double W_bound_e6 = (-1.0/tt) * Math.log(epsilon6/alpha);
 					//sqlb_W_bound[k-1] = (-1.0/tt) * Math.log(epsilon/alpha);
-					System.err.println(""+N+"\t"+k+"\t"+kdbn+"\t"+arrival_rate+"\t"+mu+"\t"+(mu*N/k)+"\t"+tt+"\t"+W_bound_e3+"\t"+W_bound_e6);
+					//System.err.println(""+N+"\t"+k+"\t"+kdbn+"\t"+arrival_rate+"\t"+mu+"\t"+(mu*N/k)+"\t"+tt+"\t"+W_bound_e3+"\t"+W_bound_e6);
 				}
 			}
-			System.err.println("");
+			//System.err.println("");
 		}
 		
 		// look at the integrands used to compute FT(tau)
@@ -288,7 +290,7 @@ public class ExponentialOrderStatistics {
 		}
 
 		// look at how W quantile bound varies with theta for a particular tau
-		if (true) {
+		if (false) {
 			int k = 32;
 			int N = 128;
 			double[] tau_list = { 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0 };
@@ -309,13 +311,14 @@ public class ExponentialOrderStatistics {
 		}
 
 		// look at how FT varies with theta for a particular tau
-		if (false) {
-			int k = 8;
+		if (true) {
+			int k = 1;
 			int N = 16;
 			double[] tau_list = { 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0 };
 			double mu = rate * k / N;
 			double thetaeps = 0.000001;
 			double tmax = findThetaLimit(N, k, arrival_rate, mu, 0.0, mu, thetaeps);
+			System.err.println("theta_max = "+tmax);
 			double theta_incr = (tmax - theta_min)/1000;
 			for (double tt=theta_min; tt<tmax; tt+= theta_incr) {
 				double ra = rhoA(arrival_rate, tt);
@@ -324,8 +327,8 @@ public class ExponentialOrderStatistics {
 				double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
 				System.out.print(""+tt+"\t"+ra+"\t"+rs+"\t"+alpha);
 				for (double tau : tau_list) {
-					double Tbound = computeTBound(alpha, k, mu, tt, tau);
-					System.out.print("\t"+Tbound);
+					double TCDF = computeTCDF(alpha, k, mu, tt, tau);
+					System.out.print("\t"+TCDF);
 				}
 				System.out.println("");
 			}
@@ -363,7 +366,7 @@ public class ExponentialOrderStatistics {
 	}
 
 	
-	public static double computeTBound(double alpha, int k, double mu, double theta, double tau) {
+	public static double computeTBoundBadBad(double alpha, int k, double mu, double theta, double tau) {
 		double FT = 0.0;
 		for (int i=1; i<=k; i++) {
 			FT += Math.pow(-1, i) * binomial(k, i) * ( (1.0 - Math.exp(-(i*mu-theta)*tau))/(i*mu-theta) );
@@ -372,6 +375,20 @@ public class ExponentialOrderStatistics {
 		FT += (1-alpha)*Math.pow((1-Math.exp(-mu*tau)), k);
 		return FT;
 	}
+	
+	public static double computeTCDF(double alpha, int k, double mu, double theta, double tau) {
+		double FT = 0.0;
+		
+		for (int i=0; i<k; i++) {
+			FT += Math.pow(-1, i)*binomial(k-1,i)*(
+					(1.0 - Math.exp(-(i+1)*mu*tau))/((i+1)*mu)
+					 + (1.0 - Math.exp((theta-(i+1)*mu)*tau)) *alpha*Math.exp(-theta*tau)/(theta-(i+1)*mu));
+		}
+		FT *= k*mu;
+		
+		return FT;
+	}
+
 
 	/**
 	 * 
@@ -385,6 +402,9 @@ public class ExponentialOrderStatistics {
 	 * @return
 	 */
 	public static double findThetaLimit(int N, int k, double lambda, double mu, double theta_min, double theta_max, double tol) {
+		// now we understand what the max value for theta is
+		theta_max = (N-k)*mu;
+		
 		// rho_A is a decreasing fuction of theta, and rho_S is increasing, so
 		// start at the lowest value of theta to see if anything is feasible.
 		if (rhoS(N, k, mu, theta_min+tol) > rhoA(lambda, theta_min+tol)) {
