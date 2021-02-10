@@ -16,7 +16,7 @@ public class ExponentialOrderStatistics {
 	
 	int orderstat_N = 32;
 	double rate = 1.0;
-	double arrival_rate = 0.7;
+	double arrival_rate = 0.3;
 	double pdf_min = 0.0;
 	double pdf_max = 100.0;
 	double binwidth = 0.01;
@@ -274,7 +274,7 @@ public class ExponentialOrderStatistics {
 		
 		// compute sojourn time bound
 		//plot [0:1][0:500] 'sqlb_T_bound_A07_N128.dat' using 3:12 w l, 'barrier_Ax07_w128.dat' using ($2/$1):12 w lp, 'sqlb_T_bound_A07_N128.dat' using 3:11 w l, 'barrier_Ax07_w128.dat' using ($2/$1):17 w lp
-		if (true) {
+		if (false) {
 			int[] N_vals = { 1, 2, 4, 8, 16, 32, 64, 128 };
 			for (int N : N_vals) {
 				for (int kk=1; kk<=N; kk++) {
@@ -297,7 +297,35 @@ public class ExponentialOrderStatistics {
 				System.out.println("");
 			}
 		}
-		
+
+		// compute sojourn time bound with the extra alpha factors gotten from limiting the convoloution
+		//plot [0:1][0:500] 'sqlb_T_bound_A07_N128.dat' using 3:12 w l, 'barrier_Ax07_w128.dat' using ($2/$1):12 w lp, 'sqlb_T_bound_A07_N128.dat' using 3:11 w l, 'barrier_Ax07_w128.dat' using ($2/$1):17 w lp
+		if (true) {
+			int[] N_vals = { 1, 2, 4, 8, 16, 32, 64, 128 };
+			for (int N : N_vals) {
+				for (int kk=1; kk<=N; kk++) {
+					//System.out.println("\n\n\n*** "+kk+" ***\n");
+					double mu = rate*kk/N;
+					double thetaeps = 0.000001;
+					//double tlimit = findThetaLimit(N, kk, arrival_rate, mu, 0.0, (N-kk+1)*mu, thetaeps);
+					double tlimit = findThetaLimit(N, kk, arrival_rate, mu, 0.0, mu, thetaeps);
+					if (tlimit>0.0) {
+						double thetaT = findTOptimalThetaLC(N, kk, arrival_rate, mu, 0.0, tlimit, 0.000001);
+						double kdbn = (1.0*kk)/N;
+						double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+						double ra = rhoA(arrival_rate, thetaT);
+						double rs = rhoS(N, kk, mu, thetaT);  // rho_S = rho_Z
+						double alpha = Math.exp(thetaT * sa) / (1.0 - Math.exp(-thetaT * (ra - rs)) );
+						double bb3 = computeTBoundLC(N, kk, arrival_rate, mu, thetaT, epsilon3, 0.000001);
+						double bb6 = computeTBoundLC(N, kk, arrival_rate, mu, thetaT, epsilon6, 0.000001);
+						double FT3 = TBoundLCHelper(N,kk,mu,alpha,thetaT,bb3);
+						System.out.println(""+N+"\t"+kk+"\t"+kdbn+"\t"+arrival_rate+"\t"+mu+"\t"+tlimit+"\t"+thetaT+"\t"+ra+"\t"+rs+"\t"+alpha+"\t"+bb3+"\t"+bb6+"\t"+FT3);
+					}
+				}
+				System.out.println("");
+			}
+		}
+
 		// look at the integrands used to compute FT(tau)
 		if (false) {
 			int k = 8;
@@ -431,7 +459,9 @@ public class ExponentialOrderStatistics {
 	 */
 	public static double findThetaLimit(int N, int k, double lambda, double mu, double theta_min, double theta_max, double tol) {
 		// now we understand what the max value for theta is
-		theta_max = (N-k+1)*mu;
+		// but the max value of theta depends on whether we are computing W or T bound
+		// use the supplied parameter
+		//theta_max = (N-k+1)*mu;
 		
 		// rho_A is a decreasing fuction of theta, and rho_S is increasing, so
 		// start at the lowest value of theta to see if anything is feasible.
@@ -603,7 +633,6 @@ public class ExponentialOrderStatistics {
 		//return TBoundHelper(N,k,mu,alpha,theta,(tau_r+tau_l)/2.0);
 		return (tau_l+tau_r)/2.0;
 	}
-	
 
 	/**
 	 * Compute the CDF of the sojourn time bound at a given tau.
@@ -622,6 +651,131 @@ public class ExponentialOrderStatistics {
 			FT += Math.pow(-1, i)*binomial(k-1,i)*(
 					(1.0-Math.exp(-(i+1)*mu*tau))/((i+1)*mu)
 							+ (1.0-Math.exp( (theta-(i+1)*mu)*tau )) * alpha*Math.exp(-theta*tau)/(theta-(i+1)*mu) ); 
+		}
+		FT *= k*mu;
+		return FT;
+	}
+
+	
+	/**
+	 * This version with the limited colvoloution.
+	 * 
+	 * Find a theta that gives the smallest possible W bound for the given parameters.
+	 * This optimizes the 1e-3 quantile.
+	 * 
+	 * @param N
+	 * @param k
+	 * @param lambda
+	 * @param mu
+	 * @param theta_min
+	 * @param theta_max
+	 * @param tol
+	 * @return
+	 */
+	public static double findTOptimalThetaLC(int N, int k, double lambda, double mu, double theta_min, double theta_max, double tol) {
+		double epsilon3 = 1e-3;
+		
+		double l_theta = theta_min + tol;
+		double r_theta = theta_max;
+		double theta = (r_theta + l_theta)/2.0;
+
+		while ((r_theta - l_theta) > tol) {
+			double b1 = computeTBoundLC(N, k, lambda, mu, theta, epsilon3, tol);
+			double b2 = computeTBoundLC(N, k, lambda, mu, theta+tol, epsilon3, tol);
+			//System.out.println("\t"+l_theta+"\t"+r_theta+"\t"+theta+"\t"+b1+"\t"+b2+"\t"+(b2-b1));
+			if (b1 < b2) {
+				// bound is increasing at this theta
+				r_theta = theta;
+			} else {
+				l_theta = theta;
+			}
+			theta = (r_theta + l_theta)/2.0;
+		}
+		return theta;
+	}
+
+	
+	/**
+	 * This version with the limited convoloution, taking into account the fact that
+	 * F_W(tau)=0 for tau<ln(alpha)/theta.
+	 * 
+	 * Compute the sojourn time bound for the BEM system for the given parameters.
+	 * This is a lot more complicated than the waiting time bound because there
+	 * is no closed form way to isolate tau as a function of everything else.
+	 * F_T(tau) is an increasing function, and we have to search for the tau
+	 * that gives the desired F_T.
+	 * 
+	 * @param N
+	 * @param k
+	 * @param lambda
+	 * @param mu
+	 * @param theta
+	 * @param epsilon
+	 * @param tol
+	 * @return
+	 */
+	public static double computeTBoundLC(int N, int k, double lambda, double mu, double theta, double epsilon, double tol) {
+		//System.out.println("\t*** computeTBoundLC("+theta+") ***");
+		double ra = rhoA(lambda, theta);
+		double rs = rhoS(N, k, mu, theta);  // rho_S = rho_Z
+		double sa = 0.0;  // sigma_A = 0 for exponential arrivals
+		double alpha = Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
+		double tau_l = 0.0;
+		double tau_r = tol;
+
+		// get tau_r on the right side of the solution, and tau_l on the left
+		// note that for tau too small, FT will be negative, so avoid that.
+		double FT = TBoundLCHelper(N,k,mu,alpha,theta,tau_r);
+		//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-FT)+"\t"+FT);
+		while (FT < (1.0-epsilon) || (FT > 1.0+tol)) {
+		//while (FT < (1.0-epsilon)) {
+			tau_l = tau_r;
+			tau_r *= 2.0;
+			FT = TBoundLCHelper(N,k,mu,alpha,theta,tau_r);
+			//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-FT)+"\t"+FT);
+			if (tau_r > 1e10) {
+				System.err.println("WARNING: failed to compute bound for N="+N+" k="+k+" theta="+theta+" eps="+epsilon+"  FT("+tau_r+")="+FT);
+				return Double.POSITIVE_INFINITY;
+			}
+		}
+		
+		//System.out.println("\t\t ** PHASE 2");
+		while ((tau_r-tau_l) > tol) {
+			double tau_m = (tau_r+tau_l)/2.0;
+			if (TBoundLCHelper(N,k,mu,alpha,theta,tau_m) < (1.0-epsilon)) {
+				tau_l = tau_m;
+			} else {
+				tau_r = tau_m;
+			}
+			//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-TBoundLCHelper(N,k,mu,alpha,theta,tau_r)+"\t"+FT));
+		}
+
+		//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-TBoundLCHelper(N,k,mu,alpha,theta,tau_r)));
+		//return TBoundLCHelper(N,k,mu,alpha,theta,(tau_r+tau_l)/2.0);
+		return (tau_l+tau_r)/2.0;
+	}
+
+	
+
+	/**
+	 * This version with the limited convoloution.
+	 * 
+	 * Compute the CDF of the sojourn time bound at a given tau.
+	 * 
+	 * @param N
+	 * @param k
+	 * @param mu
+	 * @param alpha
+	 * @param theta
+	 * @param tau
+	 * @return
+	 */
+	public static double TBoundLCHelper(int N, int k, double mu, double alpha, double theta, double tau) {
+		double FT = 0.0;
+		for (int i=0; i<=k-1; i++) {
+			FT += Math.pow(-1, i)*binomial(k-1,i)*(
+					(1.0 - Math.pow(alpha, (i+1)*mu/theta) * Math.exp(-(i+1)*mu*tau))/((i+1)*mu)
+							+ (1.0 - Math.pow(alpha, (i+1)*mu/theta - 1) * Math.exp( (theta-(i+1)*mu)*tau )) * alpha*Math.exp(-theta*tau)/(theta-(i+1)*mu) ); 
 		}
 		FT *= k*mu;
 		return FT;
