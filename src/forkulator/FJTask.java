@@ -3,7 +3,8 @@ package forkulator;
 import forkulator.randomprocess.IntertimeProcess;
 
 public class FJTask {
-	
+
+	public double overhead_time = 0.0;
 	public double start_time = 0.0;
 	public double service_time = 0.0;
 	public double completion_time = 0.0;  // redundant

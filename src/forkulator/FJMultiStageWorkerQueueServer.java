@@ -194,6 +194,9 @@ public class FJMultiStageWorkerQueueServer extends FJServer {
 		}
 		return (lsum / num_workers);
 	}
-	
-	
+
+	@Override
+	int numJobsInQueue() {
+		return queueLength()/num_workers;
+	}
 }

@@ -2,6 +2,7 @@ package forkulator;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ThreadLocalRandom;
 
 
 public class FJKLSingleQueueSplitMergeServer extends FJServer {
@@ -38,12 +39,34 @@ public class FJKLSingleQueueSplitMergeServer extends FJServer {
 		// if there is no current job, just return
 		if (current_job == null) return;
 		for (int i=0; i<num_workers; i++) {
+			// In this server type feedWorkers is only called if a new job is scheduled. So the
+			// worker idle time gets reset here. If all servers calculates at lead one task
+			// setting the time to current time is not necessary.
 			if (workers[0][i].current_task == null) {
-				serviceTask(workers[0][i], current_job.nextTask(), time);
+				workers[0][i].lastTimeCompleted = time;
+				FJTask task = current_job.nextTask();
+//				if (overhead_process != null)
+//					task.service_time += overhead_process.nextInterval();
+				serviceTask(workers[0][i], task, time);
 			}
 		}
 	}
-	
+
+	/**
+	 * Calculates the worker idle time by using the given jobFinishTime. Could be merged with
+	 * feedWorkers to prevent iterating through the workers multiple time but breaks clear
+	 * distinction.
+	 * @param job
+	 */
+	public double getWorkersWaitingTime(FJJob job) {
+//		double totalIdleTime = 0.0;
+//		for (int i=job.tasks.length-1; job.tasks.length - i + 1 < num_workers; i--) {
+//			totalIdleTime += job.completion_time - job.tasks[i].completion_time;
+//		}
+		return job.completion_time -
+				job.tasks[ThreadLocalRandom.current().nextInt(job.tasks.length)].completion_time;
+//		return totalIdleTime;
+	}
 	
 	/**
 	 * Enqueue a new job.
@@ -82,7 +105,7 @@ public class FJKLSingleQueueSplitMergeServer extends FJServer {
 	 * tasks keep running.  Do we need to keep the completed jobs around until
 	 * all their tasks finish (if they aren't sampled)?
 	 * 
-	 * @param workerId
+	 * @param worker
 	 * @param time
 	 */
 	public void taskCompleted(FJWorker worker, double time) {
@@ -91,12 +114,13 @@ public class FJKLSingleQueueSplitMergeServer extends FJServer {
 		worker.current_task = null; // Task completed. Remove it from worker.
 		task.completion_time = time;
 		task.completed = true;
-		task.job.num_tasks_running--;
+		task.job.num_tasks_started--;
 		if (++task.job.num_tasks_completed == this.current_job.tasks.length) {
 			task.job.completed = true;
 			task.job.completion_time = time;
 			task.job.departure_time = time;
-			if (task.job.num_tasks_running == 0) {
+			task.job.workerIdleTime = getWorkersWaitingTime(task.job);
+//			if (task.job.num_tasks_started == 0) {
 				// Completed Job and no task of it is running
 				jobDepart(task.job);
 				current_job = job_queue.poll();
@@ -106,7 +130,8 @@ public class FJKLSingleQueueSplitMergeServer extends FJServer {
 					return;
 				}
 
-			}	feedWorkers(time);
+//			}
+			feedWorkers(time);
 		} else {
 			// Job not completed, service a new task on the current worker
 			serviceTask(worker, current_job.nextTask(), time);

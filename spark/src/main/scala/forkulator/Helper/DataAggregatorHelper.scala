@@ -17,12 +17,14 @@ object DataAggregatorHelper {
       StructField(name = "sojournTime", dataType = DoubleType, nullable = true),
       StructField(name = "serviceTime", dataType = DoubleType, nullable = true),
       StructField(name = "cpuTime", dataType = DoubleType, nullable = true),
+//      StructField(name = "idleTime", dataType = DoubleType, nullable = true),
+      StructField(name = "inOrderSojournTime", dataType = DoubleType, nullable = true),
       StructField(name = "maxSojournTimeIncreasing", dataType = IntegerType, nullable = true),
       StructField(name = "param", dataType = StringType, nullable = true)
     )
   )
 
-  val metricTypeWithSojourn = StructType(
+  val metricTypeWithVariance = StructType(
     Seq(
       StructField(name = "sliceNum", dataType = LongType, nullable = false),
       StructField(name = "sampleNum", dataType = IntegerType, nullable = false),

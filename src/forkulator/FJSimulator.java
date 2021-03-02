@@ -1,11 +1,6 @@
 package forkulator;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.PriorityQueue;
+import java.util.*;
 
 import forkulator.randomprocess.*;
 import org.apache.commons.cli.CommandLine;
@@ -38,6 +33,7 @@ public class FJSimulator {
 	
 	public static final boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 200000;
+	public static final Map<String, Integer> NUM_OF_DIST_PARAMS = new HashMap<>();
 
 	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
 	
@@ -46,13 +42,19 @@ public class FJSimulator {
 	public IntertimeProcess arrival_process;
 	public IntertimeProcess service_process;
     public IntervalPartition job_partition_process = null;
-    public FJPartitionJob job_type = null;
+    public FJPartitionJob job_type = new FJRandomPartitionJob();
 	public FJServer server = null;
 	
 	public double binwidth = 0.1;
 	public double quanile_epsilon = 1e-6;
 	
 	public FJBaseDataAggregator data_aggregator = null;
+
+	/**
+	 * To estimate if the simulation is stable we use the data summerizer here which checks if
+	 * the average job time is increasing monotonously from a point.
+	 */
+	public FJDataSummerizer stability_aggregator = null;
 	
 	
 	/**
@@ -64,14 +66,23 @@ public class FJSimulator {
 	 * @param arrival_process
 	 * @param service_process
 	 * @param data_aggregator
-	 * @param path_logger
 	 */
 	public FJSimulator(String[] server_queue_spec,
 			int num_workers, int num_tasks,
 			IntertimeProcess arrival_process,
 			IntertimeProcess service_process,
 			IntervalPartition job_partition_process,
-			FJBaseDataAggregator data_aggregator) {
+			FJBaseDataAggregator data_aggregator,
+		    IntertimeProcess overhead_process,
+		    IntertimeProcess second_overhead_process) {
+		FJSimulator.NUM_OF_DIST_PARAMS.put("x", 2);
+		FJSimulator.NUM_OF_DIST_PARAMS.put("e", 3);
+		FJSimulator.NUM_OF_DIST_PARAMS.put("g", 3);
+		FJSimulator.NUM_OF_DIST_PARAMS.put("n", 3);
+		FJSimulator.NUM_OF_DIST_PARAMS.put("w", 3);
+		FJSimulator.NUM_OF_DIST_PARAMS.put("c", 2);
+		FJSimulator.NUM_OF_DIST_PARAMS.put("xr", 4);
+		FJSimulator.NUM_OF_DIST_PARAMS.put("xrs", 4);
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
@@ -140,33 +151,40 @@ public class FJSimulator {
 			System.exit(1);
 		}
 		this.server.setSimulator(this);
+		this.server.setOverheadProcesses(overhead_process, second_overhead_process);
 	}
 	
 	
 	/**
 	 * put the initial events in the simulation queue and start processing them
-	 * 
+	 *
 	 * @param num_jobs
+	 * @param warmup
 	 */
-	public void run(long num_jobs, int sampling_interval) {
-		System.err.println("running a simulation for "+num_jobs+" jobs with samp interval "+sampling_interval);
+	public void run(long num_jobs, int sampling_interval, boolean warmup) {
+		this.stability_aggregator = new FJDataSummerizer((int)num_jobs, 1000);
+		System.err.println("running a simulation for "+num_jobs+" jobs with samp interval "+sampling_interval
+		 + "numTasks " + num_tasks + "num workers " + server.num_workers);
 		System.err.println("Arrival value "+arrival_process.processParameters());
 		// compute the warmup period.
 		// Let's say sampling_interval*10*num_stages
-		int warmup_interval = sampling_interval * 10 * server.num_stages;
+		int warmup_interval = warmup ? sampling_interval * 10 * server.num_stages : 0;
 		
 		// before we generated all the job arrivals at once
 		// now to save space we only have one job arrival in the queue at a time
 		double lastArrivalTime = arrival_process.nextInterval();
 		event_queue.add(new QJobArrivalEvent(lastArrivalTime));
 		int jobsInQueue = 1;
+		long acc = 0;
+		long cnt = 0;
 		// start processing events
 		int sampling_countdown = sampling_interval;
 		long jobs_processed = -warmup_interval;
 		while (! event_queue.isEmpty()) {
 			if ((this.server.queueLength() > FJSimulator.QUEUE_STABILITY_THRESHOLD) ||
-					(data_aggregator instanceof FJDataSummerizer &&
-							((FJDataSummerizer) data_aggregator).isUnstable())) {
+					this.stability_aggregator.isUnstable()) {
+//					(data_aggregator instanceof FJDataSummerizer &&
+//							((FJDataSummerizer) data_aggregator).isUnstable())) {
 				data_aggregator.cancelled = true;
 				System.err.println("ERROR: queue exceeded threshold.  The system is unstable.");
 				return;
@@ -177,17 +195,17 @@ public class FJSimulator {
 				jobsInQueue--;
 				jobs_processed++;
 				if (((jobs_processed*100)%num_jobs)==0)
-					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%\tqueuesize="+server.queueLength());
+					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%\tqueuesize="+server.queueLength() + " " + (this.job_type != null));
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
-
 				FJJob job;
 				if (this.job_partition_process != null && this.job_type != null) {
 					job = job_type.createNewInstance(num_tasks, server.num_workers, service_process,
 							job_partition_process, e.time);
 				} else {
-					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process,
+				    job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process,
 							e.time);
 				}
+
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
 					if (data_aggregator.path_logger != null) {
@@ -206,21 +224,33 @@ public class FJSimulator {
 //					jobsInQueue++;
 //					lastArrivalTime += arrival_process.nextInterval();
 //					this.addEvent(new QJobArrivalEvent(lastArrivalTime));
+//					acc += event_queue.size();
+//					cnt++;
 //				}
 			} else if (e instanceof QTaskCompletionEvent) {
+//				System.out.println("Ending task");
 				QTaskCompletionEvent et = (QTaskCompletionEvent) e;
 				server.taskCompleted(et.task.worker, et.time);
 			}
+//			if (server.numJobsInQueue() < 10 && (jobs_processed + jobsInQueue) < num_jobs) {
+////				acc += event_queue.size();
+////				cnt++;
+//			}
 
+			int pendingJobs = server.numJobsInQueue() + jobsInQueue;
+//			System.out.println("Pending jobs " + pendingJobs);
 			// schedule the next job arrival
 			// This prevents the queue getting filled with too much events which can crash the
 			// simulation but the simulation runs slower
-			if (server.numJobsInQueue() < 10 && (jobs_processed + jobsInQueue) < num_jobs) {
+			if ((pendingJobs*num_tasks/num_workers) < 2 && (jobs_processed + jobsInQueue) < num_jobs) {
 				jobsInQueue++;
 				lastArrivalTime += arrival_process.nextInterval();
 				this.addEvent(new QJobArrivalEvent(lastArrivalTime));
+				acc += event_queue.size();
+				cnt++;
 			}
 		}
+		System.out.println("avg " + acc/cnt);
 	}
 	
 	
@@ -232,14 +262,12 @@ public class FJSimulator {
 	public void addEvent(QEvent e) {
 	    event_queue.add(e);
 	}
-	
-	
-	/**
-	 * compute the means of sojourn, waiting, and service times over (almost) all jobs
-	 * 
-	 * @param warmup_period
-	 * @return
-	 */
+
+
+    /**
+     * compute the means of sojourn, waiting, and service times over (almost) all jobs
+     * @return
+     */
 	public ArrayList<Double> experimentMeans() {
 		double sojourn_sum = 0.0;
 		double waiting_sum = 0.0;
@@ -350,6 +378,7 @@ public class FJSimulator {
 	 */
 	public static IntertimeProcess parseProcessSpec(String[] process_spec) {
 		IntertimeProcess process = null;
+		if (process_spec == null) return null;
 		if (process_spec[0].equals("x")) {
 			// exponential
 			double rate = Double.parseDouble(process_spec[1]);
@@ -367,10 +396,11 @@ public class FJSimulator {
 		} else if (process_spec[0].equals("w")) {
 			// weibull
 			double shape = Double.parseDouble(process_spec[1]);
-			if (process_spec.length == 2) {
-				// normalized to have mean 1.0
-				process = new WeibullIntertimeProcess(shape);
-			} else if (process_spec.length == 3) {
+//			if (process_spec.length == 2) {
+//				// normalized to have mean 1.0
+//				process = new WeibullIntertimeProcess(shape);
+//			} else
+			if (process_spec.length == 3) {
 				double scale = Double.parseDouble(process_spec[2]);
 				process = new WeibullIntertimeProcess(shape, scale);
 			}
@@ -395,6 +425,20 @@ public class FJSimulator {
 		    int k = Integer.parseInt(process_spec[2]);
 		    double rho = Double.parseDouble(process_spec[3]);
 		    process = new CorrelatedExponentialSumIntertimeProcess(rate, k, rho);
+		} else if (process_spec[0].equals("d")) {
+			System.out.println(Arrays.toString(process_spec));
+			int first_dist_end = -1;
+			int num_params_first_process = FJSimulator.NUM_OF_DIST_PARAMS.get(process_spec[1]);
+			if (num_params_first_process == -1)
+				return null;
+			String[] first_process_spec = new String[num_params_first_process];
+			String[] second_process_spec = new String[process_spec.length - 2 - num_params_first_process];
+			for (int i = 0; i < process_spec.length-2; i++) {
+				if ((i) < num_params_first_process)
+					first_process_spec[i] = process_spec[i+1];
+				else second_process_spec[i - num_params_first_process] = process_spec[i+1];
+			}
+			process = new SumTwoIntertimeProcesses(FJSimulator.parseProcessSpec(first_process_spec), FJSimulator.parseProcessSpec(second_process_spec));
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);
@@ -470,6 +514,10 @@ public class FJSimulator {
 		if (process_spec[0].equals("i")) {
 		} else if (process_spec[0].equals("r")) {
 			return new FJRandomPartitionJob();
+		} else if (process_spec[0].equals("rtt")) {
+			return new FJRandomTaskServiceProcessPartitionJob();
+		} else if (process_spec[0].equals("ur")) {
+			return new FJRandomPartitionJobUnscaled();
 		} else if (process_spec[0].equals("rtj")) {
 			return new FJRandomPartitionTasksOfJob();
 		}  else {
@@ -537,7 +585,12 @@ public class FJSimulator {
 		//
 		String[] service_process_spec = options.getOptionValues("S");
 		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
-		
+
+		String[] overhead_process_spec = options.getOptionValues("O");
+		IntertimeProcess overhead_process = FJSimulator.parseProcessSpec(overhead_process_spec);
+
+		String[] second_overhead_process_spec = options.getOptionValues("Os");
+		IntertimeProcess second_overhead_process = FJSimulator.parseProcessSpec(second_overhead_process_spec);
 		//
         // if we are in job-partitioning mode, figure out the partitioning type
         //
@@ -550,6 +603,8 @@ public class FJSimulator {
 		if (options.hasOption("Jp")) {
 			String[]  job_partition_spec = options.getOptionValues("Jp");
 			job_partition_type = FJSimulator.parseJobPartitionTypeSpec(job_partition_spec);
+		} else {
+			job_partition_type = new FJRandomPartitionJob();
 		}
 		
 		// data aggregator
@@ -561,11 +616,11 @@ public class FJSimulator {
 		}
 		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator, overhead_process, second_overhead_process);
 		sim.job_type = job_partition_type;
 
 		// start the simulator running...
-		sim.run(num_jobs, sampling_interval);
+		sim.run(num_jobs, sampling_interval, true);
 
 //		if (sim.data_aggregator.path_logger != null) {
 //			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);

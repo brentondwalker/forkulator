@@ -38,10 +38,10 @@ public abstract class IntertimeProcess {
 	 * Because service processes can be idle, you need to pass in
 	 * the current time so the process knows what time "now" is.
 	 * 
-	 * @param curentTime
+	 * @param currentTime
 	 * @return
 	 */
-	public double nextInterval(double curentTime) {
+	public double nextInterval(double currentTime) {
 		throw new UnsupportedOperationException("ERROR: method not implemeted");
 	}
 	

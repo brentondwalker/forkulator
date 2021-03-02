@@ -15,6 +15,7 @@ import org.apache.spark.sql.{Row, SQLContext, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType, StructField, StructType}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import java.net.URI
+//import java.util.logging.LogManager
 
 import forkulator.Helper.{DataAggregatorHelper, SparkHelper}
 import org.apache.hadoop.conf.Configuration
@@ -50,7 +51,6 @@ object SparkSimulator {
     //    cli_options.addOption(OptionBuilder.withLongOpt("queuetype").hasArgs().isRequired
     //      .withDescription("queue type and arguments").create("q"))
     OptionBuilder.hasArgs
-    OptionBuilder.isRequired
     OptionBuilder.withLongOpt("outfile")
     OptionBuilder.withDescription("the base name of the output files")
     cli_options.addOption(OptionBuilder.create("o"))
@@ -66,6 +66,17 @@ object SparkSimulator {
     OptionBuilder.withLongOpt("serviceprocess")
     OptionBuilder.withDescription("service process")
     cli_options.addOption(OptionBuilder.create("S"))
+    OptionBuilder.hasArgs
+//    OptionBuilder.isRequired
+    OptionBuilder.withLongOpt("overheadprocess")
+    OptionBuilder.withDescription("overhead process")
+    cli_options.addOption(OptionBuilder.create("O"))
+    OptionBuilder.hasArgs
+    //    OptionBuilder.isRequired
+    OptionBuilder.withLongOpt("secondoverheadprocess")
+    OptionBuilder.withDescription("second overhead process")
+    cli_options.addOption(OptionBuilder.create("Os"))
+
     //    cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs.isRequired.withDescription("service process").create("S"))
     OptionBuilder.hasArgs
     //    OptionBuilder.isRequired
@@ -96,7 +107,7 @@ object SparkSimulator {
     */
   def doSimulation(options: CommandLine, segment_index: Int, aggregator: FJBaseDataAggregator,
                    arrivalSpec: Array[String] = Array.empty, serviceValues: Array[String] = Array
-    .empty, numOfSampleDivider: Int = 1)
+    .empty, numOfSampleDivider: Int = 1, overheadValues: Array[String] = Array.empty)
   : FJBaseDataAggregator = {
     val server_queue_type = options.getOptionValue("q")
     val num_workers = options.getOptionValue("w").toInt
@@ -116,6 +127,10 @@ object SparkSimulator {
 //    val service_process_spec = options.getOptionValues("S")
     val service_process = FJSimulator.parseProcessSpec(if (serviceValues.isEmpty) options
       .getOptionValues("S") else serviceValues)
+    var overhead_process:forkulator.randomprocess.IntertimeProcess = null
+    overhead_process = FJSimulator.parseProcessSpec(if (overheadValues.isEmpty) options.getOptionValues("O") else overheadValues)
+    var second_overhead_process:forkulator.randomprocess.IntertimeProcess = null
+    second_overhead_process = FJSimulator.parseProcessSpec(if (overheadValues.isEmpty) options.getOptionValues("Os") else overheadValues)
     // if we are in job-partitioning mode, figure out the partitioning type
     var job_partition_process: Option[IntervalPartition] = None
     if (options.hasOption("J")) {
@@ -126,6 +141,8 @@ object SparkSimulator {
     if (options.hasOption("Jp")) {
       val job_partition_spec = options.getOptionValues("Jp")
       job_partition_type = Some(FJSimulator.parseJobPartitionTypeSpec(job_partition_spec))
+    } else {
+      job_partition_type = Some(new FJRandomPartitionJob)
     }
     // data aggregator
     val data_aggregator: FJBaseDataAggregator = aggregator.getNewInstance(samples_per_slice,
@@ -138,10 +155,10 @@ object SparkSimulator {
 
 
     val sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process,
-      service_process, job_partition_process.orNull, data_aggregator)
+      service_process, job_partition_process.orNull, data_aggregator, overhead_process, second_overhead_process)
     sim.job_type = job_partition_type.orNull
     // start the simulator running...
-    sim.run(jobs_per_slice, sampling_interval)
+    sim.run(jobs_per_slice, sampling_interval, true)
     sim.event_queue.clear() // Should not be necessary. Only for tests
     sim.data_aggregator
   }
@@ -194,7 +211,14 @@ object SparkSimulator {
       stabilityRegion = stabilityOptions(1).toDouble
       stabilityResolution = stabilityOptions(2).toDouble
     }
-    val outfile_base = options.map(_.getOptionValue("o")).getOrElse("out")
+    var outfile_base = options.map(_.getOptionValue("o")).getOrElse("out")
+    val outPath = new Path(outfile_base)
+    val fs = FileSystem.get(URI.create(outfile_base), new Configuration())
+    if (fs.exists(outPath)) {
+      outfile_base += System.currentTimeMillis()
+//      fs.delete(outPath, true)
+    }
+
     // distribute the simulation segments to workers
     val ar = new util.ArrayList[Integer](num_slices)
     if (checkStability.equals("")) {
@@ -209,7 +233,8 @@ object SparkSimulator {
             f.job_departure_time(i) - f.job_arrival_time(i),
             f.job_completion_time(i) - f.job_start_time(i),
             f.job_cpu_time(i),
-            0,
+            f.job_inorder_departure_time(i) - f.job_arrival_time(i),
+            0.toInt,
             ""
           )
 //          case _ => Row()
@@ -218,11 +243,6 @@ object SparkSimulator {
       }, DataAggregatorHelper.metricType)//.toDF().cache
       rdd.write.parquet(outfile_base)
     } else {
-      val outPath = new Path(outfile_base)
-      val fs = FileSystem.get(URI.create(outfile_base), new Configuration())
-      if (fs.exists(outPath)) {
-        fs.delete(outPath, true)
-      }
       println(checkStability)
       val arrivalSpec = options.get.getOptionValues("A")
       val serviceSpec = options.get.getOptionValues("S")
@@ -332,10 +352,12 @@ object SparkSimulator {
                   Row(
                     f._1.toLong,
                     i,
-                    summerizer.job_waiting_d(i),
-                    summerizer.job_sojourn_d(i),
-                    summerizer.job_service_d(i),
-                    summerizer.job_cputime_d(i),
+                    summerizer.job_waiting_mean(i),
+                    summerizer.job_sojourn_mean(i),
+                    summerizer.job_service_mean(i),
+                    summerizer.job_cputime_mean(i),
+//                    summerizer.worker_idle_time_mean(i),
+                    summerizer.job_inorder_sojourn_mean(i),
                     summerizer.maxSojournTimeIncreasing,
                     summerizer.params(1)
                   )}
@@ -362,7 +384,7 @@ object SparkSimulator {
         // Check here if found and set the variable
         if (found) {
           //.write.csv(outfile_base) // metricType
-          df.write.csv(outfile_base)
+          df.write.parquet(outfile_base)
           // TODO Don't use static value
           val outCsv = new BufferedWriter(new FileWriter("/mnt/out/stability.csv", true))
           outCsv.write(s"${outfile_base.split("/").last},${minT._1},${maxT._1}\n")
@@ -378,10 +400,10 @@ object SparkSimulator {
 //              Row(
 //                0, //f._1,
 //                0, //i,
-//                summerizer.job_waiting_d(i),
-//                summerizer.job_sojourn_d(i),
-//                summerizer.job_service_d(i),
-//                summerizer.job_cputime_d(i),
+//                summerizer.job_waiting_mean(i),
+//                summerizer.job_sojourn_mean(i),
+//                summerizer.job_service_mean(i),
+//                summerizer.job_cputime_mean(i),
 //                0, //summerizer.maxSojournTimeIncreasing,
 //                summerizer.params(1)
 //              )}

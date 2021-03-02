@@ -10,7 +10,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
-import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.zip.GZIPOutputStream;
@@ -23,13 +22,6 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.apache.spark.SparkConf;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.OutputStreamWriter;
-import java.util.zip.GZIPOutputStream;
 
 
 /**
@@ -79,6 +71,14 @@ public class FJSparkSimulator {
 		//
 		String[] service_process_spec = options.getOptionValues("S");
 		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
+
+
+		String[] overhead_process_spec = options.getOptionValues("O");
+		IntertimeProcess overhead_process = FJSimulator.parseProcessSpec(overhead_process_spec);
+
+
+		String[] second_overhead_process_spec = options.getOptionValues("Os");
+		IntertimeProcess second_overhead_process = FJSimulator.parseProcessSpec(second_overhead_process_spec);
 		
 		//
         // if we are in job-partitioning mode, figure out the partitioning type
@@ -100,11 +100,11 @@ public class FJSparkSimulator {
 		
 		// simulator
 		String[] server_queue_spec = options.getOptionValues("q");
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator, overhead_process, second_overhead_process);
 
 
 		// start the simulator running...
-		sim.run(jobs_per_slice, sampling_interval);
+		sim.run(jobs_per_slice, sampling_interval, true);
 		
 		return (FJDataAggregator) sim.data_aggregator;
 	}

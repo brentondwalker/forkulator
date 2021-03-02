@@ -16,11 +16,14 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  */
 public abstract class FJJob implements Comparable<FJJob> {
+    public static long JOB_ID = 0; // Holds next job id
 
+    public long job_id = FJJob.JOB_ID++;
     // essential data about the job
     public double arrival_time = 0.0;
     public double completion_time = 0.0;
     public double departure_time = 0.0;
+    public double workerIdleTime = 0.0;
 
     // the job's tasks
     public int num_tasks = 0;
@@ -28,7 +31,7 @@ public abstract class FJJob implements Comparable<FJJob> {
     // could be merged with (@link completed)
     public int num_tasks_completed = 0;
     // prevent iterating through tasks to check if tasks are running.
-    public int num_tasks_running = 0;
+    public int num_tasks_started = 0;
     public FJTask[] tasks = null;
 
     // index to keep track of which tasks have been pulled out for service

@@ -121,6 +121,11 @@ public class FJWorkerQueueServer extends FJServer {
 
 		return (lsum / num_workers);
 	}
-	
-	
+
+	@Override
+	int numJobsInQueue() {
+		// TODO replace with job count. The current implementation only tries to have at least
+		// one task per worker
+		return queueLength()/num_workers;
+	}
 }

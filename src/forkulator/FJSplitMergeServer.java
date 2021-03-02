@@ -85,6 +85,8 @@ public class FJSplitMergeServer extends FJServer {
 		
 		FJTask t = null;
 		while ((t = job.nextTask()) != null) {
+//			if (overhead_process != null)
+//				t.service_time += overhead_process.nextInterval();
 			workers[0][worker_index].queue.add(t);
 			worker_index = (worker_index + 1) % num_workers;
 		}

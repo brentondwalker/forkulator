@@ -117,7 +117,7 @@ public class FJKLSingleQueueServer extends FJServer {
 		worker.current_task = null; // Task completed. Remove it from worker.
 		task.completion_time = time;
 		task.completed = true;
-		task.job.num_tasks_running--;
+//		task.job.num_tasks_started--;
 
 		if (! task.job.completed) {
 			// check if this task is the l'th of the job.
@@ -143,10 +143,11 @@ public class FJKLSingleQueueServer extends FJServer {
 //				total_complete = total_complete && t.completed;
 //			}
 //			if (total_complete) {
-			if (task.job.num_tasks_running == 0) {
-				// sample and dispose of the job
-				jobDepart(task.job);
-			}
+			jobDepart(task.job);
+//			if (task.job.num_tasks_started == 0) {
+//				// sample and dispose of the job
+//				jobDepart(task.job);
+//			}
 		}
 
 		// if there is no current job, just clear the worker

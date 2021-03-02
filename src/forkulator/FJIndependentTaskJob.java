@@ -32,6 +32,7 @@ public class FJIndependentTaskJob extends FJPartitionJob {
 
         tasks = new FJTask[this.num_tasks];
         for (int i=0; i<this.num_tasks; i++) {
+            long t1 = System.currentTimeMillis();
             tasks[i] = new FJTask(service_process, arrival_time, this);
             // TODO: this assumes the number of tasks equals the number of servers
             //tasks[i].data_host = i;

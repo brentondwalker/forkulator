@@ -1,5 +1,7 @@
 package forkulator;
 
+import forkulator.randomprocess.IntertimeProcess;
+
 import java.util.ArrayList;
 
 public abstract class FJServer {
@@ -11,8 +13,21 @@ public abstract class FJServer {
 	public FJWorker[][] workers = null;
 	public FJJob current_job = null; // needs to change for multi-stage
 	public ArrayList<FJJob> sampled_jobs = new ArrayList<FJJob>();
-	
-	
+	public IntertimeProcess overhead_process = null;
+
+	public IntertimeProcess getOverhead_process() {
+		return overhead_process;
+	}
+
+	public void setOverheadProcesses(IntertimeProcess overhead_process, IntertimeProcess second_overhead_process) {
+		this.overhead_process = overhead_process;
+		for (int row = 0; row < workers.length; row++) {
+			for (int col = 0; col < workers[row].length; col++) {
+				workers[row][col].setOverheadProcesses(overhead_process, second_overhead_process);
+			}
+		}
+	}
+
 	/**
 	 * Super constructor.
 	 * 
@@ -100,14 +115,12 @@ public abstract class FJServer {
 		if (task != null) {
 			assert(task.job != null);
 			if (FJSimulator.DEBUG) System.out.println("serviceTask() "+task);
-			worker.current_task = task;
-			task.job.num_tasks_running++;
-			task.worker = worker;
+			worker.handleTask(task);
+			task.job.num_tasks_started++;
 			task.start_time = time;
 			task.processing = true;
-//
 //			// schedule the task's completion
-			QTaskCompletionEvent e = new QTaskCompletionEvent(task, time + task.service_time);
+			QTaskCompletionEvent e = new QTaskCompletionEvent(task, time + worker.serviceTask());
 			simulator.addEvent(e);
 		}
 	}
@@ -129,6 +142,7 @@ public abstract class FJServer {
 		if (simulator.data_aggregator != null) {
 			simulator.data_aggregator.sample(j);
 		}
+		simulator.stability_aggregator.sample(j);
 		j.dispose();
 	}
 
