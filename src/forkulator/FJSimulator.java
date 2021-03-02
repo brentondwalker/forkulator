@@ -42,6 +42,8 @@ public class FJSimulator {
 	public IntertimeProcess arrival_process;
 	public IntertimeProcess service_process;
     public IntervalPartition job_partition_process = null;
+    public IntervalPartition task_partition_process = null;
+	public int task_division_factor = 0;
     public FJPartitionJob job_type = new FJRandomPartitionJob();
 	public FJServer server = null;
 	
@@ -66,12 +68,14 @@ public class FJSimulator {
 	 * @param arrival_process
 	 * @param service_process
 	 * @param data_aggregator
+	 * @param path_logger
 	 */
 	public FJSimulator(String[] server_queue_spec,
 			int num_workers, int num_tasks,
 			IntertimeProcess arrival_process,
 			IntertimeProcess service_process,
 			IntervalPartition job_partition_process,
+            int task_division_factor,
 			FJBaseDataAggregator data_aggregator,
 		    IntertimeProcess overhead_process,
 		    IntertimeProcess second_overhead_process) {
@@ -88,7 +92,13 @@ public class FJSimulator {
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
 		this.data_aggregator = data_aggregator;
-		this.job_partition_process = job_partition_process;
+		if (task_division_factor > 0) {
+		    this.task_partition_process = job_partition_process;
+		    this.task_division_factor = task_division_factor;
+		} else {
+		    this.job_partition_process = job_partition_process;
+		}
+		
 		String server_queue_type = server_queue_spec[0];
 		
 		if (server_queue_type.toLowerCase().equals("s")) {
@@ -96,7 +106,18 @@ public class FJSimulator {
 		} else if (server_queue_type.toLowerCase().equals("w")) {
 			this.server = new FJWorkerQueueServer(num_workers); 
 		} else if (server_queue_type.toLowerCase().equals("sm")) {
-			this.server = new FJKLSingleQueueSplitMergeServer(num_workers);
+			// this.server = new FJKLSingleQueueSplitMergeServer(num_workers);
+			this.server = new FJSingleQueueSplitMergeServer(num_workers);
+        } else if (server_queue_type.toLowerCase().equals("hsm")) {
+            this.server = new FJHalfwaySplitMergeServer(num_workers);
+        } else if (server_queue_type.toLowerCase().equals("thsm")) {
+            this.server = new FJTakeHalfSplitMergeServer(num_workers);
+        } else if (server_queue_type.toLowerCase().equals("b")) {
+            this.server = new FJBarrierServer(num_workers);
+            if (num_workers < num_tasks) {
+            	System.err.println("ERROR: FJBarrierServer requires num_workers >= num_tasks");
+            	System.exit(0);
+            }
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
@@ -157,7 +178,7 @@ public class FJSimulator {
 	
 	/**
 	 * put the initial events in the simulation queue and start processing them
-	 *
+	 * 
 	 * @param num_jobs
 	 * @param warmup
 	 */
@@ -191,12 +212,14 @@ public class FJSimulator {
 //				System.exit(0);
 			}
 			QEvent e = event_queue.poll();
+
 			if (e instanceof QJobArrivalEvent) {
 				jobsInQueue--;
 				jobs_processed++;
 				if (((jobs_processed*100)%num_jobs)==0)
 					System.err.println("   ... "+(100*jobs_processed/num_jobs)+"%\tqueuesize="+server.queueLength() + " " + (this.job_type != null));
 				QJobArrivalEvent et = (QJobArrivalEvent) e;
+
 				FJJob job;
 				if (this.job_partition_process != null && this.job_type != null) {
 					job = job_type.createNewInstance(num_tasks, server.num_workers, service_process,
@@ -205,7 +228,6 @@ public class FJSimulator {
 				    job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process,
 							e.time);
 				}
-
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
 					if (data_aggregator.path_logger != null) {
@@ -548,6 +570,7 @@ public class FJSimulator {
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
+        cli_options.addOption(OptionBuilder.withLongOpt("taskpartition").hasArgs().withDescription("task_partition").create("T"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartitiontype").hasArgs().withDescription("job_partition_type").create("Jp"));
 
 		// TODO: add options for leaky bucket process filters
@@ -595,7 +618,12 @@ public class FJSimulator {
         // if we are in job-partitioning mode, figure out the partitioning type
         //
         IntervalPartition job_partition_process = null;
+        int task_division_factor = 1;
         if (options.hasOption("J")) {
+            if (options.hasOption("T")) {
+                System.err.println("ERROR: cannot use both the -J and -T options together");
+                System.exit(0);
+            }
             String[] job_partition_spec = options.getOptionValues("J");
             job_partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
         }
@@ -606,6 +634,20 @@ public class FJSimulator {
 		} else {
 			job_partition_type = new FJRandomPartitionJob();
 		}
+        
+        //
+        // Task partitioning mode is like job partitioning, but there can be many
+        // tasks that are divided into smaller tasks.  Strictly speaking, job-partitioning
+        // mode is a special case of task partitioning mode (take tasks=1), but for now we
+        // configure them differently.
+        //
+        if (options.hasOption("T")) {
+            String[] task_partition_spec = options.getOptionValues("T");
+            // for task division, the arguments are the same as job division, except the
+            // first argument is the number of subtasks to divide each task into.
+            task_division_factor = Integer.parseInt(task_partition_spec[0]);
+            job_partition_process = FJSimulator.parseJobDivisionSpec(Arrays.copyOfRange(task_partition_spec, 1, task_partition_spec.length));
+        }
 		
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator((int)(1 + num_jobs/sampling_interval));
@@ -616,7 +658,7 @@ public class FJSimulator {
 		}
 		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator, overhead_process, second_overhead_process);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, task_division_factor, data_aggregator, overhead_process, second_overhead_process);
 		sim.job_type = job_partition_type;
 
 		// start the simulator running...
@@ -626,28 +668,33 @@ public class FJSimulator {
 //			sim.data_aggregator.path_logger.writePathlog(outfile_base, false);
 //		}
 
-//		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
+		data_aggregator.printExperimentDistributions(outfile_base, sim.binwidth);
 
 		data_aggregator.printRawJobData(outfile_base);
 
 		ArrayList<Double> means = data_aggregator.experimentMeans();
 		System.out.println(
-				num_workers
-				+"\t"+num_tasks
-				+"\t"+sim.server.num_stages
-				+"\t"+sim.arrival_process.processParameters()
-				+"\t"+sim.service_process.processParameters()
-				+"\t"+means.get(0) // sojourn mean
-				+"\t"+means.get(1) // waiting mean
-				+"\t"+means.get(2) // service mean
-				+"\t"+means.get(3) // cpu mean
-				+"\t"+means.get(4) // total
-				+"\t"+means.get(5) // sojourn quantile
-				+"\t"+means.get(6) // waiting quantile
-				+"\t"+means.get(7) // service quanile
-				+"\t"+means.get(8) // sojourn quantile 2
-				+"\t"+means.get(9) // waiting quantile 2
-				+"\t"+means.get(10) // service quantile 2
+				num_workers                                     // 1
+				+"\t"+num_tasks                                 // 2
+				+"\t"+sim.server.num_stages                     // 3
+				+"\t"+sim.arrival_process.processParameters()   // 4  // this can be more than one value
+				+"\t"+sim.service_process.processParameters()   // 5  // this can be more than one value
+				+"\t"+means.get(0) // sojourn mean                 6
+				+"\t"+means.get(1) // waiting mean                 7
+				+"\t"+means.get(2) // lasttask mean                8				
+				+"\t"+means.get(3) // service mean                 9
+				+"\t"+means.get(4) // cpu mean                     10
+				+"\t"+means.get(5) // total                        11
+                +"\t"+means.get(6) // job sojourn 1e-6 quantile    12
+                +"\t"+means.get(7) // job waiting 1e-6 quantile    13
+                +"\t"+means.get(8) // job lasttask 1e-6 quantile   14
+                +"\t"+means.get(9) // job service 1e-6 quantile    15
+                +"\t"+means.get(10) // job cputime 1e-6 quantile   16
+                +"\t"+means.get(11) // job sojourn 1e-3 quantile   17
+                +"\t"+means.get(12) // job waiting 1e-3 quantile   18
+                +"\t"+means.get(13) // job lasttask 1e-3 quantile  19
+                +"\t"+means.get(14) // job service 1e-3 quantile   20
+                +"\t"+means.get(15) // job cputime 1e-3 quantile   21
 				);
 		
 //		sim.jobAutocorrelation(outfile_base, 5000);

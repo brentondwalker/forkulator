@@ -10,6 +10,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.zip.GZIPOutputStream;
@@ -22,6 +23,13 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.apache.spark.SparkConf;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.OutputStreamWriter;
+import java.util.zip.GZIPOutputStream;
 
 
 /**
@@ -84,10 +92,30 @@ public class FJSparkSimulator {
         // if we are in job-partitioning mode, figure out the partitioning type
         //
         IntervalPartition job_partition_process = null;
+        int task_division_factor = 1;
         if (options.hasOption("J")) {
+            if (options.hasOption("T")) {
+                System.err.println("ERROR: cannot use both the -J and -T options together");
+                System.exit(0);
+            }
             String[] job_partition_spec = options.getOptionValues("J");
             job_partition_process = FJSimulator.parseJobDivisionSpec(job_partition_spec);
         }
+        
+        //
+        // Task partitioning mode is like job partitioning, but there can be many
+        // tasks that are divided into smaller tasks.  Strictly speaking, job-partitioning
+        // mode is a special case of task partitioning mode (take tasks=1), but for now we
+        // configure them differently.
+        //
+        if (options.hasOption("T")) {
+            String[] task_partition_spec = options.getOptionValues("T");
+            // for task division, the arguments are the same as job division, except the
+            // first argument is the number of subtasks to divide each task into.
+            task_division_factor = Integer.parseInt(task_partition_spec[0]);
+            job_partition_process = FJSimulator.parseJobDivisionSpec(Arrays.copyOfRange(task_partition_spec, 1, task_partition_spec.length));
+        }
+
 
 		// data aggregator
 		FJDataAggregator data_aggregator = new FJDataAggregator(samples_per_slice);
@@ -100,7 +128,7 @@ public class FJSparkSimulator {
 		
 		// simulator
 		String[] server_queue_spec = options.getOptionValues("q");
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, data_aggregator, overhead_process, second_overhead_process);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, 0, data_aggregator, overhead_process, second_overhead_process);
 
 
 		// start the simulator running...
@@ -126,7 +154,7 @@ public class FJSparkSimulator {
 		cli_options.addOption(OptionBuilder.withLongOpt("arrivalprocess").hasArgs().isRequired().withDescription("arrival process").create("A"));
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
-
+        cli_options.addOption(OptionBuilder.withLongOpt("taskpartition").hasArgs().withDescription("task_partition").create("T"));
 		
 		CommandLineParser parser = new PosixParser();
 		CommandLine options = null;
@@ -185,6 +213,44 @@ public class FJSparkSimulator {
 			} catch (Exception e) {
 			}
 		}
+		
+		// try to merge all the FJDataAggregators into one big one so we can
+		// output convenient experiment stats.
+		FJDataAggregator merged_data = new FJDataAggregator(dl);
+		ArrayList<Double> means = merged_data.experimentMeans();
+		int num_workers = Integer.parseInt(options.getOptionValue("w"));
+		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
+		//
+		// figure out the arrival and service process parameters used
+		//
+		String[] arrival_process_spec = options.getOptionValues("A");
+		IntertimeProcess arrival_process = FJSimulator.parseProcessSpec(arrival_process_spec);
+		String[] service_process_spec = options.getOptionValues("S");
+		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
+		System.out.println(
+				num_workers                                     // 1
+				+"\t"+num_tasks                                 // 2
+				+"\t"+1                     // 3  assume one stage....
+				+"\t"+arrival_process.processParameters()   // 4
+				+"\t"+service_process.processParameters()   // 5
+				+"\t"+means.get(0) // sojourn mean                 6
+				+"\t"+means.get(1) // waiting mean                 7
+				+"\t"+means.get(2) // lasttask mean                8				
+				+"\t"+means.get(3) // service mean                 9
+				+"\t"+means.get(4) // cpu mean                     10
+				+"\t"+means.get(5) // total                        11
+                +"\t"+means.get(6) // job sojourn 1e-6 quantile    12
+                +"\t"+means.get(7) // job waiting 1e-6 quantile    13
+                +"\t"+means.get(8) // job lasttask 1e-6 quantile   14
+                +"\t"+means.get(9) // job service 1e-6 quantile    15
+                +"\t"+means.get(10) // job cputime 1e-6 quantile   16
+                +"\t"+means.get(11) // job sojourn 1e-3 quantile   17
+                +"\t"+means.get(12) // job waiting 1e-3 quantile   18
+                +"\t"+means.get(13) // job lasttask 1e-3 quantile  19
+                +"\t"+means.get(14) // job service 1e-3 quantile   20
+                +"\t"+means.get(15) // job cputime 1e-3 quantile   21
+				);
+
 		
 		try {
 			Thread.sleep(1000);

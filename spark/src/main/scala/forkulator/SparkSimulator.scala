@@ -155,7 +155,7 @@ object SparkSimulator {
 
 
     val sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process,
-      service_process, job_partition_process.orNull, data_aggregator, overhead_process, second_overhead_process)
+      service_process, job_partition_process.orNull, 0, data_aggregator, overhead_process, second_overhead_process)
     sim.job_type = job_partition_type.orNull
     // start the simulator running...
     sim.run(jobs_per_slice, sampling_interval, true)

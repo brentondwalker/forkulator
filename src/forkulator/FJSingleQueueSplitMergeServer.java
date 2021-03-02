@@ -5,13 +5,20 @@ import java.util.Queue;
 import java.util.concurrent.ThreadLocalRandom;
 
 
-public class FJKLSingleQueueSplitMergeServer extends FJServer {
+public class FJSingleQueueSplitMergeServer extends FJServer {
 	/**
 	 * This type of server has a single job queue, and tasks are drawn from
 	 * the job at the front of the queue until the job is fully serviced.
 	 *
 	 * The way I implemented this, I put the current "head" job in current_job,
 	 * and the jobs in the queue are the ones not serviced yet.
+	 * 
+	 * The point of this server is to experiment with SplitMerge where
+	 * the number of tasks per job  is more than the number of servers,
+	 * for example Tiny Tasks.  In FJSplitMergeServer, it assumes that 
+	 * the number of tasks per job is less than or equal to the number
+	 * of servers.
+	 * 
 	 */
 	public Queue<FJJob> job_queue = new LinkedList<FJJob>();
 	public FJJob current_job = null;
@@ -24,7 +31,7 @@ public class FJKLSingleQueueSplitMergeServer extends FJServer {
 	 *
 	 * @param num_workers
 	 */
-	public FJKLSingleQueueSplitMergeServer(int num_workers) {
+	public FJSingleQueueSplitMergeServer(int num_workers) {
 		super(num_workers);
 	}
 	

@@ -26,6 +26,7 @@ public class FJSingleQueueServer extends FJServer {
 	 */
 	public FJSingleQueueServer(int num_workers) {
 		super(num_workers);
+		System.out.println("FJSingleQueueServer()");
 	}
 	
 	
@@ -39,12 +40,20 @@ public class FJSingleQueueServer extends FJServer {
 		if (current_job == null) return;
 		// check for idle workers
 		for (int i=0; i<num_workers; i++) {
+
+			// if there is no current job, just return
+			if (current_job == null) return;
+			
 			if (workers[0][i].current_task == null) {
 				// service the next task
 				serviceTask(workers[0][i], current_job.nextTask(), time);
+				
 				// if the current job is exhausted, grab a new one (or null)
 				if (current_job.fully_serviced) {
 					current_job = job_queue.poll();
+					if (current_job == null) {
+					    break;
+					}
 				}
 			}
 		}
@@ -136,43 +145,37 @@ public class FJSingleQueueServer extends FJServer {
 
 		// check if this task was the last one of a job
 		//TODO: this could be more efficient
-//		boolean compl = true;
-//		for (FJTask t : task.job.tasks) {
-//			compl = compl && t.completed;
-//		}
-//		task.job.completed = compl;
-		task.job.completed = ++task.job.num_tasks_completed == task.job.tasks.length;
-//		if (task.job.completed) {
-//			System.out.println("tasks completed " + task.job.num_tasks_completed + " task length " + task.job.tasks.length);
-//			System.out.println("tasks completed " + task.job.num_tasks_completed + " task length " + this.current_job.tasks.length);
-//		}
-//		task.job.completed = task.job.num_tasks_completed == this.current_job.tasks.length;
+		boolean compl = true;
+		for (FJTask t : task.job.tasks) {
+			compl = compl && t.completed;
+		}
+		task.job.completed = compl;
 
 		if (task.job.completed) {
 			// it is the last, record the completion time
 			task.job.completion_time = time;
-
+			
 			// for this type of server it is also the departure time
 			task.job.departure_time = time;
-
+			
 			// sample and dispose of the job
 			jobDepart(task.job);
 		}
-
-		//if there is no current job, just clear the worker
+		
+		// if there is no current job, just clear the worker
 		if (current_job == null) {
-//			System.out.println("  no current_job");
+			if (FJSimulator.DEBUG) System.out.println("  no current_job");
 			worker.current_task = null;
 			return;
 		}
-
+		
 		// put a new task on the worker
 		serviceTask(worker, current_job.nextTask(), time);
-
+		
 		// if the current job is exhausted, grab a new one (or null)
 		if (current_job.fully_serviced) {
 			current_job = job_queue.poll();
-//			System.out.println("  set current_job to "+current_job);
+			if (FJSimulator.DEBUG) System.out.println("  set current_job to "+current_job);
 			feedWorkers(time);  // this should not do anything
 		}
 	}

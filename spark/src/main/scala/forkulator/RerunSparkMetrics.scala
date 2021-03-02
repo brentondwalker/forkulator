@@ -179,7 +179,7 @@ object RerunSparkMetrics {
 //    val oldSparkMetrics = RerunSparkMetrics.load(spark = oldSparkMetrics, inputMetricsFile)
 
     val sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process,
-      service_process, null, data_aggregator, overhead_process, second_overhead_process)
+      service_process, null, 0, data_aggregator, overhead_process, second_overhead_process)
     sim.job_type = null
     // start the simulator running...
     sim.run(jobs_per_slice, sampling_interval, false)
