@@ -1,6 +1,7 @@
 package forkulator.randomprocess;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -14,9 +15,14 @@ public class ExponentialOrderStatistics {
 
 	protected Random rand = ThreadLocalRandom.current();
 	
+	// if we have a GI|M system then the bound with alpha=1 may apply.
+	// There are so many little places we compute alpha for various purposes.
+	// Make it possible to switch to alpha=1 mode here.
+	public static boolean GI_M = true;
+	
 	int orderstat_N = 32;
 	double rate = 1.0;
-	double arrival_rate = 0.3;
+	double arrival_rate = 0.5;
 	double pdf_min = 0.0;
 	double pdf_max = 100.0;
 	double binwidth = 0.01;
@@ -240,8 +246,8 @@ public class ExponentialOrderStatistics {
 		}
 		
 		/*
-		 * plot [0:1][0:500] 'sqlb_bound_A05_S10_N8.dat' using 3:8 w lp, 'sqlb_bound_A05_S10_N16.dat' using 3:8 w lp, 'sqlb_bound_A05_S10_N32.dat' using 3:8 w l, 'sqlb_bound_A05_S10_N64.dat' using 3:8 w l, 'sqlb_bound_A05_S10_N128.dat' using 3:8 w l
 		 * plot [0:1][0:300] 'sqlb_bound_A03_S10_N2.dat' using 3:8 w lp,'sqlb_bound_A03_S10_N4.dat' using 3:8 w lp, 'sqlb_bound_A03_S10_N8.dat' using 3:8 w lp, 'sqlb_bound_A03_S10_N16.dat' using 3:8 w lp, 'sqlb_bound_A03_S10_N32.dat' using 3:8 w l, 'sqlb_bound_A03_S10_N64.dat' using 3:8 w l, 'sqlb_bound_A03_S10_N128.dat' using 3:8 w l
+		 * plot [0:1][0:500] 'sqlb_bound_A05_S10_N8.dat' using 3:8 w lp, 'sqlb_bound_A05_S10_N16.dat' using 3:8 w lp, 'sqlb_bound_A05_S10_N32.dat' using 3:8 w l, 'sqlb_bound_A05_S10_N64.dat' using 3:8 w l, 'sqlb_bound_A05_S10_N128.dat' using 3:8 w l
 		 * plot [0:1][0:300] 'sqlb_bound_A07_S10_N2.dat' using 3:8 w lp,'sqlb_bound_A07_S10_N4.dat' using 3:8 w lp,'sqlb_bound_A07_S10_N8.dat' using 3:8 w lp, 'sqlb_bound_A07_S10_N16.dat' using 3:8 w lp, 'sqlb_bound_A07_S10_N32.dat' using 3:8 w l, 'sqlb_bound_A07_S10_N64.dat' using 3:8 w l, 'sqlb_bound_A07_S10_N128.dat' using 3:8 w l
 		 */
 		double epsilon3 = 1e-3;
@@ -261,7 +267,7 @@ public class ExponentialOrderStatistics {
 						double ra = rhoA(arrival_rate, tt);
 						double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
 						double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-						double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+						double alpha = (GI_M) ? 1.0 : Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
 						double W_bound_e3 = (-1.0/tt) * Math.log(epsilon3/alpha);
 						double W_bound_e6 = (-1.0/tt) * Math.log(epsilon6/alpha);
 						//sqlb_W_bound[k-1] = (-1.0/tt) * Math.log(epsilon6/alpha);
@@ -274,7 +280,7 @@ public class ExponentialOrderStatistics {
 		
 		// compute sojourn time bound
 		//plot [0:1][0:500] 'sqlb_T_bound_A07_N128.dat' using 3:12 w l, 'barrier_Ax07_w128.dat' using ($2/$1):12 w lp, 'sqlb_T_bound_A07_N128.dat' using 3:11 w l, 'barrier_Ax07_w128.dat' using ($2/$1):17 w lp
-		if (false) {
+		if (true) {
 			int[] N_vals = { 1, 2, 4, 8, 16, 32, 64, 128 };
 			for (int N : N_vals) {
 				for (int kk=1; kk<=N; kk++) {
@@ -288,7 +294,7 @@ public class ExponentialOrderStatistics {
 						double sa = 0.0;  // sigma_A = 0 for exponential arrivals
 						double ra = rhoA(arrival_rate, thetaT);
 						double rs = rhoS(N, kk, mu, thetaT);  // rho_S = rho_Z
-						double alpha = Math.exp(thetaT * sa) / (1.0 - Math.exp(-thetaT * (ra - rs)) );
+						double alpha = (GI_M) ? 1.0 : Math.exp(thetaT * sa) / (1.0 - Math.exp(-thetaT * (ra - rs)) );
 						double bb3 = computeTBound(N, kk, arrival_rate, mu, thetaT, epsilon3, 0.000001);
 						double bb6 = computeTBound(N, kk, arrival_rate, mu, thetaT, epsilon6, 0.000001);
 						System.out.println(""+N+"\t"+kk+"\t"+kdbn+"\t"+arrival_rate+"\t"+mu+"\t"+(mu*N/kk)+"\t"+thetaT+"\t"+ra+"\t"+rs+"\t"+alpha+"\t"+bb3+"\t"+bb6);
@@ -300,10 +306,12 @@ public class ExponentialOrderStatistics {
 
 		// compute sojourn time bound with the extra alpha factors gotten from limiting the convoloution
 		//plot [0:1][0:500] 'sqlb_T_bound_A07_N128.dat' using 3:12 w l, 'barrier_Ax07_w128.dat' using ($2/$1):12 w lp, 'sqlb_T_bound_A07_N128.dat' using 3:11 w l, 'barrier_Ax07_w128.dat' using ($2/$1):17 w lp
-		if (true) {
+		if (false) {
 			int[] N_vals = { 1, 2, 4, 8, 16, 32, 64, 128 };
+			//int[] N_vals = { 128 };
 			for (int N : N_vals) {
 				for (int kk=1; kk<=N; kk++) {
+				//for (int kk=38; kk<=38; kk++) {
 					//System.out.println("\n\n\n*** "+kk+" ***\n");
 					double mu = rate*kk/N;
 					double thetaeps = 0.000001;
@@ -315,7 +323,7 @@ public class ExponentialOrderStatistics {
 						double sa = 0.0;  // sigma_A = 0 for exponential arrivals
 						double ra = rhoA(arrival_rate, thetaT);
 						double rs = rhoS(N, kk, mu, thetaT);  // rho_S = rho_Z
-						double alpha = Math.exp(thetaT * sa) / (1.0 - Math.exp(-thetaT * (ra - rs)) );
+						double alpha = (GI_M) ? 1.0 : Math.exp(thetaT * sa) / (1.0 - Math.exp(-thetaT * (ra - rs)) );
 						double bb3 = computeTBoundLC(N, kk, arrival_rate, mu, thetaT, epsilon3, 0.000001);
 						double bb6 = computeTBoundLC(N, kk, arrival_rate, mu, thetaT, epsilon6, 0.000001);
 						double FT3 = TBoundLCHelper(N,kk,mu,alpha,thetaT,bb3);
@@ -337,7 +345,7 @@ public class ExponentialOrderStatistics {
 			double ra = rhoA(arrival_rate, tt);
 			double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
 			double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-			double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+			double alpha = (GI_M) ? 1.0 : Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
 			for (double xx=0.0; xx<=tau; xx+=(tau/1000.0)) {
 				double FWtmx = 1.0 - alpha * Math.exp(-tt*(tau-xx));
 				double fQ = k * mu * Math.exp(-mu*xx) * Math.pow((1.0 - Math.exp(-mu*xx)), k-1);
@@ -359,7 +367,7 @@ public class ExponentialOrderStatistics {
 				double ra = rhoA(arrival_rate, tt);
 				double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
 				double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-				double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+				double alpha = (GI_M) ? 1.0 : Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
 				double W_bound_e3 = (-1.0/tt) * Math.log(epsilon3/alpha);
 				double W_bound_e6 = (-1.0/tt) * Math.log(epsilon6/alpha);
 				System.out.println(""+tt+"\t"+ra+"\t"+rs+"\t"+alpha+"\t"+W_bound_e3+"\t"+W_bound_e6);
@@ -380,7 +388,7 @@ public class ExponentialOrderStatistics {
 				double ra = rhoA(arrival_rate, tt);
 				double rs = rhoS(N, k, mu, tt);  // rho_S = rho_Z
 				double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-				double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+				double alpha = (GI_M) ? 1.0 : Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
 				System.out.print(""+tt+"\t"+ra+"\t"+rs+"\t"+alpha);
 				for (double tau : tau_list) {
 					double TCDF = computeTCDF(alpha, k, mu, tt, tau);
@@ -402,7 +410,7 @@ public class ExponentialOrderStatistics {
 					double ra = rhoA(arrival_rate, tt);
 					double rs = rhoS(orderstat_N, k, mu, tt);  // rho_S = rho_Z
 					double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-					double alpha = Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
+					double alpha = (GI_M) ? 1.0 : Math.exp(tt * sa) / (1.0 - Math.exp(-tt * (ra - rs)) );
 					double Tbound = computeTBound(alpha, k, mu, tt, tau);
 					System.err.print("\t"+k+"\t"+Tbound);
 				}
@@ -599,7 +607,7 @@ public class ExponentialOrderStatistics {
 		double ra = rhoA(lambda, theta);
 		double rs = rhoS(N, k, mu, theta);  // rho_S = rho_Z
 		double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-		double alpha = Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
+		double alpha = (GI_M) ? 1.0 : Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
 		double tau_l = 0.0;
 		double tau_r = tol;
 
@@ -719,22 +727,26 @@ public class ExponentialOrderStatistics {
 		double ra = rhoA(lambda, theta);
 		double rs = rhoS(N, k, mu, theta);  // rho_S = rho_Z
 		double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-		double alpha = Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
+		double alpha = (GI_M) ? 1.0 : Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
 		double tau_l = 0.0;
 		double tau_r = tol;
 
 		// get tau_r on the right side of the solution, and tau_l on the left
 		// note that for tau too small, FT will be negative, so avoid that.
-		double FT = TBoundLCHelper(N,k,mu,alpha,theta,tau_r);
-		//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-FT)+"\t"+FT);
-		while (FT < (1.0-epsilon) || (FT > 1.0+tol)) {
+		double FT_l = 0.0;
+		double FT_r = TBoundLCHelper(N,k,mu,alpha,theta,tau_r);
+		//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+FT_l+"\t"+FT_r);
+		while (FT_r < (1.0-epsilon) || (FT_r > 1.0+tol)) {
 		//while (FT < (1.0-epsilon)) {
 			tau_l = tau_r;
 			tau_r *= 2.0;
-			FT = TBoundLCHelper(N,k,mu,alpha,theta,tau_r);
-			//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-FT)+"\t"+FT);
+			FT_l = TBoundLCHelper(N,k,mu,alpha,theta,tau_l);
+			FT_r = TBoundLCHelper(N,k,mu,alpha,theta,tau_r);
+			//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+FT_l+"\t"+FT_r);
 			if (tau_r > 1e10) {
-				System.err.println("WARNING: failed to compute bound for N="+N+" k="+k+" theta="+theta+" eps="+epsilon+"  FT("+tau_r+")="+FT);
+				double FT = FT_r;
+				System.err.println("WARNING: failed to compute bound for N="+N+" k="+k+" theta="+theta+" mu="+mu+" eps="+epsilon+"  FT("+tau_r+")="+FT);
+				//System.out.println("\t\tWARNING: failed to compute bound for N="+N+" k="+k+" theta="+theta+" mu="+mu+" eps="+epsilon+"  FT("+tau_r+")="+FT);
 				return Double.POSITIVE_INFINITY;
 			}
 		}
@@ -742,12 +754,13 @@ public class ExponentialOrderStatistics {
 		//System.out.println("\t\t ** PHASE 2");
 		while ((tau_r-tau_l) > tol) {
 			double tau_m = (tau_r+tau_l)/2.0;
-			if (TBoundLCHelper(N,k,mu,alpha,theta,tau_m) < (1.0-epsilon)) {
+			double FT_m = TBoundLCHelper(N,k,mu,alpha,theta,tau_m);
+			if (FT_m < (1.0-epsilon)) {
 				tau_l = tau_m;
 			} else {
 				tau_r = tau_m;
 			}
-			//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-TBoundLCHelper(N,k,mu,alpha,theta,tau_r)+"\t"+FT));
+			//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-TBoundLCHelper(N,k,mu,alpha,theta,tau_r)+"\t"+FT_m));
 		}
 
 		//System.out.println("\t\t"+tau_l+"\t"+tau_r+"\t"+(1.0-TBoundLCHelper(N,k,mu,alpha,theta,tau_r)));
@@ -757,7 +770,7 @@ public class ExponentialOrderStatistics {
 
 	
 
-	/**
+	/**		
 	 * This version with the limited convoloution.
 	 * 
 	 * Compute the CDF of the sojourn time bound at a given tau.
@@ -772,12 +785,49 @@ public class ExponentialOrderStatistics {
 	 */
 	public static double TBoundLCHelper(int N, int k, double mu, double alpha, double theta, double tau) {
 		double FT = 0.0;
+		Double[] summands = new Double[2*k];
 		for (int i=0; i<=k-1; i++) {
-			FT += Math.pow(-1, i)*binomial(k-1,i)*(
-					(1.0 - Math.pow(alpha, (i+1)*mu/theta) * Math.exp(-(i+1)*mu*tau))/((i+1)*mu)
-							+ (1.0 - Math.pow(alpha, (i+1)*mu/theta - 1) * Math.exp( (theta-(i+1)*mu)*tau )) * alpha*Math.exp(-theta*tau)/(theta-(i+1)*mu) ); 
+			summands[2*i] =  Math.pow(-1, i)*binomial(k-1,i)*(
+					(1.0 - Math.pow(alpha, (i+1)*mu/theta) * Math.exp(-(i+1)*mu*tau))/(i+1.0) );
+			summands[2*i + 1] =  Math.pow(-1, i)*binomial(k-1,i)*(
+					(1.0 - Math.pow(alpha, ((i+1)*mu/theta) - 1.0) * Math.exp( (theta-(i+1)*mu)*tau ) ) * alpha*mu*Math.exp(-theta*tau)/(theta-(i+1)*mu) ); 
 		}
-		FT *= k*mu;
+		Arrays.sort(summands, Comparator.comparingDouble(Math::abs) );
+		for (double xx : summands) {
+			FT += xx;
+			//System.out.println("\t\t\t"+xx+"\t"+FT+"\t"+FT*k);
+		}
+		//FT *= k*mu;
+		FT *= k;
+		return FT;
+	}
+
+
+	/**
+	 * This version with the limited convoloution.
+	 * 
+	 * Compute the CDF of the sojourn time bound at a given tau.
+	 * 
+	 * @param N
+	 * @param k
+	 * @param mu
+	 * @param alpha
+	 * @param theta
+	 * @param tau
+	 * @return
+	 */
+	public static double TBoundLCHelperPrecisionProblems(int N, int k, double mu, double alpha, double theta, double tau) {
+		double FT = 0.0;
+		for (int i=0; i<=k-1; i++) {
+			//FT += Math.pow(-1, i)*binomial(k-1,i)*(
+			//		(1.0 - Math.pow(alpha, (i+1)*mu/theta) * Math.exp(-(i+1)*mu*tau))/((i+1)*mu)
+			//				+ (1.0 - Math.pow(alpha, (i+1)*mu/theta - 1) * Math.exp( (theta-(i+1)*mu)*tau )) * alpha*Math.exp(-theta*tau)/(theta-(i+1)*mu) ); 
+			FT += Math.pow(-1, i)*binomial(k-1,i)*(
+					(1.0 - Math.pow(alpha, (i+1)*mu/theta) * Math.exp(-(i+1)*mu*tau))/(i+1.0)
+							+ (1.0 - Math.pow(alpha, ((i+1)*mu/theta) - 1.0) * Math.exp( (theta-(i+1)*mu)*tau ) ) * alpha*mu*Math.exp(-theta*tau)/(theta-(i+1)*mu) ); 
+		}
+		//FT *= k*mu;
+		FT *= k;
 		return FT;
 	}
 
@@ -797,7 +847,7 @@ public class ExponentialOrderStatistics {
 		double ra = rhoA(lambda, theta);
 		double rs = rhoS(N, k, mu, theta);  // rho_S = rho_Z
 		double sa = 0.0;  // sigma_A = 0 for exponential arrivals
-		double alpha = Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
+		double alpha = (GI_M) ? 1.0 : Math.exp(theta * sa) / (1.0 - Math.exp(-theta * (ra - rs)) );
 		double W_bound = (-1.0/theta) * Math.log(epsilon/alpha);
 		return W_bound;
 	}
