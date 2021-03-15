@@ -27,6 +27,28 @@ public class FJBarrierServer extends FJServer {
 
     FJJob next_job = null;
     
+    /**
+     * BarrierServer is special because there is a barrier at trhe start of the
+     * jobs.  All tasks must start at te same time, and they reserve the workers
+     * until they can start.  This flag adds a barrier at the end as well.
+     * Workers remain reserved until all the tasks complete and the job departs.
+     */
+    private boolean departure_barrier = false;
+    
+    
+    /**
+     * Constructor
+     * 
+     * Has to allocate the workers' task queues.
+     * 
+     * @param num_workers
+     */
+    public FJBarrierServer(int num_workers, boolean departure_barrier) {
+        super(num_workers);
+        this.departure_barrier = departure_barrier;
+        System.out.println("FJBarrierServer(departure_barrier=true)");
+    }
+
     
     /**
      * Constructor
@@ -39,7 +61,7 @@ public class FJBarrierServer extends FJServer {
         super(num_workers);
         System.out.println("FJBarrierServer()");
     }
-    
+
     
     /**
      * Check for any idle workers and try to put a task on them.
@@ -114,7 +136,12 @@ public class FJBarrierServer extends FJServer {
          FJTask task = worker.current_task;
          task.completion_time = time;
          task.completed = true;
-         worker.current_task = null;
+         
+         // if there is a departure barrier, just leave the completed task
+         // on the worker and clear them out when the job is done.
+         if (! departure_barrier) {
+        	 worker.current_task = null;
+         }
          
          // check if this task was the last one of a job
          //TODO: this could be more efficient
@@ -125,6 +152,13 @@ public class FJBarrierServer extends FJServer {
          task.job.completed = compl;
          
          if (task.job.completed) {
+        	 // if there is a departure barrier, clear out the tasks
+        	 if (departure_barrier) {
+        		 for (FJTask t : task.job.tasks) {
+        			 t.worker.current_task = null;
+        		 }
+        	 }
+        	 
              // it is the last, record the completion time
              task.job.completion_time = time;
              
