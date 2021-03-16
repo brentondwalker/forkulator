@@ -52,7 +52,7 @@ public class FJBarrierServer extends FJServer {
      * 
      * @param num_workers
      */
-    public FJBarrierServer(int num_workers, boolean departure_barrier, boolean start_barrier) {
+    public FJBarrierServer(int num_workers, boolean start_barrier, boolean departure_barrier) {
         super(num_workers);
         this.departure_barrier = departure_barrier;
         this.start_barrier = start_barrier;
