@@ -96,7 +96,7 @@ public class FJBarrierServer extends FJServer {
     	 }
     	 
     	 // can we service this job?
-    	 if ((idle_workers.size() >= next_job.num_tasks) || (idle_workers.size() > 0 && !start_barrier))  {
+    	 if ((idle_workers.size() >= next_job.num_tasks) || (idle_workers.size() > 0 && start_barrier==false))  {
     		 int w = 0;
     		 FJTask nt = next_job.nextTask();
     		 while (nt != null && w < idle_workers.size()) {
@@ -105,6 +105,7 @@ public class FJBarrierServer extends FJServer {
     			 w++;
     		 }
 			 next_job = job_queue.poll();
+			 feedWorkers(time);
     	 }
      }
      
