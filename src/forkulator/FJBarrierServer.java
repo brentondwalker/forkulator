@@ -28,12 +28,21 @@ public class FJBarrierServer extends FJServer {
     FJJob next_job = null;
     
     /**
-     * BarrierServer is special because there is a barrier at trhe start of the
-     * jobs.  All tasks must start at te same time, and they reserve the workers
+     * BarrierServer is special because there is a barrier at the start of the
+     * jobs.  All tasks must start at the same time, and they reserve the workers
      * until they can start.  This flag adds a barrier at the end as well.
      * Workers remain reserved until all the tasks complete and the job departs.
      */
     private boolean departure_barrier = false;
+    
+    /**
+     * But just for the sake of generality, let's make the start barrier optional too.
+     * This way we can experiment with jobs that have the departure barrier, but not
+     * the BEM-style start barrier.
+     * If you turn off both start and departure barriers, this server type should
+     * behave like single-queue fork join.
+     */
+    private boolean start_barrier = true;
     
     
     /**
@@ -43,10 +52,11 @@ public class FJBarrierServer extends FJServer {
      * 
      * @param num_workers
      */
-    public FJBarrierServer(int num_workers, boolean departure_barrier) {
+    public FJBarrierServer(int num_workers, boolean departure_barrier, boolean start_barrier) {
         super(num_workers);
         this.departure_barrier = departure_barrier;
-        System.out.println("FJBarrierServer(departure_barrier=true)");
+        this.start_barrier = start_barrier;
+        System.out.println("FJBarrierServer(departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+")");
     }
 
     
@@ -86,10 +96,10 @@ public class FJBarrierServer extends FJServer {
     	 }
     	 
     	 // can we service this job?
-    	 if (idle_workers.size() >= next_job.num_tasks) {
+    	 if ((idle_workers.size() >= next_job.num_tasks) || (idle_workers.size() > 0 && !start_barrier))  {
     		 int w = 0;
     		 FJTask nt = next_job.nextTask();
-    		 while (nt != null ) {
+    		 while (nt != null && w < idle_workers.size()) {
     			 serviceTask(workers[0][idle_workers.get(w)], nt, time);
     			 nt = next_job.nextTask();
     			 w++;

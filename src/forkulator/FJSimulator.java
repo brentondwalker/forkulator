@@ -35,7 +35,7 @@ import org.apache.commons.cli.ParseException;
 public class FJSimulator {
 	
 	public static final boolean DEBUG = false;
-	public static final int QUEUE_STABILITY_THRESHOLD = 1000000;
+	public static final int QUEUE_STABILITY_THRESHOLD = 100000;
 	
 	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
 	
@@ -96,14 +96,17 @@ public class FJSimulator {
             this.server = new FJHalfwaySplitMergeServer(num_workers);
         } else if (server_queue_type.toLowerCase().equals("thsm")) {
             this.server = new FJTakeHalfSplitMergeServer(num_workers);
-        } else if (server_queue_type.toLowerCase().equals("b") || server_queue_type.toLowerCase().equals("bb")) {
+        } else if (server_queue_type.toLowerCase().equals("b") || server_queue_type.toLowerCase().equals("bb") || server_queue_type.toLowerCase().equals("nbb")) {
             if (num_workers < num_tasks) {
             	System.err.println("ERROR: FJBarrierServer requires num_workers >= num_tasks");
             	System.exit(0);
             }
             if (server_queue_type.toLowerCase().equals("bb")) {
             	// server with a departure barrier too
-            	this.server = new FJBarrierServer(num_workers, true);
+            	this.server = new FJBarrierServer(num_workers, true, true);
+            } else if (server_queue_type.toLowerCase().equals("nbb")) {
+            	// server with only departure barrier
+            	this.server = new FJBarrierServer(num_workers, false, true);
             } else {
             	this.server = new FJBarrierServer(num_workers);
             }

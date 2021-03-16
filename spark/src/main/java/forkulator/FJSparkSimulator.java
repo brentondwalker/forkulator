@@ -162,7 +162,7 @@ public class FJSparkSimulator {
 			e.printStackTrace();
 			System.exit(0);
 		}
-		System.out.println("options: "+options);
+		//System.out.println("options: "+options);
 		
 		// we need to make the options final in order to use them in a lambda expression
 		final CommandLine foptions = options;
