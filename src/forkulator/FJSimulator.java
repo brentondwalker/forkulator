@@ -96,6 +96,8 @@ public class FJSimulator {
             this.server = new FJHalfwaySplitMergeServer(num_workers);
         } else if (server_queue_type.toLowerCase().equals("thsm")) {
             this.server = new FJTakeHalfSplitMergeServer(num_workers);
+        } else if (server_queue_type.toLowerCase().equals("thbp")) {
+            this.server = new FJTakeHalfSplitMergeBackpressureServer(num_workers);
         } else if (server_queue_type.toLowerCase().equals("b") || server_queue_type.toLowerCase().equals("bb") || server_queue_type.toLowerCase().equals("nbb")) {
             if (num_workers < num_tasks) {
             	System.err.println("ERROR: FJBarrierServer requires num_workers >= num_tasks");

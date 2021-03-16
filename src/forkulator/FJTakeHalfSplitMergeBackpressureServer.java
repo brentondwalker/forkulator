@@ -6,32 +6,33 @@ import java.util.Queue;
 import java.util.Vector;
 
 
-public class FJTakeHalfSplitMergeServer extends FJServer {
+public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
 
     /**
-     * This server is like SplitMerge, except when a job gets serviced, it
-     * only uses half of the available servers.  The tasks are assigned to workers
-     * when the job starts, so within a job, it's not like single queue.
+     * This is like FJTakeHalfSplitMergeServer, but adds the variation that
+     * the number of workers a job is allowed, also depends on the state of the
+     * job queue.  For example, if a job arrives to a completely empty system,
+     * why should it not take all the workers?
      * 
-     * This is different from "Halfway" split merge because an incoming job only
-     * takes half of the servers available at that moment (or 1).  In the Halfway
-     * server, there are fixed "job positions" with fixed numbers of servers, so 
-     * the server really acts like a collection of parallel SM servers.  This
-     * server is in practice, more conservative in how many workers each job gets.
-     * It will always be less than or equal to the number it would have gotten
-     * in the Halfway server.
+     * The simplest version of this idea is that if the job queue is empty, then
+     * the next job can take all the available workers.
      * 
-     * Under load, I expect that this server will degenerate to a cluster of
-     * independent parallel servers.  The size of the worker pools will keep
-     * getting smaller until it's just a collection of singletons.
+     * Another idea is that if the queue is empty, maybe the next job should wait
+     * a bit for more servers to become available before it begins executing.
+     * Some weighted average of the past job queue length.
      * 
-     * The main point is that jobs can overtake each other.  An outlier task
-     * can't back up the whole system.  The sacrifice is that the worker pool
-     * appears *at best* half as big as it really is.  But OTOH, as long
-     * as there are jobs in the queue (the server is heavily loaded) the
-     * workers will be fully utilized, except within a job.
+     * Say a job is at the head of the job queue.  If there are no jobs waiting
+     * behind it, then (if all workers are not already free) it waits for G more
+     * workers to become free.
      * 
-     * Hey, it's just an idea.
+     * What you can expect here is diminishing returns.  If we start with just
+     * one worker available, waiting for a second has a huge payoff, and the
+     * expected wait time is the min() of a bunch of iid RVs (num_servers - 1).
+     * But if all but one worker is free, the benefit of waiting is negligible,
+     * and the cost of waiting is maximal, because it is the min() of one thing.
+     * 
+     * Consider expected benefit of waiting vs expected cost.
+     * 
      */
     public Queue<FJJob> job_queue = new LinkedList<FJJob>();
 
@@ -55,7 +56,7 @@ public class FJTakeHalfSplitMergeServer extends FJServer {
      * 
      * @param num_workers
      */
-    public FJTakeHalfSplitMergeServer(int num_workers) {
+    public FJTakeHalfSplitMergeBackpressureServer(int num_workers) {
         super(num_workers);
         System.out.println("FJTakeHalfSplitMergeServer()");
         
@@ -135,7 +136,11 @@ public class FJTakeHalfSplitMergeServer extends FJServer {
         if (FJSimulator.DEBUG) System.out.println("begin service on job: "+job.path_log_id+"     "+time);
 
         // pick out some number of workers to use
+        // if the job queue is empty, take all the workers
         int nworkers = (remaining_workers == 1) ? 1 : remaining_workers/2;
+        if (this.job_queue.isEmpty()) {
+        	nworkers = remaining_workers;
+        }
         
         activeJobs.add(job);
         Vector<Integer> worker_pool = new Vector<Integer>();
