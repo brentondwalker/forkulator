@@ -157,7 +157,33 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
         	if (this.job_queue.size() <= JOB_QUEUE_PATIENCE_THRESHOLD) {
         		this.patient_job = job;
         		// compute how many workers we want to have idle before we start
-        		this.idle_workers_needed = Math.min(job.num_tasks, Math.min(remaining_workers+1, num_workers));
+        		//this.idle_workers_needed = Math.min(job.num_tasks, Math.min(remaining_workers+1, num_workers));
+        		/**
+        		 * Just waiting for one more worker, always, is kind-of dumb.  If there is only
+        		 * one worker available, waiting for a 2nd doubles the parallelism of the next job.
+        		 * Also, if a lot of jobs are in service, the expected waiting time until the
+        		 * next departure is shorter.  OTOH, if almost all workers are already idle, then
+        		 * the benefit of one more worker is negligible, and less jobs in progress means a
+        		 * longer expected wait until another becomes available. So when deciding whether
+        		 * to be patient or not, we should consider:
+        		 * - the number of currently idle workers
+        		 * - the fraction of currently idle workers
+        		 * - the number of jobs in progress (and how many workers they have)
+        		 * - 
+        		 */
+        		int num_jobs_in_progress = this.activeJobs.size();
+        		double idle_fraction = (1.0*remaining_workers)/(1.0*num_workers);
+        		int busy_workers = num_workers - remaining_workers;
+        		double workers_per_job = (1.0*busy_workers)/(1.0*num_jobs_in_progress);
+        		
+        		// the expected factor to be gained by a job departing
+        		double rr = workers_per_job / remaining_workers;
+        		
+        		if ((rr >= 1.5) &&  (num_jobs_in_progress >= num_workers/4.0)) {
+        			this.idle_workers_needed = Math.min(job.num_tasks, Math.min(remaining_workers+1, num_workers));
+        		} else {
+        			this.idle_workers_needed = remaining_workers;
+        		}
         	}
         }
         
