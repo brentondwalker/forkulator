@@ -49,6 +49,16 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
     private HashMap<FJJob,Vector<Integer>> job2workers;
     private FJJob[] worker2job;
     
+    /*
+     * the patience flag determines whether or not a job can wait for more
+     * workers to become available, or if it always starts immediately on the
+     * first worker available.
+     */
+    private boolean patience = false;
+    private FJJob patient_job = null;
+    private int idle_workers_needed = 0;
+    private static final int JOB_QUEUE_PATIENCE_THRESHOLD = 0;
+    
     /**
      * Constructor
      * 
@@ -56,9 +66,11 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
      * 
      * @param num_workers
      */
-    public FJTakeHalfSplitMergeBackpressureServer(int num_workers) {
+    public FJTakeHalfSplitMergeBackpressureServer(int num_workers, boolean patience_flag) {
         super(num_workers);
         System.out.println("FJTakeHalfSplitMergeServer()");
+        
+        this.patience = patience_flag;
         
         for (int i=0; i<num_workers; i++) {
             workers[0][i].queue = new LinkedList<FJTask>();
@@ -117,7 +129,11 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
         }
         
         if (remaining_workers > 0) {
-          ServiceJob(this.job_queue.poll(), time);
+        	if (this.patient_job != null) {
+        		ServiceJob(this.patient_job, time);
+        	} else {
+        		ServiceJob(this.job_queue.poll(), time);
+        	}
         }
     }
     
@@ -135,8 +151,37 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
         if (remaining_workers == 0) return;
         if (FJSimulator.DEBUG) System.out.println("begin service on job: "+job.path_log_id+"     "+time);
 
+        // if the patience flag is set, then check the job queue to see if
+        // this job can wait for more workers to become idle
+        if (this.patient_job==null && patience) {
+        	if (this.job_queue.size() <= JOB_QUEUE_PATIENCE_THRESHOLD) {
+        		this.patient_job = job;
+        		// compute how many workers we want to have idle before we start
+        		this.idle_workers_needed = Math.min(job.num_tasks, Math.min(remaining_workers+1, num_workers));
+        	}
+        }
+        
+        // if we are going to wait for more workers, just return
+        //TODO: if the job queue is no longer empty, should just start the job?
+        if (patience && this.patient_job!=null) {
+        	if (this.patient_job != job) {
+        		System.err.println("ERROR: trying to service a job when another is being patient!");
+        		System.exit(1);
+        	}
+        	
+        	if (remaining_workers < idle_workers_needed) {
+        		//System.out.println("Being patient for job remaining_workers="+remaining_workers+"  idle_workers_needed="+idle_workers_needed);
+        		return;
+        	}
+        	
+        	// we're going to service the job that's been waiting
+        	this.patient_job = null;
+        	idle_workers_needed = 0;
+        	//System.out.println("Servicing a patient job   "+remaining_workers);
+        }
+        
         // pick out some number of workers to use
-        // if the job queue is empty, take all the workers
+        // if the job queue is below some threshold, take all the workers
         int nworkers = (remaining_workers == 1) ? 1 : remaining_workers/2;
         if (this.job_queue.isEmpty()) {
         	nworkers = remaining_workers;
