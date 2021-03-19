@@ -153,6 +153,7 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
 
         // if the patience flag is set, then check the job queue to see if
         // this job can wait for more workers to become idle
+        /*
         if (this.patient_job==null && patience) {
         	if (this.job_queue.size() <= JOB_QUEUE_PATIENCE_THRESHOLD) {
         		this.patient_job = job;
@@ -170,7 +171,7 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
         		 * - the fraction of currently idle workers
         		 * - the number of jobs in progress (and how many workers they have)
         		 * - 
-        		 */
+        		 * /
         		int num_jobs_in_progress = this.activeJobs.size();
         		double idle_fraction = (1.0*remaining_workers)/(1.0*num_workers);
         		int busy_workers = num_workers - remaining_workers;
@@ -181,14 +182,34 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
         		
         		if ((rr >= 1.5) &&  (num_jobs_in_progress >= num_workers/4.0)) {
         			this.idle_workers_needed = Math.min(job.num_tasks, Math.min(remaining_workers+1, num_workers));
+        			System.out.println("** Setting a job to be patient rr="+rr);
         		} else {
+        			System.out.println("-- J="+num_jobs_in_progress+"\t I="+remaining_workers+"\t B="+busy_workers+"\t rr="+rr);
         			this.idle_workers_needed = remaining_workers;
         		}
         	}
         }
+        */
+
+        /*
+         * Try a really restrictive version of BackPressure and Patience.
+         * Jobs are only patient in the case where there is only one available
+         * worker, and at least k/2 jobs in progress.  Also the only time the job
+         * takes all workers is the case of a patient job.
+         */
+        if (this.patient_job==null && patience) {
+        	if ((this.job_queue.size() <= JOB_QUEUE_PATIENCE_THRESHOLD) 
+        			&& (remaining_workers==1)
+        			&& (activeJobs.size() >= num_workers/2)) {
+        		this.patient_job = job;
+    			this.idle_workers_needed = remaining_workers + 1;        		
+        	}
+        }
+
         
         // if we are going to wait for more workers, just return
         //TODO: if the job queue is no longer empty, should just start the job?
+        boolean servicing_patient_job = false;
         if (patience && this.patient_job!=null) {
         	if (this.patient_job != job) {
         		System.err.println("ERROR: trying to service a job when another is being patient!");
@@ -203,13 +224,16 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
         	// we're going to service the job that's been waiting
         	this.patient_job = null;
         	idle_workers_needed = 0;
+        	servicing_patient_job = true;
         	//System.out.println("Servicing a patient job   "+remaining_workers);
         }
         
         // pick out some number of workers to use
         // if the job queue is below some threshold, take all the workers
         int nworkers = (remaining_workers == 1) ? 1 : remaining_workers/2;
-        if (this.job_queue.isEmpty()) {
+        //if (this.job_queue.isEmpty()) {
+        if (this.job_queue.isEmpty() && servicing_patient_job) {
+        	//System.out.println("  ** giving a patient job all the workers: "+remaining_workers);
         	nworkers = remaining_workers;
         }
         
