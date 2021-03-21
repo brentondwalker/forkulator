@@ -143,7 +143,7 @@ public class FJTakeHalfSplitMergeServer extends FJServer {
         if (FJSimulator.DEBUG) System.out.println("begin service on job: "+job.path_log_id+"     "+time);
 
         // pick out some number of workers to use
-        int nworkers = (remaining_workers == 1) ? 1 : (int)Math.min(remaining_workers - 1, remaining_workers * take_fraction);
+        int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers * take_fraction));
         
         activeJobs.add(job);
         Vector<Integer> worker_pool = new Vector<Integer>();
