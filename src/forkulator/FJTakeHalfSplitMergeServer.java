@@ -47,6 +47,13 @@ public class FJTakeHalfSplitMergeServer extends FJServer {
     private Vector<FJJob> activeJobs;
     private HashMap<FJJob,Vector<Integer>> job2workers;
     private FJJob[] worker2job;
+
+    /*
+     * Generalize this scheduler to fractions other than 1/2.
+     * Still keep the rule that a job won't take the last worker unless
+     * there's only one worker left.
+     */
+    private double take_fraction = 0.5;
     
     /**
      * Constructor
@@ -55,10 +62,11 @@ public class FJTakeHalfSplitMergeServer extends FJServer {
      * 
      * @param num_workers
      */
-    public FJTakeHalfSplitMergeServer(int num_workers) {
+    public FJTakeHalfSplitMergeServer(int num_workers, double take_fraction) {
         super(num_workers);
-        System.out.println("FJTakeHalfSplitMergeServer()");
+        System.out.println("FJTakeHalfSplitMergeServer("+take_fraction+")");
         
+        this.take_fraction = take_fraction;
         for (int i=0; i<num_workers; i++) {
             workers[0][i].queue = new LinkedList<FJTask>();
         }
@@ -135,7 +143,7 @@ public class FJTakeHalfSplitMergeServer extends FJServer {
         if (FJSimulator.DEBUG) System.out.println("begin service on job: "+job.path_log_id+"     "+time);
 
         // pick out some number of workers to use
-        int nworkers = (remaining_workers == 1) ? 1 : remaining_workers/2;
+        int nworkers = (remaining_workers == 1) ? 1 : (int)Math.min(remaining_workers - 1, remaining_workers * take_fraction);
         
         activeJobs.add(job);
         Vector<Integer> worker_pool = new Vector<Integer>();

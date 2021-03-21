@@ -95,7 +95,14 @@ public class FJSimulator {
         } else if (server_queue_type.toLowerCase().equals("hsm")) {
             this.server = new FJHalfwaySplitMergeServer(num_workers);
         } else if (server_queue_type.toLowerCase().equals("thsm")) {
-            this.server = new FJTakeHalfSplitMergeServer(num_workers);
+            this.server = new FJTakeHalfSplitMergeServer(num_workers, 0.5);
+        } else if (server_queue_type.toLowerCase().equals("tfsm")) {
+			if (server_queue_spec.length != 2) {
+				System.err.println("ERROR: tfsm queue requires a numeric take_fraction parameter");
+				System.exit(0);
+			}
+			double take_fraction = Double.parseDouble(server_queue_spec[1]);
+			this.server = new FJTakeHalfSplitMergeServer(num_workers, take_fraction);
         } else if (server_queue_type.toLowerCase().equals("thbp")) {
             this.server = new FJTakeHalfSplitMergeBackpressureServer(num_workers, false);
         } else if (server_queue_type.toLowerCase().equals("thbpp")) {
