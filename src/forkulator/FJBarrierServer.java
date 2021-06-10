@@ -56,7 +56,7 @@ public class FJBarrierServer extends FJServer {
         super(num_workers);
         this.departure_barrier = departure_barrier;
         this.start_barrier = start_barrier;
-        System.out.println("FJBarrierServer(departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+")");
+        System.err.println("FJBarrierServer(departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+")");
     }
 
     
@@ -69,7 +69,7 @@ public class FJBarrierServer extends FJServer {
      */
     public FJBarrierServer(int num_workers) {
         super(num_workers);
-        System.out.println("FJBarrierServer()");
+        System.err.println("FJBarrierServer()");
     }
 
     

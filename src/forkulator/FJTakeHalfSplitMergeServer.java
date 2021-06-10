@@ -64,7 +64,7 @@ public class FJTakeHalfSplitMergeServer extends FJServer {
      */
     public FJTakeHalfSplitMergeServer(int num_workers, double take_fraction) {
         super(num_workers);
-        System.out.println("FJTakeHalfSplitMergeServer("+take_fraction+")");
+        System.err.println("FJTakeHalfSplitMergeServer("+take_fraction+")");
         
         this.take_fraction = take_fraction;
         for (int i=0; i<num_workers; i++) {

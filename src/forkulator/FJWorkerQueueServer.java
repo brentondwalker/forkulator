@@ -21,6 +21,7 @@ public class FJWorkerQueueServer extends FJServer {
 	 */
 	public FJWorkerQueueServer(int num_workers) {
 		super(num_workers);
+		System.err.println("FJWorkerQueueServer("+num_workers+")");
 		
 		for (int i=0; i<num_workers; i++) {
 			workers[0][i].queue = new LinkedList<FJTask>();
