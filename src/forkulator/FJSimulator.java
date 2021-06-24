@@ -103,6 +103,20 @@ public class FJSimulator {
 			}
 			double take_fraction = Double.parseDouble(server_queue_spec[1]);
 			this.server = new FJTakeHalfSplitMergeServer(num_workers, take_fraction);
+        } else if (server_queue_type.toLowerCase().startsWith("tfb")) {
+			if (server_queue_spec.length != 2) {
+				System.err.println("ERROR: tfb* queue requires a numeric take_fraction parameter");
+				System.exit(0);
+			}
+			double take_fraction = Double.parseDouble(server_queue_spec[1]);
+			if (server_queue_type.toLowerCase().equals("tfb")) {
+				this.server = new FJTakeHalfBarrierServer(num_workers, false, take_fraction);
+			} else if (server_queue_type.toLowerCase().equals("tfbb")) {
+				this.server = new FJTakeHalfBarrierServer(num_workers, true, take_fraction);
+			} else {
+				System.err.println("ERROR: unknown queue type: "+server_queue_type);
+				System.exit(0);
+			}
         } else if (server_queue_type.toLowerCase().equals("thbp")) {
             this.server = new FJTakeHalfSplitMergeBackpressureServer(num_workers, false);
         } else if (server_queue_type.toLowerCase().equals("thbpp")) {

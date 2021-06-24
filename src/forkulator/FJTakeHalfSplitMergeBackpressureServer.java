@@ -202,7 +202,7 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
         			&& (remaining_workers==1)
         			&& (activeJobs.size() >= num_workers/2)) {
         		this.patient_job = job;
-    			this.idle_workers_needed = remaining_workers + 1;        		
+    			this.idle_workers_needed = remaining_workers + 1;
         	}
         }
 
