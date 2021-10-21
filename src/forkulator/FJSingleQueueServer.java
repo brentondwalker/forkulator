@@ -98,50 +98,6 @@ public class FJSingleQueueServer extends FJServer {
 		worker.current_task = null;
 		task.completion_time = time;
 		task.completed = true;
-//		task.job.num_tasks_completed++;
-//		task.job.num_tasks_started--;
-//		System.out.println(this.current_job);
-//		if (current_job == null) {
-////			System.out.println("  no current_job");
-//			worker.current_task = null;
-//			return;
-//		}
-		// Job finished completely
-		/*if (++task.job.num_tasks_completed == task.job.tasks.length) {
-			task.job.completed = true;
-			task.job.completion_time = time;
-			task.job.departure_time = time;
-			jobDepart(task.job);
-			current_job = null;
-		} else {
-//		if (current_job != null){
-			// Job not completed, service a new task on the current worker
-			if (current_job != null)
-				serviceTask(worker, current_job.nextTask(), time);
-			if (task.job.num_tasks_started == task.job.tasks.length) {
-				current_job = job_queue.poll();
-				feedWorkers(time);  // this should not do anything
-			}
-		}
-		//if there is no current job, just clear the worker
-//		if (current_job == null) {
-//			System.out.println("  no current_job");
-//			worker.current_task = null;
-//			return;
-//		}
-//		serviceTask(worker, current_job.nextTask(), time);
-
-//		if (current_job.fully_serviced) {
-//			current_job = job_queue.poll();
-//			System.out.println("  set current_job to "+current_job);
-//			feedWorkers(time);  // this should not do anything
-//		}
-//		if (task.job.num_tasks_started == this.current_job.tasks.length) {
-//			current_job = job_queue.poll();
-////			System.out.println("  set current_job to "+current_job);
-//			feedWorkers(time);  // this should not do anything
-//		}
-*/
 
 		// check if this task was the last one of a job
 		//TODO: this could be more efficient
@@ -152,11 +108,14 @@ public class FJSingleQueueServer extends FJServer {
 		task.job.completed = compl;
 
 		if (task.job.completed) {
+			double jobOverhead = 0.0;
+			if(this.server_overhead_process != null)
+				jobOverhead = this.server_overhead_process.nextInterval();
 			// it is the last, record the completion time
-			task.job.completion_time = time;
+			task.job.completion_time = time + jobOverhead;
 			
 			// for this type of server it is also the departure time
-			task.job.departure_time = time;
+			task.job.departure_time = time + jobOverhead;
 			
 			// sample and dispose of the job
 			jobDepart(task.job);

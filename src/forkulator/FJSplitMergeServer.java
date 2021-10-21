@@ -141,18 +141,21 @@ public class FJSplitMergeServer extends FJServer {
 		task.job.completed = compl;
 		
 		if (task.job.completed) {
+			double jobOverhead = 0.0;
+			if(this.server_overhead_process != null)
+				jobOverhead = this.server_overhead_process.nextInterval();
 			// it is the last, record the completion time
-			task.job.completion_time = time;
+			task.job.completion_time = time + jobOverhead;
 			
 			// for this type of server it is also the departure time
-			task.job.departure_time = time;
+			task.job.departure_time = time + jobOverhead;
 			
 			// sample and dispose of the job
 			if (FJSimulator.DEBUG) System.out.println("job departing: "+task.job.path_log_id);
 			jobDepart(task.job);
 			
 			// service the next job, if any
-			feedWorkers(time);
+			feedWorkers(time + jobOverhead);
 		} else {
 			serviceTask(worker, worker.queue.poll(), time);
 		}

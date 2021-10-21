@@ -87,6 +87,10 @@ public class FJSparkSimulator {
 
 		String[] second_overhead_process_spec = options.getOptionValues("Os");
 		IntertimeProcess second_overhead_process = FJSimulator.parseProcessSpec(second_overhead_process_spec);
+
+
+		String[] server_overhead_process_spec = options.getOptionValues("OS");
+		IntertimeProcess server_overhead_process = FJSimulator.parseProcessSpec(server_overhead_process_spec);
 		
 		//
         // if we are in job-partitioning mode, figure out the partitioning type
@@ -128,7 +132,7 @@ public class FJSparkSimulator {
 		
 		// simulator
 		String[] server_queue_spec = options.getOptionValues("q");
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, 0, data_aggregator, overhead_process, second_overhead_process);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, 0, data_aggregator, overhead_process, second_overhead_process, server_overhead_process);
 
 
 		// start the simulator running...

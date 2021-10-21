@@ -112,6 +112,30 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 		job_cputime_mean = new double[max_samples];
 		job_lt_waiting_mean = new double[max_samples];
 	}
+
+	private double[] extendArray(double[] oldArr, int newSize) {
+		double[] newArr = new double[newSize];
+		System.arraycopy(oldArr, 0, newArr, 0, oldArr.length);
+		return newArr;
+	}
+
+	private void checkArrayLength() {
+		if (num_samples >= job_sojourn_mean.length) {
+			System.out.println("Number of samples bigger than maximum samples. Extending the arrays. Please check configuration.");
+			this.max_samples = num_samples + 1;
+			job_sojourn_mean = extendArray(job_sojourn_mean, this.max_samples);
+			worker_idle_time_mean = extendArray(worker_idle_time_mean, this.max_samples);
+			job_sojourn_variance = extendArray(job_sojourn_variance, this.max_samples);
+			job_waiting_mean = extendArray(job_waiting_mean, this.max_samples);
+			job_waiting_variance = extendArray(job_waiting_variance, this.max_samples);
+			job_lasttask_mean = extendArray(job_lasttask_mean, this.max_samples);
+			job_service_mean = extendArray(job_service_mean, this.max_samples);
+			job_service_variance = extendArray(job_service_variance, this.max_samples);
+			job_inorder_sojourn_mean = extendArray(job_inorder_sojourn_mean, this.max_samples);
+			job_cputime_mean = extendArray(job_cputime_mean, this.max_samples);
+			job_lt_waiting_mean = extendArray(job_lt_waiting_mean, this.max_samples);
+		}
+	}
 	
 	
 	/**
@@ -134,6 +158,7 @@ public class FJDataSummerizer extends FJBaseDataAggregator implements Serializab
 				}
 //				samples_in_batch++;
 				num_samples++;
+				checkArrayLength();
 			}
 			double jst = job.tasks[0].start_time;
 			double jlt = job.tasks[0].start_time;

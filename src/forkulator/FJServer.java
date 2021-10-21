@@ -13,19 +13,24 @@ public abstract class FJServer {
 	public FJWorker[][] workers = null;
 	public FJJob current_job = null; // needs to change for multi-stage
 	public ArrayList<FJJob> sampled_jobs = new ArrayList<FJJob>();
-	public IntertimeProcess overhead_process = null;
+	public IntertimeProcess worker_overhead_process = null;
+	public IntertimeProcess server_overhead_process = null;
 
-	public IntertimeProcess getOverhead_process() {
-		return overhead_process;
+	public IntertimeProcess getWorkerOverheadProcess() {
+		return worker_overhead_process;
 	}
 
-	public void setOverheadProcesses(IntertimeProcess overhead_process, IntertimeProcess second_overhead_process) {
-		this.overhead_process = overhead_process;
+	public void setWorkerOverheadProcesses(IntertimeProcess overhead_process, IntertimeProcess second_overhead_process) {
+		this.worker_overhead_process = overhead_process;
 		for (int row = 0; row < workers.length; row++) {
 			for (int col = 0; col < workers[row].length; col++) {
 				workers[row][col].setOverheadProcesses(overhead_process, second_overhead_process);
 			}
 		}
+	}
+
+	public void setServerOverheadProcess(IntertimeProcess overhead_process) {
+		this.server_overhead_process = overhead_process;
 	}
 
 	/**

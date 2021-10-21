@@ -1,7 +1,7 @@
 package forkulator.Helper
 
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.sql.types.{DoubleType, IntegerType, LongType, StringType, StructField, StructType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 
 class DataAggregatorHelper {
@@ -9,6 +9,14 @@ class DataAggregatorHelper {
 }
 
 object DataAggregatorHelper {
+  val stabilityMetricType = StructType(
+    Seq(
+      StructField(name = "sliceNum", dataType = LongType, nullable = true),
+      StructField(name = "maxSojournTimeIncreasing", dataType = IntegerType, nullable = true),
+      StructField(name = "isUnstable", dataType = BooleanType),
+      StructField(name = "param", dataType = StringType, nullable = true)
+    )
+  )
   val metricType = StructType(
     Seq(
       StructField(name = "sliceNum", dataType = LongType, nullable = true),

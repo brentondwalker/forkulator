@@ -34,6 +34,16 @@ public class FJSimulator {
 	public static final boolean DEBUG = false;
 	public static final int QUEUE_STABILITY_THRESHOLD = 200000;
 	public static final Map<String, Integer> NUM_OF_DIST_PARAMS = new HashMap<>();
+	static {
+		NUM_OF_DIST_PARAMS.put("x", 2);
+		NUM_OF_DIST_PARAMS.put("e", 3);
+		NUM_OF_DIST_PARAMS.put("g", 3);
+		NUM_OF_DIST_PARAMS.put("n", 3);
+		NUM_OF_DIST_PARAMS.put("w", 3);
+		NUM_OF_DIST_PARAMS.put("c", 2);
+		NUM_OF_DIST_PARAMS.put("xr", 4);
+		NUM_OF_DIST_PARAMS.put("xrs", 4);
+	}
 
 	public PriorityQueue<QEvent> event_queue = new PriorityQueue<QEvent>();
 	
@@ -78,15 +88,8 @@ public class FJSimulator {
             int task_division_factor,
 			FJBaseDataAggregator data_aggregator,
 		    IntertimeProcess overhead_process,
-		    IntertimeProcess second_overhead_process) {
-		FJSimulator.NUM_OF_DIST_PARAMS.put("x", 2);
-		FJSimulator.NUM_OF_DIST_PARAMS.put("e", 3);
-		FJSimulator.NUM_OF_DIST_PARAMS.put("g", 3);
-		FJSimulator.NUM_OF_DIST_PARAMS.put("n", 3);
-		FJSimulator.NUM_OF_DIST_PARAMS.put("w", 3);
-		FJSimulator.NUM_OF_DIST_PARAMS.put("c", 2);
-		FJSimulator.NUM_OF_DIST_PARAMS.put("xr", 4);
-		FJSimulator.NUM_OF_DIST_PARAMS.put("xrs", 4);
+		    IntertimeProcess second_overhead_process,
+		    IntertimeProcess server_overhead_process) {
 		this.num_workers = num_workers;
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
@@ -172,7 +175,8 @@ public class FJSimulator {
 			System.exit(1);
 		}
 		this.server.setSimulator(this);
-		this.server.setOverheadProcesses(overhead_process, second_overhead_process);
+		this.server.setWorkerOverheadProcesses(overhead_process, second_overhead_process);
+		this.server.setServerOverheadProcess(server_overhead_process);
 	}
 	
 	
@@ -182,11 +186,13 @@ public class FJSimulator {
 	 * @param num_jobs
 	 * @param warmup
 	 */
-	public void run(long num_jobs, int sampling_interval, boolean warmup) {
-		this.stability_aggregator = new FJDataSummerizer((int)num_jobs, 1000);
+	public void run(long num_jobs_to_sample, int sampling_interval, boolean warmup) {
+		long num_jobs = num_jobs_to_sample * sampling_interval;
+		this.stability_aggregator = new FJDataSummerizer((int)num_jobs, 1500);
 		System.err.println("running a simulation for "+num_jobs+" jobs with samp interval "+sampling_interval
-		 + "numTasks " + num_tasks + "num workers " + server.num_workers);
-		System.err.println("Arrival value "+arrival_process.processParameters());
+		 + " numTasks " + num_tasks + "num workers " + server.num_workers + " service process " + service_process.processParameters()
+		 + " arrival process " + arrival_process.processParameters());
+//		System.err.println("Arrival value "+arrival_process.processParameters());
 		// compute the warmup period.
 		// Let's say sampling_interval*10*num_stages
 		int warmup_interval = warmup ? sampling_interval * 10 * server.num_stages : 0;
@@ -203,7 +209,7 @@ public class FJSimulator {
 		long jobs_processed = -warmup_interval;
 		while (! event_queue.isEmpty()) {
 			if ((this.server.queueLength() > FJSimulator.QUEUE_STABILITY_THRESHOLD) ||
-					this.stability_aggregator.isUnstable()) {
+					this.stability_aggregator.isUnstable()) { //  || event_queue.size() > FJSimulator.QUEUE_STABILITY_THRESHOLD
 //					(data_aggregator instanceof FJDataSummerizer &&
 //							((FJDataSummerizer) data_aggregator).isUnstable())) {
 				data_aggregator.cancelled = true;
@@ -454,8 +460,8 @@ public class FJSimulator {
 			if (num_params_first_process == -1)
 				return null;
 			String[] first_process_spec = new String[num_params_first_process];
-			String[] second_process_spec = new String[process_spec.length - 2 - num_params_first_process];
-			for (int i = 0; i < process_spec.length-2; i++) {
+			String[] second_process_spec = new String[process_spec.length - 1 - num_params_first_process];
+			for (int i = 0; i < process_spec.length-1; i++) {
 				if ((i) < num_params_first_process)
 					first_process_spec[i] = process_spec[i+1];
 				else second_process_spec[i - num_params_first_process] = process_spec[i+1];
@@ -614,6 +620,9 @@ public class FJSimulator {
 
 		String[] second_overhead_process_spec = options.getOptionValues("Os");
 		IntertimeProcess second_overhead_process = FJSimulator.parseProcessSpec(second_overhead_process_spec);
+
+		String[] server_overhead_process_spec = options.getOptionValues("OS");
+		IntertimeProcess server_overhead_process = FJSimulator.parseProcessSpec(server_overhead_process_spec);
 		//
         // if we are in job-partitioning mode, figure out the partitioning type
         //
@@ -658,7 +667,7 @@ public class FJSimulator {
 		}
 		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, task_division_factor, data_aggregator, overhead_process, second_overhead_process);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_partition_process, task_division_factor, data_aggregator, overhead_process, second_overhead_process, server_overhead_process);
 		sim.job_type = job_partition_type;
 
 		// start the simulator running...

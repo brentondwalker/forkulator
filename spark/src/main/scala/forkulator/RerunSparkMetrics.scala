@@ -103,6 +103,10 @@ object RerunSparkMetrics {
     OptionBuilder.withLongOpt("secondoverheadprocess")
     OptionBuilder.withDescription("second overhead process")
     cli_options.addOption(OptionBuilder.create("Os"))
+    OptionBuilder.hasArgs
+    OptionBuilder.withLongOpt("serveroverheadprocess")
+    OptionBuilder.withDescription("server overhead process")
+    cli_options.addOption(OptionBuilder.create("OS"))
     //    cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs.isRequired.withDescription("service process").create("S"))
     OptionBuilder.hasArgs
     //    OptionBuilder.isRequired
@@ -156,7 +160,7 @@ object RerunSparkMetrics {
     */
   def doSimulation(options: CommandLine, segment_index: Int, aggregator: FJBaseDataAggregator,
                    arrival_process: RerunIntertimeProcess, service_process: RerunIntertimeProcess,
-                   numOfSampleDivider: Int = 1, overhead_process: RerunIntertimeProcess = null, second_overhead_process: RerunIntertimeProcess = null)
+                   numOfSampleDivider: Int = 1, overhead_process: RerunIntertimeProcess = null, second_overhead_process: RerunIntertimeProcess = null, server_overhead_process: RerunIntertimeProcess = null)
   : FJBaseDataAggregator = {
     val num_workers = options.getOptionValue("w").toInt
     val num_tasks = options.getOptionValue("t").toInt
@@ -179,7 +183,7 @@ object RerunSparkMetrics {
 //    val oldSparkMetrics = RerunSparkMetrics.load(spark = oldSparkMetrics, inputMetricsFile)
 
     val sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process,
-      service_process, null, 0, data_aggregator, overhead_process, second_overhead_process)
+      service_process, null, 0, data_aggregator, overhead_process, second_overhead_process, server_overhead_process)
     sim.job_type = null
     // start the simulator running...
     sim.run(jobs_per_slice, sampling_interval, false)
