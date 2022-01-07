@@ -26,8 +26,9 @@ public class HarmonicNumber {
 	 */
 	public static double Hn(int n) {
 		double s = 0.0;
-		for (int k=0; k<=n; k++) {
+		for (int k=1; k<=n; k++) {
 			s += 1.0/k;
+			//System.err.println("k="+k+"\ts="+s);
 		}
 		return s;
 	}
@@ -130,17 +131,19 @@ public class HarmonicNumber {
 	
 	public static void maxStableRho1Barrier(int tasks_per_job, int max_workers) {
 	    //for (int s=tasks_per_job; s<=max_workers; s+=tasks_per_job) {
+	    double Hk = Hn(tasks_per_job);
+	    //System.err.println("Hk = "+Hk+"\ttasks_per_job="+tasks_per_job);
+	    double max_2b_rho = 1.0/Hk;
+	    
 	    for (int s=tasks_per_job; s<=max_workers; s++) {
 	        double sum = 0.0;
 	        for (int j=0; j<tasks_per_job; j++) {
 	            sum += 1.0/(tasks_per_job - j*tasks_per_job/(1.0*s));
 	        }
 	        double rho_max = 1.0/sum;
-	        System.out.println(""+tasks_per_job+"\t"+s+"\t"+rho_max);
+	        System.out.println(""+tasks_per_job+"\t"+s+"\t"+rho_max+"\t"+max_2b_rho);
 	    }
 	}
-
-	
 	
 
 	/**
