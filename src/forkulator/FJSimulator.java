@@ -184,6 +184,16 @@ public class FJSimulator {
             }
 		    double data_location_penalty = Double.parseDouble(server_queue_spec[1]);
 		    this.server = new FJSingleQueueDataLocationServer(num_workers, data_location_penalty);
+		} else if (server_queue_type.toLowerCase().equals("hiersm")) {
+		    if (server_queue_spec.length != 2) {
+                System.err.println("ERROR: hiersm queue requires numeric num_threads_per_process argument");
+                System.exit(0);
+            }
+		    // NOTE: in this server num_workers is taken to be the number of processes
+		    int num_processes = num_workers;
+		    int num_threads_per_process = Integer.parseInt(server_queue_spec[1]);
+		    
+            this.server = new FJHierarchicalSplitMergeServer(num_processes, num_threads_per_process);
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);
@@ -538,7 +548,7 @@ public class FJSimulator {
 		int num_workers = Integer.parseInt(options.getOptionValue("w"));
 		int num_tasks = Integer.parseInt(options.getOptionValue("t"));
 		long num_samples = Long.parseLong(options.getOptionValue("n"));
-		int sampling_interval = Integer.parseInt(options.getOptionValue("i"));
+		int sampling_interval = (options.hasOption("i")) ? Integer.parseInt(options.getOptionValue("i")) : 1;
 		String outfile_base = options.getOptionValue("o");
 
 		// compute the number of jobs necessary to get the desired samples
