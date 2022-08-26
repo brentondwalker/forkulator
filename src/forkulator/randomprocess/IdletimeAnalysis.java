@@ -5,6 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.util.Random;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -44,6 +45,10 @@ public class IdletimeAnalysis {
         cli_options.addOption(OptionBuilder.withLongOpt("outfile").hasArg().withDescription("output file to store samples").create("o"));
         cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
+        
+        // most randomness comes from the service process classes
+        // use this to randomly pick a task to sample
+        Random rand = new Random();
         
         //CommandLineParser parser = new DefaultParser();
         CommandLineParser parser = new PosixParser();
@@ -144,7 +149,10 @@ public class IdletimeAnalysis {
             }
             
             // sample just one task per job, as the other idle times may be correlated
-            samples[i] = max_workload - workloads[0];
+            // it should not matter which one we sample (they all have the same distribution)
+            // but we pick a random one anyway.
+            int workload_to_sample = rand.nextInt(num_workers);
+            samples[i] = max_workload - workloads[workload_to_sample];
             /*
             // exclude the largest workload which has idle time = 0?
             if (max_j != 0) {

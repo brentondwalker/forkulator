@@ -147,18 +147,21 @@ public class SampleGenerator {
             // in normal mode the task service times are drawn from the service_process
             // in this mode num_tasks and num_workers don't matter.  All samples are independent
             int batch_num = -1;
+            double[] samples = new double[(int)num_samples];
             for (int i=0; i<num_samples; i++) {
                 if ((i % num_tasks) == 0) {
                     batch_num++;
                 }
+                samples[i] = service_process.nextInterval();
                 try {
-                    out.write(String.join("\t", new String[] { Integer.toString(i), Integer.toString(batch_num), Integer.toString(i % num_tasks), Double.toString(service_process.nextInterval()) })+"\n");
+                    out.write(String.join("\t", new String[] { Integer.toString(i), Integer.toString(batch_num), Integer.toString(i % num_tasks), Double.toString(samples[i]) })+"\n");
                 }
                 catch (IOException e) {
                     System.err.println("Error: " + e.getMessage());
                     System.exit(0);
                 }
             }
+            printMeanVar(samples);
         }
         
         if(out != null) {
@@ -171,6 +174,28 @@ public class SampleGenerator {
         }
     }
 
+    /**
+     * 
+     * @param samples
+     */
+    public static void printMeanVar(double[] samples) {
+        int n = samples.length;
+        double nd = n;
+        double sum = 0.0;
+        for (int i=0; i<n; i++) {
+            sum += samples[i];
+        }
+        double mean = sum / nd;
+        
+        sum = 0.0;
+        for (int i=0; i<n; i++) {
+            sum += (samples[i] - mean) * (samples[i] - mean);
+        }
+        double var = Math.sqrt(sum / (nd-1));
+        
+        System.out.println(""+n+"\t"+mean+"\t"+var);
+    }
+    
     public static void usage(Options cli_options) {
         HelpFormatter formatter = new HelpFormatter();
         formatter.printHelp("SampleGenerator", cli_options);

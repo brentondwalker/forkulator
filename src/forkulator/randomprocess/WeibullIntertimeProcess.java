@@ -80,7 +80,7 @@ public class WeibullIntertimeProcess extends IntertimeProcess {
 
 	@Override
 	public String processParameters() {
-		return ""+this.shape;
+		return ""+this.shape+"\t"+this.scale;
 	}
 }
 

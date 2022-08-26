@@ -1,6 +1,6 @@
 # forkulator
 
-Simulator for fork-join queueing systems.
+Simulator for parallel queueing systems.
 
 Fork-join queueing systems are models for several kinds of real-world systems, such as multi-path routing and parallelized computing architectures.  The canonical model has a system with _k_ parallel servers and jobs arriving that are composed of _k_ tasks.  Upon arrival the _k_ tasks are queued at the _k_ servers.  A job can depart when each of its tasks has finished processing.
 
