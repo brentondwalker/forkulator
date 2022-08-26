@@ -409,8 +409,8 @@ public class FJSimulator {
 				// normalized to have mean 1.0
 				process = new WeibullIntertimeProcess(shape);
 			} else if (process_spec.length == 3) {
-				double scale = Double.parseDouble(process_spec[2]);
-				process = new WeibullIntertimeProcess(shape, scale);
+				double rate = Double.parseDouble(process_spec[2]);
+				process = new WeibullIntertimeProcess(shape, rate);
 			}
 		} else if (process_spec[0].equals("c")) {
 			// constant inter-arrival times
