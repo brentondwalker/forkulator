@@ -185,15 +185,24 @@ public class FJSimulator {
 		    double data_location_penalty = Double.parseDouble(server_queue_spec[1]);
 		    this.server = new FJSingleQueueDataLocationServer(num_workers, data_location_penalty);
 		} else if (server_queue_type.toLowerCase().equals("hiersm")) {
-		    if (server_queue_spec.length != 2) {
-                System.err.println("ERROR: hiersm queue requires numeric num_threads_per_process argument");
-                System.exit(0);
-            }
-		    // NOTE: in this server num_workers is taken to be the number of processes
-		    int num_processes = num_workers;
-		    int num_threads_per_process = Integer.parseInt(server_queue_spec[1]);
-		    
-            this.server = new FJHierarchicalSplitMergeServer(num_processes, num_threads_per_process);
+			if (server_queue_spec.length == 4) {
+				// this is the version with simulated overhead
+				int num_processes = num_workers;
+			    int num_threads_per_process = Integer.parseInt(server_queue_spec[1]);
+			    double job_predeparture_overhead = Double.parseDouble(server_queue_spec[2]);
+			    double task_predeparture_overhead = Double.parseDouble(server_queue_spec[3]);
+			    this.server = new FJHierarchicalSplitMergeServerOverhead(num_processes, num_threads_per_process, job_predeparture_overhead, task_predeparture_overhead);
+			} else {
+			    if (server_queue_spec.length != 2) {
+	                System.err.println("ERROR: hiersm queue requires numeric num_threads_per_process argument");
+	                System.exit(0);
+	            }
+			    // NOTE: in this server num_workers is taken to be the number of processes
+			    int num_processes = num_workers;
+			    int num_threads_per_process = Integer.parseInt(server_queue_spec[1]);
+			    
+	            this.server = new FJHierarchicalSplitMergeServer(num_processes, num_threads_per_process);
+			}
 		} else {
 			System.err.println("ERROR: unknown server queue type: "+server_queue_type);
 			System.exit(1);
@@ -443,6 +452,13 @@ public class FJSimulator {
 		    int k = Integer.parseInt(process_spec[2]);
 		    double rho = Double.parseDouble(process_spec[3]);
 		    process = new CorrelatedExponentialSumIntertimeProcess(rate, k, rho);
+		} else if (process_spec[0].equals("xtpo")) {
+			// exponential with two-parameter overhead model
+			System.out.println(Arrays.toString(process_spec));
+			double rate = Double.parseDouble(process_spec[1]);
+			double const_overhead = Double.parseDouble(process_spec[2]);
+			double exp_overhead = Double.parseDouble(process_spec[3]);
+			process = new TwoParamExponentialOverheadIntertimeProcess(rate, const_overhead, exp_overhead);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);

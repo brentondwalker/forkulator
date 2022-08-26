@@ -12,9 +12,8 @@ public class FJHierarchicalSplitMergeServerOverhead extends FJServer {
     /**
      * This will be like the previous class, but with the 4-parameter model for overhead.
      * The task service overhead could be incorporated into the service IntertimeProcess,
-     * though we don't have the right thing implemented yet.  In the split-merge case,
-     * the task pre-departure overhead can also be part of the per-task overhead.
-     * The job pre-departure overhead has to be implemented in this class.
+     * though we don't have the right thing implemented yet.  
+     * The job and task pre-departure overhead has to be implemented in this class.
      * 
      * Initially we're just interested in the Split-Merge behavior.
      * This is to simulate hierarchical parallel systems like Slurm/MPI/OpenMP.  
@@ -38,6 +37,12 @@ public class FJHierarchicalSplitMergeServerOverhead extends FJServer {
     
     public IntertimeProcess pre_departure_overhead_process = null;
     
+    /**
+     * To implement pre-departure overhead, once all the tasks finish and
+     * the job is marked "complete", we queue a dummy task on a dummy worker
+     * that has a fixed execution time equal to the desired pre-departure
+     * overhead.  When this task completes, then the job can depart.
+     */
     public FJTask dummy_overhead_task = null;
     public FJWorker dummy_overhead_worker = null;
     
@@ -208,7 +213,7 @@ public class FJHierarchicalSplitMergeServerOverhead extends FJServer {
              this.current_job = null;
              
              // sample and dispose of the job
-             if (FJSimulator.DEBUG) System.out.println("job departing: "+task.job.path_log_id);
+             if (FJSimulator.DEBUG) System.out.println("job departing: "+task.job.path_log_id+"\t"+time);
              jobDepart(task.job);
              
          } else {
@@ -223,6 +228,7 @@ public class FJHierarchicalSplitMergeServerOverhead extends FJServer {
              if (task.job.completed) {
                  // we should not have to clear out the tasks from the workers,
                  // that is done as the individual tasks complete.
+                 if (FJSimulator.DEBUG) System.out.println("job complete: "+task.job.path_log_id+"\t"+time);
                  
                  // it is the last, record the completion time
                  task.job.completion_time = time;
