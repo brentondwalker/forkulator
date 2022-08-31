@@ -70,13 +70,14 @@ public class FJHierarchicalSplitMergeServerOverhead extends FJServer {
      */
     public FJHierarchicalSplitMergeServerOverhead(int num_processes, int num_threads_per_process, double job_predeparture_overhead, double task_predeparture_overhead) {
         super(num_processes * num_threads_per_process);  // also initializes num_workers
-        System.err.println("FJHierarchicalSplitMergeServerOverhead(num_processes="+num_processes+", num_threads_per_process="+num_threads_per_process+")");
+        System.err.println("FJHierarchicalSplitMergeServerOverhead(num_processes="+num_processes+", num_threads_per_process="+num_threads_per_process
+                +", job_predeparture_overhead="+job_predeparture_overhead+", task_predeparture_overhead="+task_predeparture_overhead+")");
         
         this.num_processes = num_processes;
         this.num_threads_per_process = num_threads_per_process;
         this.job_predeparture_overhead = job_predeparture_overhead;
         this.task_predeparture_overhead = task_predeparture_overhead;
-        this.pre_departure_overhead_process = new ConstantIntertimeProcess(job_predeparture_overhead + num_processes*num_threads_per_process*task_predeparture_overhead);
+        //this.pre_departure_overhead_process = new ConstantIntertimeProcess(job_predeparture_overhead + num_processes*num_threads_per_process*task_predeparture_overhead, true);
         this.dummy_overhead_worker = new FJWorker();
         this.process_task_queue = (Queue<FJTask>[]) new LinkedList<?>[num_processes];  // absolute hack but necessary?  https://stackoverflow.com/questions/217065/cannot-create-an-array-of-linkedlists-in-java
         for (int p=0; p<num_processes; p++) {
@@ -232,6 +233,12 @@ public class FJHierarchicalSplitMergeServerOverhead extends FJServer {
                  
                  // it is the last, record the completion time
                  task.job.completion_time = time;
+                 
+                 // if this is the first job to complete, we still need to allocate the pre-departure
+                 // overhead process.  This assumes that the number of tasks per job will stay the same
+                 if (pre_departure_overhead_process == null) {
+                     pre_departure_overhead_process = new ConstantIntertimeProcess(job_predeparture_overhead + task.job.num_tasks*task_predeparture_overhead, true);
+                 }
                  
                  // the overhead model includes pre-departure overhead that we implement by scheduling 
                  // a final dummy task whose runtime is the pre-departure overhead.
