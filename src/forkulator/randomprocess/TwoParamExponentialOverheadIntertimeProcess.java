@@ -24,7 +24,9 @@ public class TwoParamExponentialOverheadIntertimeProcess extends IntertimeProces
 	
 	@Override
 	public double nextInterval(int jobSize) {
-		return -Math.log(rand.nextDouble())/rate + const_overhead - Math.log(rand.nextDouble())/exp_overhead;
+	    double eoverhead = (exp_overhead == 0) ? 0.0 : -Math.log(rand.nextDouble())/exp_overhead;
+	    double sample = (rate == 0) ? 0.0 : -Math.log(rand.nextDouble())/rate;
+		return sample + const_overhead + eoverhead;
 	}
 
 	@Override
