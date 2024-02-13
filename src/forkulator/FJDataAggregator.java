@@ -393,7 +393,14 @@ public class FJDataAggregator implements Serializable {
         result.add(quantile(job_lasttask_d, num_samples, 1.0e-3, binwidth));
         result.add(quantile(job_service_d, num_samples, 1.0e-3, binwidth));
         result.add(quantile(job_cputime_d, num_samples, 1.0e-3, binwidth));
-		
+
+        // to compare to spark results we need 10^-2 quantiles
+        result.add(quantile(job_sojourn_d, num_samples, 1.0e-2, binwidth));
+        result.add(quantile(job_waiting_d, num_samples, 1.0e-2, binwidth));
+        result.add(quantile(job_lasttask_d, num_samples, 1.0e-2, binwidth));
+        result.add(quantile(job_service_d, num_samples, 1.0e-2, binwidth));
+        result.add(quantile(job_cputime_d, num_samples, 1.0e-2, binwidth));
+
 		return result;
 	}
 	
