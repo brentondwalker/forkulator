@@ -123,17 +123,37 @@ public class FJSimulator {
             this.server = new FJTakeHalfSplitMergeBackpressureServer(num_workers, true);
         } else if (server_queue_type.toLowerCase().equals("b") || server_queue_type.toLowerCase().equals("bb") || server_queue_type.toLowerCase().equals("nbb")) {
             if (num_workers < num_tasks) {
-            	System.err.println("ERROR: FJBarrierServer requires num_workers >= num_tasks");
-            	System.exit(0);
+                System.err.println("ERROR: FJBarrierServer requires num_workers >= num_tasks");
+                System.exit(0);
             }
             if (server_queue_type.toLowerCase().equals("bb")) {
-            	// server with a departure barrier too
-            	this.server = new FJBarrierServer(num_workers, true, true);
+                // server with a departure barrier too
+                this.server = new FJBarrierServer(num_workers, true, true);
             } else if (server_queue_type.toLowerCase().equals("nbb")) {
-            	// server with only departure barrier
-            	this.server = new FJBarrierServer(num_workers, false, true);
+                // server with only departure barrier
+                this.server = new FJBarrierServer(num_workers, false, true);
             } else {
-            	this.server = new FJBarrierServer(num_workers);
+                this.server = new FJBarrierServer(num_workers);
+            }
+        } else if (server_queue_type.toLowerCase().equals("bo") || server_queue_type.toLowerCase().equals("bbo") || server_queue_type.toLowerCase().equals("nbbo")) {
+            if (num_workers < num_tasks) {
+                System.err.println("ERROR: FJBarrierServerOverhead requires num_workers >= num_tasks");
+                System.exit(0);
+            }
+            if (server_queue_spec.length != 3) {
+                System.err.println("ERROR: server type \""+server_queue_type+"\" takes two arguments: job_predeparture_overhead task_predeparture_overhead");
+                System.exit(0);
+            }
+            double job_predeparture_overhead = Double.parseDouble(server_queue_spec[1]);
+            double task_predeparture_overhead = Double.parseDouble(server_queue_spec[2]);
+            if (server_queue_type.toLowerCase().equals("bbo")) {
+                // server with a departure barrier too
+                this.server = new FJBarrierServerOverhead(num_workers, true, true, job_predeparture_overhead, task_predeparture_overhead);
+            } else if (server_queue_type.toLowerCase().equals("nbb")) {
+                // server with only departure barrier
+                this.server = new FJBarrierServerOverhead(num_workers, false, true, job_predeparture_overhead, task_predeparture_overhead);
+            } else {
+                this.server = new FJBarrierServerOverhead(num_workers, job_predeparture_overhead, task_predeparture_overhead);
             }
 		} else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
