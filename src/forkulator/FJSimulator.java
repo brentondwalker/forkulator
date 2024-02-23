@@ -472,13 +472,20 @@ public class FJSimulator {
 		    int k = Integer.parseInt(process_spec[2]);
 		    double rho = Double.parseDouble(process_spec[3]);
 		    process = new CorrelatedExponentialSumIntertimeProcess(rate, k, rho);
-		} else if (process_spec[0].equals("xtpo")) {
-			// exponential with two-parameter overhead model
-			System.out.println(Arrays.toString(process_spec));
-			double rate = Double.parseDouble(process_spec[1]);
-			double const_overhead = Double.parseDouble(process_spec[2]);
-			double exp_overhead = Double.parseDouble(process_spec[3]);
-			process = new TwoParamExponentialOverheadIntertimeProcess(rate, const_overhead, exp_overhead);
+        } else if (process_spec[0].equals("xtpo")) {
+            // exponential with two-parameter overhead model
+            System.out.println(Arrays.toString(process_spec));
+            double rate = Double.parseDouble(process_spec[1]);
+            double const_overhead = Double.parseDouble(process_spec[2]);
+            double exp_overhead = Double.parseDouble(process_spec[3]);
+            process = new TwoParamExponentialOverheadIntertimeProcess(rate, const_overhead, exp_overhead);
+        } else if (process_spec[0].equals("xuo")) {
+            // exponential with uniform overhead model
+            System.out.println(Arrays.toString(process_spec));
+            double rate = Double.parseDouble(process_spec[1]);
+            double lower = Double.parseDouble(process_spec[2]);
+            double upper = Double.parseDouble(process_spec[3]);
+            process = new ExponentialUniformOverheadIntertimeProcess(rate, lower, upper);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);
