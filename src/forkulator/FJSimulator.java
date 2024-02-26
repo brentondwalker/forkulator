@@ -155,7 +155,21 @@ public class FJSimulator {
             } else {
                 this.server = new FJBarrierServerOverhead(num_workers, job_predeparture_overhead, task_predeparture_overhead);
             }
-		} else if (server_queue_type.toLowerCase().startsWith("td")) {
+        } else if (server_queue_type.toLowerCase().equals("bsbo")) {
+            if (num_workers < num_tasks) {
+                System.err.println("ERROR: \""+server_queue_type+"\" requires num_workers >= num_tasks");
+                System.exit(0);
+            }
+            if (server_queue_spec.length != 5) {
+                System.err.println("ERROR: server type \""+server_queue_type+"\" takes four arguments: job_predeparture_overhead task_predeparture_overhead lower upper");
+                System.exit(0);
+            }
+            double job_predeparture_overhead = Double.parseDouble(server_queue_spec[1]);
+            double task_predeparture_overhead = Double.parseDouble(server_queue_spec[2]);
+            double lower = Double.parseDouble(server_queue_spec[3]);
+            double upper = Double.parseDouble(server_queue_spec[4]);
+            this.server = new FJBarrierServerStartBlockingOverhead(num_workers, true, false, job_predeparture_overhead, task_predeparture_overhead, lower, upper);
+        } else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing
 			} else {
