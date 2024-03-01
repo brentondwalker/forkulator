@@ -500,6 +500,14 @@ public class FJSimulator {
             double lower = Double.parseDouble(process_spec[2]);
             double upper = Double.parseDouble(process_spec[3]);
             process = new ExponentialUniformOverheadIntertimeProcess(rate, lower, upper);
+        } else if (process_spec[0].equals("tulc")) {
+            // the triangle/uniform layer cake distribution
+            System.out.println(Arrays.toString(process_spec));
+            double a = Double.parseDouble(process_spec[1]);
+            double b = Double.parseDouble(process_spec[2]);
+            double c = Double.parseDouble(process_spec[3]);
+            double z = Double.parseDouble(process_spec[4]);
+            process = new LayerCakeIntertimeProcess(new UniformIntertimeProcess(a,b), 1.0, new TriangleIntertimeProcess(a, b, c), z);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);
