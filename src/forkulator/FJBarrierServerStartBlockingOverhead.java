@@ -7,6 +7,8 @@ import java.util.Vector;
 
 import forkulator.randomprocess.ConstantIntertimeProcess;
 import forkulator.randomprocess.UniformIntertimeProcess;
+import forkulator.randomprocess.TriangleIntertimeProcess;
+import forkulator.randomprocess.LayerCakeIntertimeProcess;
 import forkulator.randomprocess.IntertimeProcess;
 
 public class FJBarrierServerStartBlockingOverhead extends FJServer {
@@ -139,7 +141,9 @@ public class FJBarrierServerStartBlockingOverhead extends FJServer {
         this.task_predeparture_overhead = task_predeparture_overhead;
         this.blocking_start_overhead_lower = blocking_start_overhead_lower;
         this.blocking_start_overhead_upper = blocking_start_overhead_upper;
-        this.start_blocking_overhead_process = new UniformIntertimeProcess(blocking_start_overhead_lower, blocking_start_overhead_upper);
+        //this.start_blocking_overhead_process = new UniformIntertimeProcess(blocking_start_overhead_lower, blocking_start_overhead_upper);
+        this.start_blocking_overhead_process = new LayerCakeIntertimeProcess(new UniformIntertimeProcess(blocking_start_overhead_lower, blocking_start_overhead_upper), 1.0,
+                new TriangleIntertimeProcess(blocking_start_overhead_lower, blocking_start_overhead_upper, blocking_start_overhead_lower), 0.5);
         this.dummy_overhead_worker = new FJWorker();
         System.err.println("FJBarrierServerOverhead(departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+")"
                 +", job_predeparture_overhead="+job_predeparture_overhead+", task_predeparture_overhead="+task_predeparture_overhead
