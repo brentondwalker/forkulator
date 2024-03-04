@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 import java.io.Serializable;
+import org.apache.commons.math3.stat.descriptive.rank.Percentile;
+
 
 /**
  * It is convenient to sample the actual jobs (and tasks) as we run,
@@ -360,12 +362,24 @@ public class FJDataAggregator implements Serializable {
         double lasttask_sum = 0.0;
         double service_sum = 0.0;
         double cputime_sum = 0.0;
+        
+        double[] job_waiting_time = new double[num_samples];  // job_start_time[i] - job_arrival_time[i];
+        double[] job_lt_waiting_time = new double[num_samples];  // job_lasttask_time[i] - job_arrival_time[i];
+        double[] job_sojourn_time = new double[num_samples];  // job_departure_time[i] - job_arrival_time[i];
+        double[] job_service_time = new double[num_samples];  // job_completion_time[i] - job_start_time[i];
+        double[] job_inorder_sojourn_time = new double[num_samples];  // job_inorder_departure_time[i] - job_arrival_time[i];
+        
 		for (int i=0; i<num_samples; i++) {
             waiting_sum += job_start_time[i] - job_arrival_time[i];
             lasttask_sum += job_lasttask_time[i] - job_arrival_time[i];
 			sojourn_sum += job_departure_time[i] - job_arrival_time[i];
 			service_sum += job_completion_time[i] - job_start_time[i];
 			cputime_sum += job_cpu_time[i];
+			job_waiting_time[i] = job_start_time[i] - job_arrival_time[i];
+			job_lt_waiting_time[i] = job_lasttask_time[i] - job_arrival_time[i];
+			job_sojourn_time[i] = job_departure_time[i] - job_arrival_time[i];
+			job_service_time[i] = job_completion_time[i] - job_start_time[i];
+			job_inorder_sojourn_time[i] = job_inorder_departure_time[i] - job_arrival_time[i];
 		}
 		
 		double total = num_samples;
@@ -381,14 +395,76 @@ public class FJDataAggregator implements Serializable {
 		//
 		// make sure the distributions have been computed and are long enough
 		// to compute the quantiles we're interested in
-		result.add(quantile(job_sojourn_d, num_samples, 1.0e-6, binwidth));
-        result.add(quantile(job_waiting_d, num_samples, 1.0e-6, binwidth));
-        result.add(quantile(job_lasttask_d, num_samples, 1.0e-6, binwidth));
-		result.add(quantile(job_service_d, num_samples, 1.0e-6, binwidth));
-		result.add(quantile(job_cputime_d, num_samples, 1.0e-6, binwidth));
+		Percentile percentile = new Percentile().withEstimationType(org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType.LEGACY);
+		double q = 1.0 - 1.0e-6;
+		result.add(percentile.evaluate(job_sojourn_time, q));
+        result.add(percentile.evaluate(job_waiting_time, q));
+        result.add(percentile.evaluate(job_lt_waiting_time, q));
+		result.add(percentile.evaluate(job_service_time, q));
+		result.add(percentile.evaluate(job_cpu_time, q));
 
 		// also add 10^-3 quantiles
-		result.add(quantile(job_sojourn_d, num_samples, 1.0e-3, binwidth));
+		q = 1.0 - 1.0e-3;
+        result.add(percentile.evaluate(job_sojourn_time, q));
+        result.add(percentile.evaluate(job_waiting_time, q));
+        result.add(percentile.evaluate(job_lt_waiting_time, q));
+        result.add(percentile.evaluate(job_service_time, q));
+        result.add(percentile.evaluate(job_cpu_time, q));
+
+        // to compare to spark results we need 10^-2 quantiles
+        q = 1.0 - 1.0e-2;
+        result.add(percentile.evaluate(job_sojourn_time, q));
+        result.add(percentile.evaluate(job_waiting_time, q));
+        result.add(percentile.evaluate(job_lt_waiting_time, q));
+        result.add(percentile.evaluate(job_service_time, q));
+        result.add(percentile.evaluate(job_cpu_time, q));
+
+		return result;
+	}
+
+	   /**
+     * Compute the means of sojourn, waiting, and service times over (almost) all jobs.
+     * 
+     * @return
+     */
+    public ArrayList<Double> experimentMeansOld() {
+        if (job_sojourn_d == null)
+            computeExperimentDistributions(this.binwidth);
+        
+        double sojourn_sum = 0.0;
+        double waiting_sum = 0.0;
+        double lasttask_sum = 0.0;
+        double service_sum = 0.0;
+        double cputime_sum = 0.0;
+        for (int i=0; i<num_samples; i++) {
+            waiting_sum += job_start_time[i] - job_arrival_time[i];
+            lasttask_sum += job_lasttask_time[i] - job_arrival_time[i];
+            sojourn_sum += job_departure_time[i] - job_arrival_time[i];
+            service_sum += job_completion_time[i] - job_start_time[i];
+            cputime_sum += job_cpu_time[i];
+        }
+        
+        double total = num_samples;
+        ArrayList<Double> result = new ArrayList<Double>(12 + 1);
+        result.add(sojourn_sum/total);
+        result.add(waiting_sum/total);
+        result.add(lasttask_sum/total);
+        result.add(service_sum/total);
+        result.add(cputime_sum/total);
+        result.add(total * 1.0);
+        
+        // also throw in the 10^-6 quantiles
+        //
+        // make sure the distributions have been computed and are long enough
+        // to compute the quantiles we're interested in
+        result.add(quantile(job_sojourn_d, num_samples, 1.0e-6, binwidth));
+        result.add(quantile(job_waiting_d, num_samples, 1.0e-6, binwidth));
+        result.add(quantile(job_lasttask_d, num_samples, 1.0e-6, binwidth));
+        result.add(quantile(job_service_d, num_samples, 1.0e-6, binwidth));
+        result.add(quantile(job_cputime_d, num_samples, 1.0e-6, binwidth));
+
+        // also add 10^-3 quantiles
+        result.add(quantile(job_sojourn_d, num_samples, 1.0e-3, binwidth));
         result.add(quantile(job_waiting_d, num_samples, 1.0e-3, binwidth));
         result.add(quantile(job_lasttask_d, num_samples, 1.0e-3, binwidth));
         result.add(quantile(job_service_d, num_samples, 1.0e-3, binwidth));
@@ -401,8 +477,9 @@ public class FJDataAggregator implements Serializable {
         result.add(quantile(job_service_d, num_samples, 1.0e-2, binwidth));
         result.add(quantile(job_cputime_d, num_samples, 1.0e-2, binwidth));
 
-		return result;
-	}
+        return result;
+    }
+
 	
 	
 	/**
