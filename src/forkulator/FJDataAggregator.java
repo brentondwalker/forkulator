@@ -395,8 +395,8 @@ public class FJDataAggregator implements Serializable {
 		//
 		// make sure the distributions have been computed and are long enough
 		// to compute the quantiles we're interested in
-		Percentile percentile = new Percentile().withEstimationType(org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType.LEGACY);
-		double q = 1.0 - 1.0e-6;
+		Percentile percentile = new Percentile().withEstimationType(org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType.R_9);
+		double q = (1.0 - 1.0e-6)*100.0;
 		result.add(percentile.evaluate(job_sojourn_time, q));
         result.add(percentile.evaluate(job_waiting_time, q));
         result.add(percentile.evaluate(job_lt_waiting_time, q));
@@ -404,7 +404,7 @@ public class FJDataAggregator implements Serializable {
 		result.add(percentile.evaluate(job_cpu_time, q));
 
 		// also add 10^-3 quantiles
-		q = 1.0 - 1.0e-3;
+        double q = (1.0 - 1.0e-3)*100.0;
         result.add(percentile.evaluate(job_sojourn_time, q));
         result.add(percentile.evaluate(job_waiting_time, q));
         result.add(percentile.evaluate(job_lt_waiting_time, q));
@@ -412,7 +412,7 @@ public class FJDataAggregator implements Serializable {
         result.add(percentile.evaluate(job_cpu_time, q));
 
         // to compare to spark results we need 10^-2 quantiles
-        q = 1.0 - 1.0e-2;
+        double q = (1.0 - 1.0e-2)*100.0;
         result.add(percentile.evaluate(job_sojourn_time, q));
         result.add(percentile.evaluate(job_waiting_time, q));
         result.add(percentile.evaluate(job_lt_waiting_time, q));
