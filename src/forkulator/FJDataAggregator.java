@@ -404,7 +404,7 @@ public class FJDataAggregator implements Serializable {
 		result.add(percentile.evaluate(job_cpu_time, q));
 
 		// also add 10^-3 quantiles
-        double q = (1.0 - 1.0e-3)*100.0;
+        q = (1.0 - 1.0e-3)*100.0;
         result.add(percentile.evaluate(job_sojourn_time, q));
         result.add(percentile.evaluate(job_waiting_time, q));
         result.add(percentile.evaluate(job_lt_waiting_time, q));
@@ -412,7 +412,7 @@ public class FJDataAggregator implements Serializable {
         result.add(percentile.evaluate(job_cpu_time, q));
 
         // to compare to spark results we need 10^-2 quantiles
-        double q = (1.0 - 1.0e-2)*100.0;
+        q = (1.0 - 1.0e-2)*100.0;
         result.add(percentile.evaluate(job_sojourn_time, q));
         result.add(percentile.evaluate(job_waiting_time, q));
         result.add(percentile.evaluate(job_lt_waiting_time, q));
