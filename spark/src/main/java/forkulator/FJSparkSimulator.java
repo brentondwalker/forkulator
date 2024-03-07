@@ -245,11 +245,11 @@ public class FJSparkSimulator {
                 +"\t"+means.get(13) // job lasttask 1e-3 quantile  19
                 +"\t"+means.get(14) // job service 1e-3 quantile   20
                 +"\t"+means.get(15) // job cputime 1e-3 quantile   21
-                +"\t"+means.get(11) // job sojourn 1e-2 quantile   22
-                +"\t"+means.get(12) // job waiting 1e-2 quantile   23
-                +"\t"+means.get(13) // job lasttask 1e-2 quantile  24
-                +"\t"+means.get(14) // job service 1e-2 quantile   25
-                +"\t"+means.get(15) // job cputime 1e-2 quantile   26
+                +"\t"+means.get(16) // job sojourn 1e-2 quantile   22
+                +"\t"+means.get(17) // job waiting 1e-2 quantile   23
+                +"\t"+means.get(18) // job lasttask 1e-2 quantile  24
+                +"\t"+means.get(19) // job service 1e-2 quantile   25
+                +"\t"+means.get(20) // job cputime 1e-2 quantile   26
 				);
 
 		
