@@ -26,7 +26,7 @@ public class FJSingleQueueServer extends FJServer {
 	 */
 	public FJSingleQueueServer(int num_workers) {
 		super(num_workers);
-		System.out.println("FJSingleQueueServer()");
+		//System.out.println("FJSingleQueueServer()");
 	}
 	
 	

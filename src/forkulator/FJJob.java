@@ -52,6 +52,12 @@ public abstract class FJJob implements Comparable<FJJob> {
     public IntertimeProcess job_service_process = null;
     public double job_service_time = 0;
     
+    // the random process giving a service scale factor to the jobs
+    // this would be used in models where the tasks are iid, but for each job there
+    // is a random factor that scales all the tasks.
+    public IntertimeProcess job_scale_process = null;
+    public double job_service_scale_factor = 1.0;
+    
     // the random process giving service times to this job's tasks
     // this is passed to the FJTask constructor.
     public IntertimeProcess task_service_process = null;

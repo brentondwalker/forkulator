@@ -2,7 +2,6 @@ package forkulator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.PriorityQueue;
 
 import forkulator.randomprocess.*;
@@ -42,8 +41,9 @@ public class FJSimulator {
 	public int num_workers;
 	public int num_tasks;
 	public IntertimeProcess arrival_process;
-	public IntertimeProcess service_process;
-    public IntervalPartition job_partition_process = null;
+    public IntertimeProcess service_process;
+    public IntertimeProcess job_scale_process;
+    public IntervalPartition job_partition_process = null;    
     public IntervalPartition task_partition_process = null;
     public int task_division_factor = 0;
 	public FJServer server = null;
@@ -68,7 +68,8 @@ public class FJSimulator {
 	public FJSimulator(String[] server_queue_spec,
 			int num_workers, int num_tasks,
 			IntertimeProcess arrival_process,
-			IntertimeProcess service_process,
+            IntertimeProcess service_process,
+            IntertimeProcess job_scale_process,
             IntervalPartition partition_process,
             int task_division_factor,
 			FJDataAggregator data_aggregator) {
@@ -76,6 +77,7 @@ public class FJSimulator {
 		this.num_tasks = num_tasks;
 		this.arrival_process = arrival_process;
 		this.service_process = service_process;
+		this.job_scale_process = job_scale_process;
 		this.data_aggregator = data_aggregator;
 		if (task_division_factor > 0) {
 		    this.task_partition_process = partition_process;
@@ -280,8 +282,10 @@ public class FJSimulator {
 					job = new FJRandomPartitionJob(num_tasks, server.num_workers, service_process, job_partition_process, e.time);
 				} else if (this.task_partition_process != null) {
 				    job = new FJRandomTaskPartitionJob(num_tasks, server.num_workers, task_division_factor, service_process, task_partition_process, e.time);
+				}  else if (this.job_scale_process != null) {
+				    job = new FJGrandCanonicalTaskScaledJob(num_tasks, server.num_workers, service_process, job_scale_process, e.time);
 				} else {
-					job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
+				    job = new FJIndependentTaskJob(num_tasks, server.num_workers, service_process, e.time);
 				}
 				job.arrival_time = et.time;
 				if (jobs_processed >= 0) {
@@ -445,11 +449,15 @@ public class FJSimulator {
 			// exponential
 			double rate = Double.parseDouble(process_spec[1]);
 			process = new ExponentialIntertimeProcess(rate);
-		} else if (process_spec[0].equals("e")) {
+		} else if (process_spec[0].equals("e") || process_spec[0].equals("es")) {
 			// erlang k
 			int k = Integer.parseInt(process_spec[1]);
 			double rate = Double.parseDouble(process_spec[2]);
-			process = new ErlangIntertimeProcess(rate, k);
+			if (process_spec[0].equals("es")) {
+			    process = new ErlangIntertimeProcess(rate, k, true);
+			} else {
+			    process = new ErlangIntertimeProcess(rate, k);
+			}
 		} else if (process_spec[0].equals("g") || process_spec[0].equals("n")) {
 			// gaussian/normal
 			double mean = Double.parseDouble(process_spec[1]);
@@ -594,6 +602,8 @@ public class FJSimulator {
 		cli_options.addOption(OptionBuilder.withLongOpt("serviceprocess").hasArgs().isRequired().withDescription("service process").create("S"));
         cli_options.addOption(OptionBuilder.withLongOpt("jobpartition").hasArgs().withDescription("job_partition").create("J"));
         cli_options.addOption(OptionBuilder.withLongOpt("taskpartition").hasArgs().withDescription("task_partition").create("T"));
+        cli_options.addOption(OptionBuilder.withLongOpt("jobscaleprocess").hasArgs().withDescription("job_scale_process").create("L"));
+        
 
 		// TODO: add options for leaky bucket process filters
 		
@@ -630,6 +640,17 @@ public class FJSimulator {
 		//
 		String[] service_process_spec = options.getOptionValues("S");
 		IntertimeProcess service_process = FJSimulator.parseProcessSpec(service_process_spec);
+
+		// if there is a job_scale_process, figure it out
+		IntertimeProcess job_scale_process = null;
+		if (options.hasOption("L")) {
+		    if (options.hasOption("J") || options.hasOption("T")) {
+                System.err.println("ERROR: -L option excludes the -J and -T options");
+                System.exit(0);
+            }
+		    String[] job_scale_process_spec = options.getOptionValues("L");
+		    job_scale_process = FJSimulator.parseProcessSpec(job_scale_process_spec);
+		}
 		
 		//
         // if we are in job-partitioning mode, figure out the partitioning type
@@ -637,8 +658,8 @@ public class FJSimulator {
         IntervalPartition partition_process = null;
         int task_division_factor = 1;
         if (options.hasOption("J")) {
-            if (options.hasOption("T")) {
-                System.err.println("ERROR: cannot use both the -J and -T options together");
+            if (options.hasOption("T") || options.hasOption("L")) {
+                System.err.println("ERROR: -J option excludes the -L and -T options");
                 System.exit(0);
             }
             String[] job_partition_spec = options.getOptionValues("J");
@@ -668,7 +689,7 @@ public class FJSimulator {
 		}
 		
 		// simulator
-		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, partition_process, task_division_factor, data_aggregator);
+		FJSimulator sim = new FJSimulator(server_queue_spec, num_workers, num_tasks, arrival_process, service_process, job_scale_process, partition_process, task_division_factor, data_aggregator);
 
 		// start the simulator running...
 		sim.run(num_jobs, sampling_interval);

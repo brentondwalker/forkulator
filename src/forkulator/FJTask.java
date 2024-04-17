@@ -6,6 +6,7 @@ public class FJTask {
 	
 	public double start_time = 0.0;
 	public double service_time = 0.0;
+	public double service_scale_factor = 1.0;
 	public double completion_time = 0.0;  // redundant
 	public FJWorker worker = null;
 	public boolean processing = false;
@@ -21,18 +22,31 @@ public class FJTask {
 	// for now assume there is no redundancy in the placement of data.
 	public int data_host = -1;
 	
-	/**
-	 * Constuctor
-	 * 
-	 * @param service_process
-	 * @param arrival_time
-	 * @param job
-	 */
-	public FJTask(IntertimeProcess service_process, double arrival_time, FJJob job) {
-		this.service_process = service_process;
-		this.service_time = service_process.nextInterval(arrival_time);
-		this.job = job;
-	}
+    /**
+     * Constuctor
+     * 
+     * @param service_process
+     * @param arrival_time
+     * @param job
+     */
+    public FJTask(IntertimeProcess service_process, double arrival_time, FJJob job) {
+        this(service_process, arrival_time, job, 1.0);
+    }
+
+    /**
+     * Constructor
+     * 
+     * @param service_process
+     * @param arrival_time
+     * @param job
+     * @param service_scale_factor
+     */
+    public FJTask(IntertimeProcess service_process, double arrival_time, FJJob job, double service_scale_factor) {
+        this.service_process = service_process;
+        this.service_scale_factor = service_scale_factor;
+        this.service_time = service_process.nextInterval(arrival_time) * service_scale_factor;
+        this.job = job;
+    }
 	
 	
 	/**
