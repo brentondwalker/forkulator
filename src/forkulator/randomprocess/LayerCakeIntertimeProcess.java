@@ -59,7 +59,7 @@ public class LayerCakeIntertimeProcess  extends IntertimeProcess {
             num_samples = Integer.parseInt(args[0]);
         }
         //IntertimeProcess p = new LayerCakeIntertimeProcess(new UniformIntertimeProcess(2.0, 5.0), 1.0, new TriangleIntertimeProcess(2.0, 5.0, 4.0), 0.5);
-        IntertimeProcess p = new LayerCakeIntertimeProcess(new UniformIntertimeProcess(0.0, 1000.0), 1.0, new TriangleIntertimeProcess(0, 1000.0, 0.0), 0.5);
+        IntertimeProcess p = new LayerCakeIntertimeProcess(new UniformIntertimeProcess(0.0, 1000.0), 1.0, new TriangleIntertimeProcess(0, 1000.0, 0.0), 1.0);
         //IntertimeProcess p = new TriangleIntertimeProcess(2.0, 5.0, 4.0);
         for (int i=0; i<num_samples; i++) {
             System.out.println(p.nextInterval());
