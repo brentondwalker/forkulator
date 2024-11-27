@@ -169,6 +169,25 @@ public class FJSimulator {
             double lower = Double.parseDouble(server_queue_spec[3]);
             double upper = Double.parseDouble(server_queue_spec[4]);
             this.server = new FJBarrierServerStartBlockingOverhead(num_workers, true, false, job_predeparture_overhead, task_predeparture_overhead, lower, upper);
+		} else if (server_queue_type.toLowerCase().equals("bh") || server_queue_type.toLowerCase().equals("bbh") || server_queue_type.toLowerCase().equals("nbbh")) {
+			if (num_workers < num_tasks) {
+				System.err.println("ERROR: FJBarrierHybridServer requires num_workers >= num_tasks");
+				System.exit(0);
+			}
+			if (server_queue_spec.length != 2) {
+				System.err.println("ERROR: server type \""+server_queue_type+"\" requires one argument: bem_rate");
+				System.exit(0);
+			}
+			double bem_rate = Double.parseDouble(server_queue_spec[1]);
+			if (server_queue_type.toLowerCase().equals("bbh")) {
+				// server with a departure barrier too
+				this.server = new FJBarrierHybridServer(num_workers, true, true, bem_rate);
+			} else if (server_queue_type.toLowerCase().equals("nbbh")) {
+				// server with only departure barrier
+				this.server = new FJBarrierHybridServer(num_workers, false, true, bem_rate);
+			} else {
+				this.server = new FJBarrierHybridServer(num_workers, true, false, bem_rate);
+			}
         } else if (server_queue_type.toLowerCase().startsWith("td")) {
 			if (server_queue_type.length() == 3 && server_queue_type.toLowerCase().equals("tdr")) {
 				this.server = new FJThinningServer(num_workers, false, true);  // resequencing

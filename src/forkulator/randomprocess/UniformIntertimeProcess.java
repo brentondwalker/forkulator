@@ -26,7 +26,7 @@ public class UniformIntertimeProcess extends IntertimeProcess {
             lower = upper;
             upper = tmp;
         }
-        System.err.println("using uniform("+lower+", "+upper+") intertime process");
+        //System.err.println("using uniform("+lower+", "+upper+") intertime process");
     }
     
     @Override
