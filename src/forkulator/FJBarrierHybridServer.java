@@ -1,5 +1,7 @@
 package forkulator;
 
+import forkulator.randomprocess.IntertimeProcess;
+import forkulator.randomprocess.UniformIntertimeProcess;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Vector;
@@ -7,11 +9,12 @@ import java.util.Vector;
 public class FJBarrierHybridServer extends FJServer {
 
 	/**
-	 * This server is to simulate jobs running on barrier RDDs in spark.
-	 * The constraint on these jobs is that all tasks must start at the same time.
-	 * So if there are t tasks in the job, no tasks can be serviced until at least
-	 * t workers are free.  If t=w then anticipate that this will act like
-	 * Split-Merge.
+     * This server is like the FJBarrierServer, but it serves a mix of BEM jobs
+     * and standard single-queue fork-join jobs (FJSingleQueueServer).
+     * Consider the case of BEM jobs with start barriers.  When such a job
+     * starts service, it blocks the available workers until k workers are
+     * available and its tasks can start in unison.  When a non-BEM job begins
+     * service, its tasks are assigned to workers and begin executing immediately.
 	 *
 	 * Design issue: should this server assume that all jobs have the same number
 	 * of tasks?  If we assume that, then we never need to look deeper than the
@@ -24,7 +27,8 @@ public class FJBarrierHybridServer extends FJServer {
 
     public Queue<FJJob> job_queue = new LinkedList<FJJob>();
 
-    FJJob next_job = null;
+    boolean current_job_bem = true;
+    IntertimeProcess uniform_random = new UniformIntertimeProcess(0.0, 1.0);
 
     /**
      * BarrierServer is special because there is a barrier at the start of the
@@ -43,6 +47,15 @@ public class FJBarrierHybridServer extends FJServer {
      */
     private boolean start_barrier = true;
 
+    /**
+     * The Bernoulli probability that any job is a barrier job.
+     * Implement the distinction here so the changes can be confined to this FJServer class.
+     * Otherwise we'd need different FJJob subclasses, or a flag in FJJob.
+     * XXX In the future, we may want the BEM probability to be something other than Bernoulli.
+     * XXX The case that this kind of implementation can't support, is the case where
+     *     BEM jobs and non-BEM jobs are fed by different random processes.
+     */
+    private double bem_rate = 1.0;
 
     /**
      * Constructor
@@ -50,12 +63,22 @@ public class FJBarrierHybridServer extends FJServer {
      * Has to allocate the workers' task queues.
      *
      * @param num_workers
+     * @param start_barrier
+     * @param departure_barrier
+     * @param bem_rate    the Bernoulli probability that any job is a BEM job
+     *
      */
-    public FJBarrierHybridServer(int num_workers, boolean start_barrier, boolean departure_barrier) {
+    public FJBarrierHybridServer(int num_workers, boolean start_barrier, boolean departure_barrier, double bem_rate) {
         super(num_workers);
+        if (bem_rate > 1.0 || bem_rate < 0.0) {
+            System.err.println("ERROR: FJBarrierHybridServer bem_rate must be between 0 and 1");
+            System.exit(0);
+        }
+
         this.departure_barrier = departure_barrier;
         this.start_barrier = start_barrier;
-        System.err.println("FJBarrierServer(departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+")");
+        this.bem_rate = bem_rate;
+        System.err.println("FJBarrierHybridServer(departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+", bem_rate="+bem_rate+")");
     }
 
 
@@ -68,7 +91,7 @@ public class FJBarrierHybridServer extends FJServer {
      */
     public FJBarrierHybridServer(int num_workers) {
         super(num_workers);
-        System.err.println("FJBarrierServer()");
+        System.err.println("FJBarrierHybridServer()");
     }
 
     
@@ -82,30 +105,51 @@ public class FJBarrierHybridServer extends FJServer {
      * @param time
      */
 	public void feedWorkers(double time) {
-    	 if (next_job == null) {
-    		 return;
-    	 }
-    	 
-    	 // count the number of idle workers
-    	 Vector<Integer> idle_workers = new Vector<Integer>();
-    	 for (int w=0; w<num_workers; w++) {
-    		 if (workers[0][w].current_task == null) {
-    			 idle_workers.add(w);
-    		 }
-    	 }
-    	 
-    	 // can we service this job?
-    	 if ((idle_workers.size() >= next_job.num_tasks) || (idle_workers.size() > 0 && start_barrier==false))  {
-    		 int w = 0;
-    		 FJTask nt = next_job.nextTask();
-    		 while (nt != null && w < idle_workers.size()) {
-    			 serviceTask(workers[0][idle_workers.get(w)], nt, time);
-    			 nt = next_job.nextTask();
-    			 w++;
-    		 }
-			 next_job = job_queue.poll();
-			 feedWorkers(time);
-    	 }
+    	 if (current_job == null) return;
+
+         // count the number of idle workers
+         Vector<Integer> idle_workers = new Vector<Integer>();
+         for (int w = 0; w < num_workers; w++) {
+             if (workers[0][w].current_task == null) {
+                 idle_workers.add(w);
+             }
+         }
+         if (idle_workers.isEmpty()) return;
+
+        // handle BEM jobs and non-BEM jobs differently
+        if (current_job_bem) {  // BEM case
+             // can we service this job?
+            //System.err.println("feedWorkers(BEM)");
+             if ((idle_workers.size() >= current_job.num_tasks) || (idle_workers.size() > 0 && start_barrier == false)) {
+                 int w = 0;
+                 FJTask nt = current_job.nextTask();
+                 while (nt != null && w < idle_workers.size()) {
+                     serviceTask(workers[0][idle_workers.get(w)], nt, time);
+                     nt = current_job.nextTask();
+                     w++;
+                 }
+                 current_job = job_queue.poll();
+                 current_job_bem = (uniform_random.nextInterval() <= bem_rate);
+                 feedWorkers(time);
+             }
+        } else {  // non-BEM case
+            //System.err.println("feedWorkers(NON-BEM)");
+            for (int w=0; w<num_workers; w++) {
+                 if (workers[0][w].current_task == null) {
+                     // service the next task
+                     serviceTask(workers[0][w], current_job.nextTask(), time);
+                     // if the current job is exhausted, grab a new one (or null)
+                     if (current_job.fully_serviced) {
+                         current_job = job_queue.poll();
+                         current_job_bem = (uniform_random.nextInterval() <= bem_rate);
+                         // we have to exit this loop, even if there are idle workers,
+                         // because the next job may have barriers.
+                         break;
+                     }
+                 }
+             }
+            feedWorkers(time);
+        }
      }
      
      
@@ -124,8 +168,9 @@ public class FJBarrierHybridServer extends FJServer {
          // only keep a reference to the job if the simulator tells us to
          job.setSample(sample);
          
-         if (next_job == null) {
-        	 next_job = job;
+         if (current_job == null) {
+        	 current_job = job;
+             current_job_bem = (uniform_random.nextInterval() <= bem_rate);
              feedWorkers(job.arrival_time);
          } else {
         	 job_queue.add(job);
@@ -190,7 +235,7 @@ public class FJBarrierHybridServer extends FJServer {
      
 	@Override
 	public int queueLength() {
-		if (next_job == null) {
+		if (current_job == null) {
 			return 0;
 		}
         return this.job_queue.size() + 1;
