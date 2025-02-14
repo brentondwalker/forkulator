@@ -169,6 +169,21 @@ public class FJSimulator {
             double lower = Double.parseDouble(server_queue_spec[3]);
             double upper = Double.parseDouble(server_queue_spec[4]);
             this.server = new FJBarrierServerStartBlockingOverhead(num_workers, true, false, job_predeparture_overhead, task_predeparture_overhead, lower, upper);
+        } else if (server_queue_type.toLowerCase().equals("bskl") || server_queue_type.toLowerCase().equals("bbskl")) {
+                if (num_workers < num_tasks) {
+                    System.err.println("ERROR: \""+server_queue_type+"\" requires num_workers >= num_tasks");
+                    System.exit(0);
+                }
+                if (server_queue_spec.length != 2) {
+                    System.err.println("ERROR: server type \""+server_queue_type+"\" takes 1 argument: l (number of takss necessary for departure)");
+                    System.exit(0);
+                }
+                int l = Integer.parseInt(server_queue_spec[1]);
+                if (server_queue_type.toLowerCase().equals("bskl")) {
+                    this.server = new FJBarrierKLServerStartBlockingOverhead(num_workers, l, true, false);
+                } else if (server_queue_type.toLowerCase().equals("bbskl")) {
+                    this.server = new FJBarrierKLServerStartBlockingOverhead(num_workers, l, true, true);
+                }
 		} else if (server_queue_type.toLowerCase().equals("bh") || server_queue_type.toLowerCase().equals("bbh") || server_queue_type.toLowerCase().equals("nbbh")) {
 			if (num_workers < num_tasks) {
 				System.err.println("ERROR: FJBarrierHybridServer requires num_workers >= num_tasks");
@@ -287,6 +302,10 @@ public class FJSimulator {
 				System.exit(0);
 			}
 			QEvent e = event_queue.poll();
+			
+			if (e.deleted) {
+			    continue;
+			}
 
 			if (e instanceof QJobArrivalEvent) {
 				jobs_processed++;

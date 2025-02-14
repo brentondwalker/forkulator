@@ -108,6 +108,7 @@ public abstract class FJServer {
 //
 //			// schedule the task's completion
 			QTaskCompletionEvent e = new QTaskCompletionEvent(task, time + task.service_time);
+			task.completion_event = e;
 			simulator.addEvent(e);
 		}
 	}

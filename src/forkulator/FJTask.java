@@ -10,8 +10,10 @@ public class FJTask {
 	public FJWorker worker = null;
 	public boolean processing = false;
 	public boolean completed = false;
+	public boolean abandoned = false;
 	public FJJob job = null;
 	public IntertimeProcess service_process = null;
+	QTaskCompletionEvent completion_event = null;
 	
 	// this is assigned and used by FJPathLogger to keep track of the sequence of task arrivals
 	public int path_log_id = -1;
