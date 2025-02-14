@@ -183,7 +183,7 @@ public class FJSimulator {
                 if (ld < 1.0) {
                     // if the user gave the l parameter as a fraction of the tasks that need to complete,
                     // compute the corresponding integer value of l
-                    l = (int) Math.round(ld * num_workers);
+                    l = (int) Math.round(ld * num_tasks);
                 }
                 if (server_queue_type.toLowerCase().equals("bskl")) {
                     this.server = new FJBarrierKLServerStartBlockingOverhead(num_workers, l, true, false);

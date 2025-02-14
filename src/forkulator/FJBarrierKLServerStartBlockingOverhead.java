@@ -184,7 +184,7 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
         this.departure_barrier = departure_barrier;
         //this.start_barrier = start_barrier;
         if (!start_barrier) {
-            System.err.println("ERROR: FJBarrierServerStartBlockingOverhead only works when you have a start barrier.");
+            System.err.println("ERROR: FJBarrierKLServerStartBlockingOverhead only works when you have a start barrier.");
             System.exit(0);
         }
         this.job_predeparture_overhead = 0.0;
@@ -193,7 +193,7 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
         this.blocking_start_overhead_upper = 0.0;
         this.start_blocking_overhead_process = new ConstantIntertimeProcess(0.0, true);
         this.dummy_overhead_worker = new FJWorker();
-        System.err.println("FJBarrierServerOverhead(departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+")"
+        System.err.println("FJBarrierKLServerStartBlockingOverhead(l="+l+", departure_barrier="+departure_barrier+" , start_barrier="+start_barrier+")"
                 +", job_predeparture_overhead="+job_predeparture_overhead+", task_predeparture_overhead="+task_predeparture_overhead
                 +", blocking_start_overhead_lower="+blocking_start_overhead_lower+", blocking_start_overhead_upper="+blocking_start_overhead_upper+")");
     }
@@ -309,11 +309,14 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
       * Unlike the old (k,l) server models, we kill the stragglers processes, so they are free to service other jobs.
       */
      private void killStragglers(FJJob job, double time) {
+	 //System.err.println("killStragglers("+time+")");
+	 int idx = 0;
          for (FJTask t : job.tasks) {
              if (! t.completed) {
                  // do we really need to un-schedule its completion?
                  // We just need to ensure that nothing happens when its completion event actually fires.
                  // it seems sloppy, though.
+		 //System.err.println("\tkill task "+idx);
                  t.worker.current_task = null;
                  t.completed = true;
                  t.abandoned = true;
@@ -322,6 +325,7 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
                  // tell the simulator to ignore this tasks's completion event
                  t.completion_event.deleted = true;
              }
+	     idx++;
          }
      }
      
@@ -386,6 +390,7 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
              serviceTask(dummy_overhead_worker, dummy_overhead_task_queue.poll(), time);
              
          } else {
+	     //System.err.println("main job task completion...");
              // if there is a departure barrier, just leave the completed task
              // on the worker and clear them out when the job is done.
              // XXX: by putting this here, (inside the else block) we are making pre-departure overhead
@@ -401,13 +406,16 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
              for (FJTask t : task.job.tasks) {
                  num_complete += (t.completed) ? 1 : 0;
              }
+	     //System.err.println("num_complete="+num_complete);
              if (num_complete >= this.l) {
+		 //System.err.println("num_complete >="+this.l);
                  task.job.completed = true;
              }
 
              if (task.job.completed) {
                  
                  // since this is a (k,l) server, need to clear out any straggler tasks we abandon.
+		 //System.err.println("calling killStragglers()...");
                  killStragglers(task.job, time);
 
                  // if there is a departure barrier, clear out the tasks
