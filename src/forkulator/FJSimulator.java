@@ -175,10 +175,16 @@ public class FJSimulator {
                     System.exit(0);
                 }
                 if (server_queue_spec.length != 2) {
-                    System.err.println("ERROR: server type \""+server_queue_type+"\" takes 1 argument: l (number of takss necessary for departure)");
+                    System.err.println("ERROR: server type \""+server_queue_type+"\" takes 1 argument: l (number or fraction of tasks necessary for departure)");
                     System.exit(0);
                 }
-                int l = Integer.parseInt(server_queue_spec[1]);
+                double ld = Double.parseDouble(server_queue_spec[1]);
+                int l = (int) Math.round(ld);
+                if (ld < 1.0) {
+                    // if the user gave the l parameter as a fraction of the tasks that need to complete,
+                    // compute the corresponding integer value of l
+                    l = (int) Math.round(ld * num_workers);
+                }
                 if (server_queue_type.toLowerCase().equals("bskl")) {
                     this.server = new FJBarrierKLServerStartBlockingOverhead(num_workers, l, true, false);
                 } else if (server_queue_type.toLowerCase().equals("bbskl")) {
