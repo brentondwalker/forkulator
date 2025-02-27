@@ -186,7 +186,9 @@ def main():
     #print("steady state:\n",ss)
     ssit = matrix_power(m , 10)
     print("stationary dist power: \n",ssit)
-    print("\n dotted:\n",np.dot(ssit, np.ones(ssit.shape[0])))
+    dotted = np.dot(ssit, np.ones(ssit.shape[0]))
+    print("\n dotted:\n", dotted)
+    print("\n normed:\n", dotted/np.linalg.norm(dotted, ord=1))
 
 
 # ======================================
