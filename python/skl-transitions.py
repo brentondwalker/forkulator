@@ -3,19 +3,14 @@ import math
 import sys
 import numpy as np
 np.set_printoptions(edgeitems=30, linewidth=100000, formatter={'float': lambda x: "{0:0.3f}".format(x)})
-from random import random
-from queue import PriorityQueue
-from enum import Enum
-import itertools
 import argparse
-from scipy.integrate import odeint
 
 
 class SysState:
     __global_id_counter__ = 0
 
     state_id = 0
-    statelen = 0
+    state_len = 0
     s = 0
     k = 0
     l = 0
@@ -47,7 +42,7 @@ class SysState:
     def __init__(self, s, k, l, Svec):
         self.state_id = SysState.__global_id_counter__
         SysState.__global_id_counter__ += 1
-        self.statelen = k - l + 1
+        self.state_len = k - l + 1
         self.s = s
         self.k = k
         self.l = l
@@ -169,6 +164,17 @@ def compute_steady_state(m):
     b = np.vstack((np.zeros((dimension - 1, 1)), [1]))
     return np.linalg.solve(MM, b).transpose()[0]
 
+def compute_stationary_linear(m):
+    print("\nshape=",m.shape)
+    dimension = m.shape[0]
+    #MM = np.vstack((m.transpose()[:-1] - np.identity(dimension), np.ones(dimension)))
+    MM = np.vstack((m.transpose(), np.ones(dimension)))
+    print("\nMM=\n",MM)
+    b = np.vstack((np.zeros((dimension - 1, 1)), [1]))
+    print("\nb=\n",b)
+    soln = np.linalg.solve(MM, b)
+    print("\nsoln=\n",soln)
+
 def build_cycle_classes(states:dict[tuple,SysState], m, m210):
     toler = 1e-15
     classes = {}
@@ -249,9 +255,19 @@ def main():
     print("\n dotted:\n", dotted)
     print("\n normed:\n", dotted/np.linalg.norm(dotted, ord=1))
 
-    print("\n  m * normed:\n", np.dot(m, dotted/np.linalg.norm(dotted, ord=1)))
+    print("\n  m.T * normed:\n", np.dot(m.T, dotted/np.linalg.norm(dotted, ord=1)))
 
     classes, class_transitions = build_cycle_classes(states, m, ssit)
+
+    print("\nm.T=\n",m.T)
+    #compute_stationary_linear(m)
+
+    evals, evecs = np.linalg.eig(m.T)
+    evec1 = -evecs[:, np.isclose(evals, 1)]
+    normevec1 = evec1 / np.linalg.norm(evec1, ord=1)
+    print("\nevals:\n", evals, "\nevecs:\n", evecs, "\nevec1:\n", evec1, "\nnormevec1:\n", normevec1)
+    print("\nm.T * normevec1=\n", np.dot(m.T, normevec1))
+
 
 # ======================================
 # ======================================
@@ -259,5 +275,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
