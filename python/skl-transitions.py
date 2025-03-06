@@ -29,15 +29,19 @@ class SysState:
         S2 = None
         num_tasks = 0
         weight = 0.0
+        job_start = False
+        job_departure = False
 
-        def __init__(self, S1, S2, num_tasks, weight):
+        def __init__(self, S1, S2, num_tasks, weight, job_start=False, job_departure = False):
             self.S1 = S1
             self.S2 = S2
             self.num_tasks = num_tasks
             self.weight = weight
+            self.job_start = job_start
+            self.job_departure = job_departure
 
         def __str__(self):
-            return "Transition: "+str(self.S1.Svec)+" --> "+str(self.S2.Svec)+"\tweight= "+str(self.weight)
+            return "Transition: "+str(self.S1.Svec)+" --> "+str(self.S2.Svec)+"\tweight= "+str(self.weight)+"\tstart="+str(self.job_start)+"\tdeparture="+str(self.job_departure)
 
 
     def __init__(self, s, k, l, Svec):
@@ -87,9 +91,9 @@ class SysState:
         #print("long_form=", lf)
         return lf
 
-    def add_transition(self, S2, job_size):
+    def add_transition(self, S2, job_size, job_start, job_departure):
         num_tasks = job_size * self.Svec[job_size - (self.k - self.l +1)]
-        self.transitions[S2.Svec] = SysState.Transition(self, S2, num_tasks, num_tasks / self.num_tasks)
+        self.transitions[S2.Svec] = SysState.Transition(self, S2, num_tasks, num_tasks / self.num_tasks, job_start, job_departure)
         print("\tadd_transition ", self.Svec, "-->", S2.Svec, num_tasks, self.num_tasks, (num_tasks/self.num_tasks))
         #for vec2, tr in self.transitions.items():
         #    print("\t\t")
@@ -102,6 +106,8 @@ def traverse_states(states: dict[tuple,SysState], S: SysState) -> object:
     # determine which transitions this state can have
     for r in range(len(S.Svec)):
         if S.Svec[r] > 0:
+            job_start = False
+            job_departure = False
             job_size = r + (S.k - S.l + 1)
             num_tasks = S.num_tasks
             # now consider what happens when a task in this set finishes
@@ -114,8 +120,10 @@ def traverse_states(states: dict[tuple,SysState], S: SysState) -> object:
                 new_vec[r-1] += 1
                 num_tasks -= 1
             else:
+                # otherwise a job departs
                 #print("\t**JOB departure from ",S.Svec)
                 num_tasks -= (S.k - S.l + 1)
+                job_departure = True
             # if enough tasks have finished, and new job will start
             # since l<k, the completion of one task can only free up enough capacity for one new job
             if (S.s - num_tasks) >= S.k:
@@ -123,12 +131,13 @@ def traverse_states(states: dict[tuple,SysState], S: SysState) -> object:
                 #print("\t\t", S.s, num_tasks, S.k)
                 new_vec[-1] += 1
                 num_tasks += S.k
+                job_start = True
             # create the state we transition to, if it does not already exist
             S2vec = tuple(new_vec)
             if S2vec not in states:
                 states[S2vec] = SysState(S.s, S.k, S.l, S2vec)
             S2 = states.get(S2vec)
-            S.add_transition(S2, job_size)
+            S.add_transition(S2, job_size, job_start, job_departure)
             traverse_states(states, S2)
 
 def create_markov_matrix(states):
@@ -254,9 +263,9 @@ def main():
     print("stationary dist power: \n",ssit)
     dotted = np.dot(ssit, np.ones(ssit.shape[0]))
     print("\n dotted:\n", dotted)
-    print("\n normed:\n", dotted/np.linalg.norm(dotted, ord=1))
+    print("\n normed:\n", dotted/sum(dotted))
 
-    print("\n  m.T * normed:\n", np.dot(m.T, dotted/np.linalg.norm(dotted, ord=1)))
+    print("\n  m.T * normed:\n", np.dot(m.T, dotted/sum(dotted)))
 
     classes, class_transitions = build_cycle_classes(states, m, ssit)
 
@@ -265,10 +274,23 @@ def main():
 
     evals, evecs = np.linalg.eig(m.T)
     evec1 = -evecs[:, np.isclose(evals, 1)]
-    normevec1 = evec1 / np.linalg.norm(evec1, ord=1)
+    #normevec1 = evec1 / np.linalg.norm(evec1, ord=1)
+    normevec1 = np.real(evec1 / sum(evec1))
     print("\nevals:\n", evals, "\nevecs:\n", evecs, "\nevec1:\n", evec1, "\nnormevec1:\n", normevec1)
     print("\nm.T * normevec1=\n", np.dot(m.T, normevec1))
 
+    # compute the departure rate
+    # In the backlogged steady state, what fraction of task completions lead to a job departure?
+    # In the steady state, the starting rate has to be the same as the departure rate.
+    no_depart_rate = 0.0
+    depart_rate = 0.0
+    for vec, S in states.items():
+        for vec2, tr in S.transitions.items():
+            if tr.job_departure:
+                depart_rate += normevec1[S.state_id] * tr.weight
+            else:
+                no_depart_rate += normevec1[S.state_id] * tr.weight
+    print("\ndepart weight:", depart_rate, "no depart weight:", no_depart_rate)
 
 # ======================================
 # ======================================
