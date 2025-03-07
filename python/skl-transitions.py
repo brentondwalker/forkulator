@@ -4,12 +4,7 @@ import math
 import sys
 import numpy as np
 np.set_printoptions(edgeitems=30, linewidth=100000, formatter={'float': lambda x: "{0:0.3f}".format(x)})
-from random import random
-from queue import PriorityQueue
-from enum import Enum
-import itertools
 import argparse
-from scipy.integrate import odeint
 
 
 class SysState:
@@ -284,18 +279,41 @@ def main():
     print("\nevals:\n", evals, "\nevecs:\n", evecs, "\nevec1:\n", evec1, "\nnormevec1:\n", normevec1)
     print("\nm.T * normevec1=\n", np.dot(m.T, normevec1))
 
+    # The rate of transitions out of the different states is different because they
+    # have different numbers of tasks running.  This is a Continuous-Time Markov Model,
+    # and we need to consider the holding time in the states.
+    # https://www.probabilitycourse.com/chapter11/11_3_2_stationary_and_limiting_distributions.php
+    ct_stationary = np.zeros(len(states))
+    holding_sum = 0.0
+    for vec, S in states.items():
+        ct_stationary[S.state_id] = normevec1[S.state_id,0] / S.num_tasks
+        holding_sum += normevec1[S.state_id,0] / S.num_tasks
+    ct_stationary /= holding_sum
+    print("\nCT Stationary Distr:\n", ct_stationary)
+
     # compute the departure rate
     # In the backlogged steady state, what fraction of task completions lead to a job departure?
-    # In the steady state, the starting rate has to be the same as the departure rate.
+    # In the steady state, the starting rate has to be the same as the departure rate, so we
+    # compute that too as a sanity check.
     no_depart_rate = 0.0
     depart_rate = 0.0
+    no_start_rate = 0.0
+    start_rate = 0.0
     for vec, S in states.items():
         for vec2, tr in S.transitions.items():
             if tr.job_departure:
-                depart_rate += normevec1[S.state_id] * tr.weight
+                depart_rate += ct_stationary[S.state_id] * tr.weight
             else:
-                no_depart_rate += normevec1[S.state_id] * tr.weight
+                no_depart_rate += ct_stationary[S.state_id] * tr.weight
+            if tr.job_start:
+                start_rate += ct_stationary[S.state_id] * tr.weight
+            else:
+                no_start_rate += ct_stationary[S.state_id] * tr.weight
+
     print("\ndepart weight:", depart_rate, "no depart weight:", no_depart_rate)
+    print("\nstart weight:", start_rate, "no start weight:", no_start_rate)
+
+
 
 # ======================================
 # ======================================
@@ -303,5 +321,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
