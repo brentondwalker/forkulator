@@ -34,7 +34,7 @@ np.set_printoptions(edgeitems=30, linewidth=100000, formatter={'float': lambda x
 import argparse
 import scipy.sparse
 import scipy.sparse.linalg
-from scipy.sparse import csr_matrix, csc_matrix
+from scipy.sparse import csr_matrix, csc_matrix, lil_matrix
 from scipy.sparse.linalg import spsolve
 
 ### for older versions of python
@@ -252,19 +252,21 @@ def create_rate_matrix(states):
 
 def create_rate_matrix_sparse(states):
     print("\ncreate_rate_matrix_sparse()")
-    Q = csr_matrix((len(states), len(states)))
+    #Q = csr_matrix((len(states), len(states)))
+    Ql = lil_matrix((len(states), len(states)))
     for vec, S in states.items():
         #print("vec:",vec, "S:",S)
         for vec2, tr in S.transitions.items():
             #print("\tvec2:",vec2, "tr:",tr)
-            Q[tr.S1.state_id, tr.S2.state_id] = tr.num_tasks
-    rowsums = Q.sum(axis=1)
+            Ql[tr.S1.state_id, tr.S2.state_id] = tr.num_tasks
+    rowsums = Ql.sum(axis=1)
     #print("rowsums=\n", rowsums)
     for vec, S in states.items():
         rs = rowsums[S.state_id]
         #print("sum:", rs)
-        Q[S.state_id, S.state_id] = -rs
-    return Q
+        Ql[S.state_id, S.state_id] = -rs
+    print("created lil_matrix...")
+    return Ql.tocsc()
 
 
 def matrix_power(m,n):
@@ -308,11 +310,27 @@ def compute_rate_stationary_sparse(m):
     #MM = scipy.sparse.vstack((m.transpose()[:-1], np.ones(dimension)))
     MM = m.transpose().copy()
     MM[-1,:] = 1
+    print("created MM...")
     #print("MM=\n", MM.todense())
     #b = np.vstack((np.zeros((dimension - 1, 1)), [1]))
     b = csc_matrix((dimension, 1))
     b[dimension-1] = 1
+    print("created b...")
     return spsolve(MM, b).transpose()
+
+def compute_rate_stationary_sparse_trick(m):
+    print("compute_rate_stationary_sparse_trick()")
+    dimension = m.shape[0]
+    #MM = scipy.sparse.vstack((m.transpose()[:-1], np.ones(dimension)))
+    MM = m[:-1,:-1].transpose()
+    print("MM=\n", MM.todense())
+    #b = np.vstack((np.zeros((dimension - 1, 1)), [1]))
+    b = m[:-1,-1]
+    x = spsolve(MM, b).transpose()
+    print("x = \n",x)
+    rowsum = x.sum()
+    print("rowsum = ",rowsum)
+    return x/rowsum
 
 
 def compute_stationary_linear(m):
@@ -439,8 +457,10 @@ def main():
     #print("\nweight matrix dense:\n", Q_dense)
     ##print("\nweight matrix:\n", Q.todense())
     #ctpi_dense = compute_steady_state(Q_dense)
+    #ctpi_trick = compute_rate_stationary_sparse_trick(Q)
     ctpi = compute_rate_stationary_sparse(Q)
     #print("\n ct pi dense:\n", ctpi_dense)
+    #print("\n ct pi trick:\n", ctpi_trick)
     print("\n ct pi:\n", ctpi)
     #print("\n Qt * ct pi dense:\n", np.dot(Q_dense.transpose(), ctpi_dense.transpose()))
     print("\n Qt * ct pi:\n", Q.transpose().dot(ctpi.transpose()))
