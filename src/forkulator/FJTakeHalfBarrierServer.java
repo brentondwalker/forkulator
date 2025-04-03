@@ -52,6 +52,14 @@ public class FJTakeHalfBarrierServer extends FJServer {
      * This type of server has a separate queue for each worker.
      */
     
+    /**
+     * To study the distributions of job parallelism and other stuff.
+     * Easy but sloppy way is just print it out and analyze in matlab.
+     * This is very specific to this scheduler type, so I'm just doing
+     * this the lazy way.
+     */
+    public static boolean PRINT_EXTRA_DATA = true;
+    
     /*
      * Data structures to keep track of the correspondence between workers and jobs.
      */
@@ -164,6 +172,7 @@ public class FJTakeHalfBarrierServer extends FJServer {
         // pick out some number of workers to use
         int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers * take_fraction));
         int initially_remaining_workers = remaining_workers;
+        if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+time+"\t"+nworkers);
         
         activeJobs.add(job);
         Vector<Integer> worker_pool = new Vector<Integer>();
