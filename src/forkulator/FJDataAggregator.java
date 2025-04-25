@@ -395,7 +395,7 @@ public class FJDataAggregator implements Serializable {
 		//
 		// make sure the distributions have been computed and are long enough
 		// to compute the quantiles we're interested in
-		Percentile percentile = new Percentile().withEstimationType(org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType.R_9);
+		Percentile percentile = new Percentile().withEstimationType(org.apache.commons.math3.stat.descriptive.rank.Percentile.EstimationType.R_8);
 		double q = (1.0 - 1.0e-6)*100.0;
 		result.add(percentile.evaluate(job_sojourn_time, q));
         result.add(percentile.evaluate(job_waiting_time, q));
