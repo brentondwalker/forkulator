@@ -18,6 +18,8 @@ This is a really rough approximation
 
 import math
 import sys
+from operator import truediv
+
 import numpy as np
 np.set_printoptions(edgeitems=30, linewidth=100000, formatter={'float': lambda x: "{0:0.3f}".format(x)})
 import argparse
@@ -71,7 +73,7 @@ class SysState:
         self.state_id = SysState.__global_id_counter__
         SysState.__global_id_counter__ += 1
         self.s = s
-        self.b = s - l
+        self.b = min(s - l, s)
         self.l = l
         self.transitions = {}
 
@@ -86,10 +88,9 @@ class SysState:
         print("\tadd_transition ", self.l, "-->", S2.l, "  weight=",weight)
 
 
-def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu) -> object:
+def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_frac = 0.5) -> object:
     unvisited = {S.l}
     states[S.l] = S
-    take_frac = 0.5
     while len(unvisited) > 0:
         #print("len(unvisited)=",len(unvisited), unvisited)
         l1 = unvisited.pop()
@@ -101,7 +102,22 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu) -> obj
             # equilibrium degree of parallelism
             # allow it to be fractional
             print("task completion transition")
-            parallelism = min(max(S1.l*take_frac/(1-take_frac), 1), S1.s*take_frac)
+            # Experimenting here with the parallelism limit for larger number of idle workers.
+            # In reality, the parallelism can't be any higher than s*take_frac.
+            # To have the number of busy worker be less than s*take_frac, it can only be
+            # through tasks finishing, and those tasks have parallelism at most s*take_frac.
+            # But the model seems more elegant (and matches results better) if we let it
+            # be simply the parallelism that would have gotten us directly to this point.
+            # That is, treat it like we arrived at this state from a job arrival to a state that
+            # had more than s idle workers.
+            # Notable, for s=32, the model with Ax=0.5 matches the shape of the real system with
+            # Ax=0.2 pretty well.  In the real system, those are some of the most exotic shaped
+            # distributions, so it is notable that it can achieve those.  Bot for other Ax, this
+            # approximation gives pretty awful results.
+            #parallelism = min(max(S1.l*take_frac/(1-take_frac), 1), S1.s*take_frac)
+            #parallelism = max(S1.l * take_frac / (1 - take_frac), 1)
+            # main lineage model
+            parallelism = max(math.log2(S1.s-S1.l), 1)
             print("\t S1 parallelism = ", parallelism)
             l2 = S1.l + 1
             if l2 not in states:
@@ -109,7 +125,9 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu) -> obj
             S2 = states.get(l2)
             # factor of S1.l because we are looking for the first task to finish out of
             # the S1.b that are running, so it is the 1. order statistic.
-            S1.add_transition(S2, max(S1.b,1)*mu*parallelism/S1.s, task_departure=True)
+            #S1.add_transition(S2, max(S1.b,1)*mu*parallelism/S1.s, task_departure=True)
+            # main lineage model
+            S1.add_transition(S2, mu * parallelism, task_departure=True)
             if not S2.visited:
                 unvisited.add(l2)
 
@@ -131,6 +149,22 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu) -> obj
         print("len(unvisited) = ", len(unvisited), list(unvisited))
 
 
+def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, queue:int) -> object:
+    # get the state with no idle workers
+    S1 = states.get(0)
+    # queued states are labeled with negative l
+    # intuition: less than 0 workers are available.  There is worker debt.
+    for l2 in range(-1, -queue, -1):
+        S2 = SysState(S1.s, l2)
+        S1.add_transition(S2, lmbda, job_start=True)
+        # rate of individual task/jobs is mu/s, but with s of them running, the
+        # min order statistic rate is s*mu/s = mu.
+        S2.add_transition(S1, mu, task_departure=True)
+        states[S2.l] = S2
+        S2.visited = True
+        S1 = S2
+
+
 def create_markov_matrix(states):
     m = np.zeros((len(states), len(states)))
     for vec, S in states.items():
@@ -142,18 +176,19 @@ def create_markov_matrix(states):
 
 def create_rate_matrix(states):
     print("\ncreate_rate_matrix()")
+    offset = min(states.keys())
     Q = np.zeros((len(states), len(states)))
     for l1, S1 in states.items():
         print("l1:",l1, "S1:",S1)
         for l2, tr in S1.transitions.items():
             print("\tl2:",l2, "tr:",tr)
             #Q[tr.S1.state_id, tr.S2.state_id] = tr.weight
-            Q[tr.S1.l, tr.S2.l] = tr.weight
+            Q[tr.S1.l-offset, tr.S2.l-offset] = tr.weight
     for l, S in states.items():
         #rs = sum(Q[S.state_id, :])
         #Q[S.state_id, S.state_id] = -rs
-        rs = sum(Q[S.l, :])
-        Q[S.l, S.l] = -rs
+        rs = sum(Q[S.l-offset, :])
+        Q[S.l-offset, S.l-offset] = -rs
     return Q
 
 
@@ -249,17 +284,23 @@ def main():
     parser.add_argument("-s", '--num_workers', type=int, default=12)
     parser.add_argument("-m", '--mu', type=float, default=1.0)
     parser.add_argument("-l", '--lmbda', type=float, default=0.5)
+    parser.add_argument("-f", '--takefrac', type=float, default=0.5)
+    parser.add_argument("-q", '--queue', type=int, default=0)
     args = parser.parse_args()
 
     s = args.num_workers
     mu = args.mu
     lmbda = args.lmbda
+    queue = args.queue
+    take_frac = args.takefrac
 
     S0 = SysState(s, s)
     print(S0)
     #S0.long_form()
     states = {s: S0}
-    traverse_states(states, S0, lmbda, mu)
+    traverse_states(states, S0, lmbda, mu, take_frac = take_frac)
+    if queue > 0:
+        add_queueing_states(states, lmbda, mu, queue)
 
     print("\nNumber of states: ", str(len(states)))
     #sys.exit()
@@ -323,6 +364,11 @@ def main():
     print("\n Qt * ct pi dense:\n", np.dot(Q_dense.transpose(), ctpi_dense.transpose()))
     #print("\n Qt * ct pi:\n", Q.transpose().dot(ctpi.transpose()))
     plt.plot(ctpi_dense)
+    if queue > 0:
+        plt.axvline(x=(queue-1), color='red')
+    plt.grid()
+    plt.xlabel('queue length | idle workers')
+    plt.ylabel('P(state)')
     plt.show()
 
     # compute the departure rate
