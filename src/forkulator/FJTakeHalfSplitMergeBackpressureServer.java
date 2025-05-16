@@ -321,7 +321,12 @@ public class FJTakeHalfSplitMergeBackpressureServer extends FJServer {
             // service the next job, if any
             feedWorkers(time);
         } else {
-            serviceTask(worker, worker.queue.poll(), time);
+            //XXX There was a possible bug.  With *no* departure barrier, when a worker completed all its
+            //    tasks, the worker would not be put back into service until the next job got queued, or
+            //    the job departed.  It was like a partial departure barrier.
+            //  This was the error: serviceTask(worker, worker.queue.poll(), time);
+            // Calling feedWorkers takes care of everything here...
+            feedWorkers(time);
         }
     }
 

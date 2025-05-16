@@ -171,8 +171,8 @@ public class FJTakeHalfBarrierServer extends FJServer {
 
         // pick out some number of workers to use
         int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers * take_fraction));
-        int initially_remaining_workers = remaining_workers;
-        if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+time+"\t"+nworkers);
+        //int initially_remaining_workers = remaining_workers;
+        if (PRINT_EXTRA_DATA) System.out.println("THJS\t"+job.arrival_time+"\t"+time+"\t"+nworkers+"\t"+remaining_workers);
         
         activeJobs.add(job);
         Vector<Integer> worker_pool = new Vector<Integer>();
@@ -215,7 +215,13 @@ public class FJTakeHalfBarrierServer extends FJServer {
          
          // only keep a reference to the job if the simulator tells us to
          job.setSample(sample);
+
+         // analysis of the algorithm
+         // PROBLEM: this records the remaining workers at the moment after the last job started
+         if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+remaining_workers);
+         int rwk = 0;
          
+
          job_queue.add(job);
          feedWorkers(job.arrival_time);
          if (FJSimulator.DEBUG) System.out.println("  queued a job.    New queue length: "+job_queue.size());
@@ -249,6 +255,11 @@ public class FJTakeHalfBarrierServer extends FJServer {
          }
          task.job.completed = compl;
          
+         // XXX is this correct?
+         // 1. if the job is completed, we feed the workers
+         // 2. else try to service the next task in this worker's queue
+         // 3. but what if this worker's queue is empty, there is no departure barrier, and
+         //    the job is not done??
          if (task.job.completed) {
         	 // if there is a departure barrier, clear out the tasks
         	 if (departure_barrier) {
@@ -270,7 +281,12 @@ public class FJTakeHalfBarrierServer extends FJServer {
              // service the next job, if possible, if any
              feedWorkers(time);
          } else {
-             serviceTask(worker, worker.queue.poll(), time);
+             //XXX There was a possible bug.  With *no* departure barrier, when a worker completed all its
+             //    tasks, the worker would not be put back into service until the next job got queued, or
+             //    the job departed.  It was like a partial departure barrier.
+             //  This was the error: serviceTask(worker, worker.queue.poll(), time);
+             // Calling feedWorkers takes care of everything here...
+             feedWorkers(time);
          }
      }
      
