@@ -19,7 +19,8 @@ This is a really rough approximation
 import math
 import sys
 from operator import truediv
-
+import csv
+import re
 import numpy as np
 np.set_printoptions(edgeitems=30, linewidth=100000, formatter={'float': lambda x: "{0:0.3f}".format(x)})
 import argparse
@@ -112,12 +113,28 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_f
             # had more than s idle workers.
             # Notable, for s=32, the model with Ax=0.5 matches the shape of the real system with
             # Ax=0.2 pretty well.  In the real system, those are some of the most exotic shaped
-            # distributions, so it is notable that it can achieve those.  Bot for other Ax, this
+            # distributions, so it is notable that it can achieve those.  But for other Ax, this
             # approximation gives pretty awful results.
             #parallelism = min(max(S1.l*take_frac/(1-take_frac), 1), S1.s*take_frac)
             #parallelism = max(S1.l * take_frac / (1 - take_frac), 1)
-            # main lineage model
-            parallelism = max(math.log2(S1.s-S1.l), 1)
+            # ####################
+            # BUGGY!!! main lineage model
+            #parallelism = max(math.log2(S1.s-S1.l), 1)
+            #parallelism = max(math.log2(S1.s - S1.l + 1), 1)  # the max is now redundant
+            #parallelism = math.log2(S1.s) - math.log2(max(S1.l,1))
+            #parallelism = max(math.log(S1.s-S1.l), 1)
+            #parallelism = np.sqrt(S1.s - S1.l)
+            parallelism = math.log2((S1.s - S1.l + 1)/S1.s)
+            # ####################
+            # limiting case distr
+            #parallelism = (S1.s-S1.l)/2
+            #parallelism = (S1.s - S1.l) / (S.s - S.l + 1)
+            # ####################
+            # FIXED main lineage model
+            # zero is a special case.  It has the same transition probs as l=1
+            #aa = math.log2(S1.s) - math.log2(max(1,S1.l))
+            # Archimedian sum
+            #parallelism = 2*max((1-(1/4)**(aa+1))/(3/4), 1)
             print("\t S1 parallelism = ", parallelism)
             l2 = S1.l + 1
             if l2 not in states:
@@ -369,6 +386,23 @@ def main():
     plt.grid()
     plt.xlabel('queue length | idle workers')
     plt.ylabel('P(state)')
+
+    # get corresponding simulator data
+    lmbda_string = re.sub(r'[\.]', '', str(lmbda))
+    filename = "../pdistr-tfb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    pdist_data = np.zeros((s+1, 2), float)
+    pcount = 0
+    with open(filename) as pdist_file:
+        reader = csv.reader(pdist_file, delimiter='\t')
+        for row in reader:
+            pdist_data[int(row[3]), 1] += 1
+            pcount += 1
+    for i in range(0,s+1):
+        pdist_data[i, 0] = i + queue-1
+        pdist_data[i, 1] /= pcount
+
+    print(pdist_data)
+    plt.plot(pdist_data[:,0], pdist_data[:,1], '--')
     plt.show()
 
     # compute the departure rate
