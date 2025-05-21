@@ -18,6 +18,7 @@ This is a really rough approximation
 
 import math
 import sys
+import os.path
 from operator import truediv
 import csv
 import re
@@ -28,6 +29,8 @@ import scipy.sparse
 import scipy.sparse.linalg
 from scipy.sparse import csr_matrix, csc_matrix, lil_matrix
 from scipy.sparse.linalg import spsolve
+from scipy.integrate import quad
+from scipy.special import gammainc, gamma
 import matplotlib.pyplot as plt
 
 ### for older versions of python
@@ -123,11 +126,14 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_f
             #parallelism = max(math.log2(S1.s - S1.l + 1), 1)  # the max is now redundant
             #parallelism = math.log2(S1.s) - math.log2(max(S1.l,1))
             #parallelism = max(math.log(S1.s-S1.l), 1)
-            #parallelism = np.sqrt(S1.s - S1.l)
+            parallelism = np.sqrt(S1.s - S1.l)
             #parallelism = math.log2((S1.s - S1.l + 1)/S1.s)
-            gamma = S1.l/S1.s
+            #gamma = S1.l/S1.s
             #parallelism = (1/S1.s + (0.5566 * gamma) - (0.5566 * gamma * gamma))*S1.s
-            parallelism = (1 / S1.s + (0.6 * gamma) - (0.6 * gamma * gamma)) * S1.s
+            #parallelism = (1 / S1.s + (0.6 * gamma) - (0.6 * gamma * gamma)) * S1.s
+            # #############################
+            # the mystery log2 model scaled for all s
+            #parallelism = (S1.s/32)*math.log2(32*(S1.s - S1.l)/S1.s + 1)
             # ####################
             # limiting case distr
             #parallelism = (S1.s-S1.l)/2
@@ -393,20 +399,21 @@ def main():
     # get corresponding simulator data
     lmbda_string = re.sub(r'[\.]', '', str(lmbda))
     filename = "../pdistr-tfb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
-    pdist_data = np.zeros((s+1, 2), float)
-    pcount = 0
-    with open(filename) as pdist_file:
-        reader = csv.reader(pdist_file, delimiter='\t')
-        for row in reader:
-            pdist_data[int(row[3]), 1] += 1
-            pcount += 1
-    for i in range(0,s+1):
-        pdist_data[i, 0] = i + queue-1
-        pdist_data[i, 1] /= pcount
+    if os.path.isfile(filename):
+        pdist_data = np.zeros((s+1, 2), float)
+        pcount = 0
+        with open(filename) as pdist_file:
+            reader = csv.reader(pdist_file, delimiter='\t')
+            for row in reader:
+                pdist_data[int(row[3]), 1] += 1
+                pcount += 1
+        for i in range(0,s+1):
+            pdist_data[i, 0] = i + queue-1
+            pdist_data[i, 1] /= pcount
 
-    print(pdist_data)
-    plt.plot(pdist_data[:,0], pdist_data[:,1], '--')
-    plt.show()
+        print(pdist_data)
+        plt.plot(pdist_data[:,0], pdist_data[:,1], '--')
+    #plt.show()
 
     # compute the departure rate
     # In the backlogged steady state, what fraction of task completions lead to a job departure?
@@ -419,6 +426,49 @@ def main():
     # in the common units of \mu (task service rate).
     print("\nNumber of states: ", str(len(states)))
 
+    # use the steady state distribution to predict the mean sojourn time
+    def cdf_erlk(x, k, lambd):
+        """CDF of Erlang-k distribution with rate parameter lambda."""
+        # Regularized lower incomplete gamma function
+        return gammainc(k, lambd * x)
+
+    def pdf_erlk(x, k, lambd):
+        """PDF of Erlang-k distribution with rate parameter lambda."""
+        if x < 0:
+            return 0
+        return (lambd ** k * x ** (k - 1) * np.exp(-lambd * x)) / gamma(k)
+
+    def pdf_max_erlk(x, n, k, lambd):
+        """PDF of the maximum of n independent Erlang-k random variables."""
+        if x < 0:
+            return 0
+        cdf_x = cdf_erlk(x, k, lambd)
+        pdf_x = pdf_erlk(x, k, lambd)
+        return n * (cdf_x ** (n - 1)) * pdf_x
+
+    def expected_value_max_erlk(n, k, lambd):
+        """Expected value of the maximum of n Erlang-k random variables."""
+        integral, _ = quad(lambda x: x * pdf_max_erlk(x, n, k, lambd), 0, np.inf)
+        return integral
+
+    expected_runtime_sum = 0.0
+    ctpi_sum = 0.0
+    for l in range(0,s):
+        # for now ignore the small ammt of probability in the queue
+        ctpi_sum += ctpi_dense[l+queue]
+        # There are z=max(1,l/2) composite tasks.  Each contains
+        # (s/z) exponential stages.  To compute the expected runtime,
+        # we need the expectation of the max order statistic of the z
+        # composite tasks.
+        num_tasks = max(1,l/2)
+        num_stages = s/num_tasks
+        print("num_tasks=", str(num_tasks), "num_stages=", str(num_stages))
+        ert = expected_value_max_erlk(num_tasks, num_stages, mu)
+        expected_runtime_sum += ctpi_dense[l+queue] * ert
+    print("ctpi_sum=", ctpi_sum)
+    print("expected_runtime_sum=", expected_runtime_sum)
+
+    plt.show()
 
 # ======================================
 # ======================================
