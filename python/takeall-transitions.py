@@ -133,29 +133,34 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_f
         S1.visited = True
         print("len(unvisited) = ", len(unvisited), list(unvisited))
 
-def lstate_condense(s:int, states: dict[tuple,SysState], ctpi_dense):
-    pi = np.zeros((2,s+1))
-    for i in range(0,s+1):
-        pi[0,i] = i
+def lstate_condense(s:int, queue:int, states: dict[tuple,SysState], ctpi_dense):
+    pi = np.zeros((2,s+1+queue))
+    for l in range(-queue,s+1):
+        pi[0,l+queue] = l
     for (l,h), S in states.items():
-        pi[1,l] += ctpi_dense[S.state_id]
+        pi[1,l+queue] += ctpi_dense[S.state_id]
     return pi
 
-def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, queue:int) -> object:
-    # XXX TODO!!!
-    # get the state with no idle workers
-    S1 = states.get((0,0))
-    # queued states are labeled with negative l
-    # intuition: less than 0 workers are available.  There is worker debt.
-    for l2 in range(-1, -queue, -1):
-        S2 = SysState(S1.s, l2)
-        S1.add_transition(S2, lmbda, job_start=True)
-        # rate of individual task/jobs is mu/s, but with s of them running, the
-        # min order statistic rate is s*mu/s = mu.
-        S2.add_transition(S1, mu, task_departure=True)
-        states[S2.l] = S2
-        S2.visited = True
-        S1 = S2
+def add_queueing_states(s:int, states: dict[tuple,SysState], lmbda:float, mu:float, queue:int) -> object:
+    for h in range(1,s+1):
+        # get the state with no idle workers
+        S1 = states.get((0,h))
+        # queued states are labeled with negative l
+        # intuition: less than 0 workers are available.  There is worker debt.
+        for l2 in range(-1, -queue, -1):
+            S2 = SysState(S1.s, l2, h)
+            S1.add_transition(S2, lmbda, job_start=True)
+            # rate of individual task/jobs is mu/s, but with s of them running, the
+            # min order statistic rate is s*mu/s = mu.
+            if l2 == -1:
+                h3 = math.ceil(h + 1 - h/s)
+                S3 = states.get((0,h3))
+                S2.add_transition(S3, mu, task_departure=True)
+            else:
+                S2.add_transition(S1, mu, task_departure=True)
+            states[(S2.l,h)] = S2
+            S2.visited = True
+            S1 = S2
 
 
 def create_markov_matrix(states):
@@ -169,7 +174,7 @@ def create_markov_matrix(states):
 
 def create_rate_matrix(states):
     print("\ncreate_rate_matrix()")
-    offset = min(states.keys())
+    #offset = min(states.keys())
     Q = np.zeros((len(states), len(states)))
     for (l1,h1), S1 in states.items():
         print("l1:",l1, "h1:", h1, "S1:",S1)
@@ -293,7 +298,7 @@ def main():
     states = {(s,0): S0}
     traverse_states(states, S0, lmbda, mu, take_frac = take_frac)
     if queue > 0:
-        add_queueing_states(states, lmbda, mu, queue)
+        add_queueing_states(s, states, lmbda, mu, queue)
 
     print("\nNumber of states: ", str(len(states)))
     #sys.exit()
@@ -315,13 +320,13 @@ def main():
     #print("\n ct pi:\n", ctpi)
     print("\n Qt * ct pi dense:\n", np.dot(Q_dense.transpose(), ctpi_dense.transpose()))
     #print("\n Qt * ct pi:\n", Q.transpose().dot(ctpi.transpose()))
-    lstate_pi = lstate_condense(s, states, ctpi_dense)
+    lstate_pi = lstate_condense(s, queue, states, ctpi_dense)
     print("\n lstate_pi:\n", lstate_pi)
     #sys.exit(0)
 
     plt.plot(lstate_pi[0,:], lstate_pi[1,:])
     if queue > 0:
-        plt.axvline(x=(queue-1), color='red')
+        plt.axvline(x=0, color='red')
     plt.grid()
     plt.xlabel('queue length | idle workers')
     plt.ylabel('P(state)')
