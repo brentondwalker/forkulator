@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 
 """
-Compute the markov model properties for the equilibrium approximation of a take-all parallel system.
+Compute the markov model properties for the equilibrium approximation of a take-half parallel system.
 
 S = number of workers
 B = number of busy workers
 I = number of idle workers
 F = 1/2 = take fraction (use 1/2 for now)
-H = height of the exponential stack on a worker
+
+This is a really rough approximation
+- treat each composite task as exponential, even though it is a sum of exponentials.
+- the service rate of the composite tasks is L*mu/S.
+- assume the system is in a sort of equilibrium where all the tasks currently running have the same rate.
 
 """
 
@@ -90,48 +94,75 @@ class SysState:
         print("\tadd_transition (", self.l, self.h, ") --> (", S2.l, S2.h, ")  weight=",weight)
 
 
-def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_frac = 0.5) -> object:
+def traverse_states_maxstack(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_frac = 0.5) -> object:
     unvisited = {(S.l,S.h)}
     states[S.l,S.h] = S
+    print("initial state: "+str(S))
     while len(unvisited) > 0:
         #print("len(unvisited)=",len(unvisited), unvisited)
         (l1,h1) = unvisited.pop()
         S1 = states.get((l1,h1))
 
-        # there is a task completion transition (except the zero state)
-        if S1.l < S1.s:
-            print("task completion transition")
+        # there is a "spacing" task completion transition (except the zero state)
+        # don't allow transitions into the l=s state unless the stack height is back down to 1
+        #if S1.l < S1.s and (S1.l < S1.s-1 or S1.h == 1):
+        # try with no inter-stack lateral transitions
+        if S1.l < S1.s and S1.h == 1:
+            #if S1.l < S1.s and (S1.l < S1.s - 1 or S1.h == 1):
+            print("task 'spacing' completion transition")
 
             l2 = S1.l + 1
-            h2 = max(h1-1, 1)
+            h2 = h1
             if (l2,h2) not in states:
                 states[l2,h2] = SysState(S1.s, l2, h2)
             S2 = states.get((l2,h2))
             # factor of S1.l because we are looking for the first task to finish out of
             # the S1.b that are running, so it is the 1. order statistic.
             #S1.add_transition(S2, max(S1.b,1)*mu*parallelism/S1.s, task_departure=True)
-            rate_factor = (S1.s-S1.l)/S1.h
+            #rate_factor = (S1.s-S1.l) / S1.s
+            rate_factor = (S1.s - S1.l)
+            #rate_factor = (S1.s - S1.l) / S1.h
+            #rate_factor = np.sqrt(S1.s - S1.l)
             print("\t S1 rate_factor = ", rate_factor)
-
             S1.add_transition(S2, mu * rate_factor, task_departure=True)
             if not S2.visited:
                 unvisited.add((l2,h2))
 
-        # there is a job arrival transition
-        if S1.h < S1.s:
+        # there is a max-stack task departure transition
+        # these are purely exponential
+        # though we model a single one of them, and there could be several,
+        # and the associated variance and order statistics...?
+        if S1.h > 1:
+            print("task 'max-stack' completion transition")
+            l2 = S1.l
+            h2 = S1.h - 1
+            if (l2,h2) not in states:
+                states[l2,h2] = SysState(S1.s, l2, h2)
+            S2 = states.get((l2,h2))
+            rate_factor = 1
+            print("\t S1 rate_factor = ", rate_factor)
+            S1.add_transition(S2, mu * rate_factor, task_departure=True)
+            if not S2.visited:
+                unvisited.add((l2,h2))
+
+        # finally the job arrival transition
+        if S1.l > 0:
             print("job arrival transition")
-            l2 = 0
-            h2 = math.ceil(S1.h + 1 - S1.l*S1.h/S1.s)
-            if l2 != S1.l or h2 != S1.h:
-                if (l2,h2) not in states:
-                    states[l2,h2] = SysState(S1.s, l2, h2)
-                S2 = states.get((l2,h2))
-                S1.add_transition(S2, lmbda, job_start=True)
-                if not S2.visited:
-                    unvisited.add((l2,h2))
+            parallelism = min(S1.l * take_frac, S1.s * take_frac)
+            print("\t S2 parallelism = ", S1.l, "*", take_frac, " = ", (S1.l * take_frac), "=",
+                  math.ceil(S1.l * take_frac), " = ", parallelism)
+            l2 = S1.l - math.ceil(parallelism)
+            h2 = round(S1.s / math.ceil(parallelism))  # round, or ceil here?  We want it to be the max stack...
+            if (l2,h2) not in states:
+                states[l2,h2] = SysState(S1.s, l2, h2)
+            S2 = states.get((l2,h2))
+            S1.add_transition(S2, lmbda, job_start=True)
+            if not S2.visited:
+                unvisited.add((l2,h2))
 
         S1.visited = True
         print("len(unvisited) = ", len(unvisited), list(unvisited))
+
 
 def lstate_condense(s:int, queue:int, states: dict[tuple,SysState], ctpi_dense):
     pi = np.zeros((2,s+1+queue))
@@ -142,26 +173,20 @@ def lstate_condense(s:int, queue:int, states: dict[tuple,SysState], ctpi_dense):
         pi[1,l+queue] += ctpi_dense[S.state_id]
     return pi
 
-def add_queueing_states(s:int, states: dict[tuple,SysState], lmbda:float, mu:float, queue:int) -> object:
-    for h in range(1,s+1):
-        # get the state with no idle workers
-        S1 = states.get((0,h))
-        # queued states are labeled with negative l
-        # intuition: less than 0 workers are available.  There is worker debt.
-        for l2 in range(-1, -queue, -1):
-            S2 = SysState(S1.s, l2, h)
-            S1.add_transition(S2, lmbda, job_start=True)
-            # rate of individual task/jobs is mu/s, but with s of them running, the
-            # min order statistic rate is s*mu/s = mu.
-            if l2 == -1:
-                h3 = math.ceil(h + 1 - h/s)
-                S3 = states.get((0,h3))
-                S2.add_transition(S3, mu, task_departure=True)
-            else:
-                S2.add_transition(S1, mu, task_departure=True)
-            states[(S2.l,h)] = S2
-            S2.visited = True
-            S1 = S2
+def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, queue:int) -> object:
+    # get the state with no idle workers
+    S1 = states.get(0)
+    # queued states are labeled with negative l
+    # intuition: less than 0 workers are available.  There is worker debt.
+    for l2 in range(-1, -queue, -1):
+        S2 = SysState(S1.s, l2)
+        S1.add_transition(S2, lmbda, job_start=True)
+        # rate of individual task/jobs is mu/s, but with s of them running, the
+        # min order statistic rate is s*mu/s = mu.
+        S2.add_transition(S1, mu, task_departure=True)
+        states[S2.l] = S2
+        S2.visited = True
+        S1 = S2
 
 
 def create_markov_matrix(states):
@@ -189,7 +214,6 @@ def create_rate_matrix(states):
         #rs = sum(Q[S.l-offset, :])
         #Q[S.l-offset, S.l-offset] = -rs
     return Q
-
 
 def matrix_power(m,n):
     # computes m^(2^n)
@@ -293,66 +317,62 @@ def main():
     queue = args.queue
     take_frac = args.takefrac
 
-    S0 = SysState(s, s, 0)
+    S0 = SysState(s, s, 1)
     print(S0)
-    #S0.long_form()
-    states = {(s,1): S0}
-    traverse_states(states, S0, lmbda, mu, take_frac = take_frac)
+    # S0.long_form()
+    states = {(S0.l, S0.h): S0}
+    traverse_states_maxstack(states, S0, lmbda, mu, take_frac = take_frac)
     if queue > 0:
-        add_queueing_states(s, states, lmbda, mu, queue)
+        add_queueing_states(states, lmbda, mu, queue)
 
     print("\nNumber of states: ", str(len(states)))
     #sys.exit()
 
-
-
     # compute stationary distribution by linearly solving the CTMC rate matrix
     Q_dense = create_rate_matrix(states)
-    #Q = create_rate_matrix_sparse(states)
+    # Q = create_rate_matrix_sparse(states)
     print("\nweight matrix dense:\n", Q_dense)
 
     ##print("\nweight matrix:\n", Q.todense())
     ctpi_dense = compute_steady_state(Q_dense)
 
-    #ctpi_trick = compute_rate_stationary_sparse_trick(Q)
-    #ctpi = compute_rate_stationary_sparse(Q)
+    # ctpi_trick = compute_rate_stationary_sparse_trick(Q)
+    # ctpi = compute_rate_stationary_sparse(Q)
     print("\n ct pi dense:\n", ctpi_dense)
-    #print("\n ct pi trick:\n", ctpi_trick)
-    #print("\n ct pi:\n", ctpi)
+    # print("\n ct pi trick:\n", ctpi_trick)
+    # print("\n ct pi:\n", ctpi)
     print("\n Qt * ct pi dense:\n", np.dot(Q_dense.transpose(), ctpi_dense.transpose()))
-    #print("\n Qt * ct pi:\n", Q.transpose().dot(ctpi.transpose()))
+    # print("\n Qt * ct pi:\n", Q.transpose().dot(ctpi.transpose()))
     lstate_pi = lstate_condense(s, queue, states, ctpi_dense)
     print("\n lstate_pi:\n", lstate_pi)
-    #sys.exit(0)
+    # sys.exit(0)
 
-    plt.plot(lstate_pi[0,:], lstate_pi[1,:])
+    plt.plot(lstate_pi[0, :], lstate_pi[1, :])
     if queue > 0:
         plt.axvline(x=0, color='red')
     plt.grid()
     plt.xlabel('queue length | idle workers')
     plt.ylabel('P(state)')
-    plt.show()
-    sys.exit(1)
+    #plt.show()
 
     # get corresponding simulator data
     lmbda_string = re.sub(r'[\.]', '', str(lmbda))
     filename = "../pdistr-tfb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
     if os.path.isfile(filename):
-        pdist_data = np.zeros((s+1, 2), float)
+        pdist_data = np.zeros((s + 1, 2), float)
         pcount = 0
         with open(filename) as pdist_file:
             reader = csv.reader(pdist_file, delimiter='\t')
             for row in reader:
                 pdist_data[int(row[3]), 1] += 1
                 pcount += 1
-        for i in range(0,s+1):
-            pdist_data[i, 0] = i + queue-1
+        for i in range(0, s + 1):
+            pdist_data[i, 0] = i + queue
             pdist_data[i, 1] /= pcount
 
         print(pdist_data)
-        plt.plot(pdist_data[:,0], pdist_data[:,1], '--')
+        plt.plot(pdist_data[:, 0], pdist_data[:, 1], '--')
     plt.show()
-
     # compute the departure rate
     # In the backlogged steady state, what fraction of task completions lead to a job departure?
     # In the steady state, the starting rate has to be the same as the departure rate, so we
