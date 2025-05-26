@@ -66,6 +66,7 @@ public class FJTakeHalfBarrierServer extends FJServer {
     private int remaining_workers;
     private Vector<FJJob> activeJobs;
     private HashMap<FJJob,Vector<Integer>> job2workers;
+    private HashMap<FJJob,Integer> job2parallelism;
     private FJJob[] worker2job;
     
     /**
@@ -89,6 +90,7 @@ public class FJTakeHalfBarrierServer extends FJServer {
 
         activeJobs = new Vector<FJJob>();
         job2workers = new HashMap<FJJob,Vector<Integer>>();
+        job2parallelism = new HashMap<FJJob,Integer>();
         worker2job = new FJJob[num_workers];
     }
     
@@ -124,6 +126,10 @@ public class FJTakeHalfBarrierServer extends FJServer {
                 	// back into circulation immediately.
                 	worker2job[w] = null;
                 	//System.out.println("freeing worker "+w+" (no barrier)");
+                	// how many workers did this job originally get?
+                	// we can't use job2workers because workers are removed from that as they finish.
+                	// add a new hashmap to keep track of it.
+                	if (PRINT_EXTRA_DATA) System.out.println("THTC\t"+time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+job2parallelism.get(job));
                 	freed_workers.add(w);
                 	remaining_workers++;
                 }
@@ -148,6 +154,7 @@ public class FJTakeHalfBarrierServer extends FJServer {
         for (FJJob job : completed_jobs) {
             activeJobs.remove(job);
             job2workers.remove(job);
+            job2parallelism.remove(job);
         }
         
         if (remaining_workers > 0) {
@@ -184,6 +191,7 @@ public class FJTakeHalfBarrierServer extends FJServer {
                 remaining_workers--;
             }
         }
+        job2parallelism.put(job,  worker_pool.size());
         
         //System.out.println("remaining_workers = "+initially_remaining_workers+"   worker_pool.size() = "+worker_pool.size()+"   nworkers = "+nworkers+"   activeJobs.size() = "+activeJobs.size()+"   queue size = "+this.job_queue.size());
         
@@ -219,8 +227,6 @@ public class FJTakeHalfBarrierServer extends FJServer {
          // analysis of the algorithm
          // PROBLEM: this records the remaining workers at the moment after the last job started
          if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+remaining_workers);
-         int rwk = 0;
-         
 
          job_queue.add(job);
          feedWorkers(job.arrival_time);
@@ -243,9 +249,12 @@ public class FJTakeHalfBarrierServer extends FJServer {
          
          // if there is a departure barrier, just leave the completed task
          // on the worker and clear them out when the job is done.
-         if (! departure_barrier) {
+         // this does not work!!  
+         // Even with a departure barrier, the worker has to service all the sub-tasks in its queue.
+         // This is handled in feedWorkers().
+         //if (! departure_barrier) {
         	 worker.current_task = null;
-         }
+         //}
          
          // check if this task was the last one of a job
          //TODO: this could be more efficient
