@@ -2,6 +2,7 @@
 
 """
 Compute the markov model properties for the equilibrium approximation of a take-half parallel system.
+This version designed to model the system with a departure barrier.
 
 S = number of workers
 B = number of busy workers
@@ -93,6 +94,14 @@ class SysState:
         self.transitions[S2.l,S2.h] = SysState.Transition(self, S2, weight, job_start, task_departure)
         print("\tadd_transition (", self.l, self.h, ") --> (", S2.l, S2.h, ")  weight=",weight)
 
+def log2_decomp(x):
+    powers = []
+    i = 1
+    while i <= x:
+        if i & x:
+            powers.append(i)
+        i <<= 1
+    return powers
 
 def traverse_states_maxstack(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_frac = 0.5) -> object:
     unvisited = {(S.l,S.h)}
@@ -106,36 +115,46 @@ def traverse_states_maxstack(states: dict[tuple,SysState], S: SysState, lmbda, m
         # there is a "spacing" task completion transition (except the zero state)
         # don't allow transitions into the l=s state unless the stack height is back down to 1
         #if S1.l < S1.s and (S1.l < S1.s-1 or S1.h == 1):
-        # try with no inter-stack lateral transitions
-        #if S1.l < S1.s and S1.h == 1:
-        if S1.l < S1.s and (S1.l < S1.s - 1 or S1.h == 1):
-            print("task 'spacing' completion transition")
-
-            l2 = S1.l + 1
-            h2 = h1
-            if (l2,h2) not in states:
-                states[l2,h2] = SysState(S1.s, l2, h2)
-            S2 = states.get((l2,h2))
-            # factor of S1.l because we are looking for the first task to finish out of
-            # the S1.b that are running, so it is the 1. order statistic.
-            #S1.add_transition(S2, max(S1.b,1)*mu*parallelism/S1.s, task_departure=True)
-            #rate_factor = (S1.s-S1.l) / S1.s
-            #rate_factor = (S1.s - S1.l)
-            rate_factor = (S1.s - S1.l) / (S1.h)
-            #rate_factor = np.sqrt(S1.s - S1.l)
-            #rate_factor = math.log2(S1.s - S1.l + 1)
-            # rate_factor = math.log(S1.s - S1.l + 1)/math.log(2)
-            #rate_factor = math.log(S1.s - S1.l + 1) + 0.577
-            #rate_factor = (S1.s/32)*math.log2(32*(S1.s - S1.l)/S1.s + 1)
-            print("\t S1 rate_factor = ", rate_factor)
-            S1.add_transition(S2, mu * rate_factor, task_departure=True)
-            if not S2.visited:
-                unvisited.add((l2,h2))
+        # with departure barriers there are no h>1 lateral transitions
+        # if S1.l < S1.s and (S1.l < S1.s - 1 or S1.h == 1):
+        if S1.l < S1.s and S1.h == 1:
+            print("job completion transition")
+            # decompose the busy workers into its powers of 2
+            # this decomposition assumes the most efficient path to b=s-l (i.e. low load)
+            powers = log2_decomp(S1.s-S1.l)
+            print("\t log2 decomposition (S1.l="+str(S1.l)+") = "+str(powers))
+            for bi in powers:
+                l2 = min(S1.s, S1.l + bi)
+                #h2 = h1
+                h2 = S1.s/bi
+                if (l2,h2) not in states:
+                    states[l2,h2] = SysState(S1.s, l2, h2)
+                S2 = states.get((l2,h2))
+                # factor of S1.l because we are looking for the first task to finish out of
+                # the S1.b that are running, so it is the 1. order statistic.
+                #S1.add_transition(S2, max(S1.b,1)*mu*parallelism/S1.s, task_departure=True)
+                #rate_factor = (S1.s-S1.l) / S1.s
+                # jumping across l states, in spacings mode.  Treat as exponential w rate mu*b/l?  Or just mu/l?
+                #rate_factor = (S1.s - S1.l)/max(S1.l, 1)
+                #rate_factor = bi/(S1.s-S1.l)
+                rate_factor = bi * (S1.s - S1.l)
+                #rate_factor = (S1.s - S1.l) / (S1.h)
+                #rate_factor = np.sqrt(S1.s - S1.l)
+                #rate_factor = math.log2(S1.s - S1.l + 1)
+                # rate_factor = math.log(S1.s - S1.l + 1)/math.log(2)
+                #rate_factor = math.log(S1.s - S1.l + 1) + 0.577
+                #rate_factor = (S1.s/32)*math.log2(32*(S1.s - S1.l)/S1.s + 1)
+                print("\t S1 rate_factor = ", rate_factor)
+                S1.add_transition(S2, mu * rate_factor, task_departure=True)
+                if not S2.visited:
+                    unvisited.add((l2,h2))
 
         # there is a max-stack task departure transition
         # these are purely exponential
         # though we model a single one of them, and there could be several,
         # and the associated variance and order statistics...?
+        # in the departure barrier case, we also should factor in that it's modeling the max order statistic.
+        # but how...?
         if S1.h > 1:
             print("task 'max-stack' completion transition")
             l2 = S1.l

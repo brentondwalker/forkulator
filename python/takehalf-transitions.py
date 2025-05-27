@@ -413,6 +413,24 @@ def main():
 
         print(pdist_data)
         plt.plot(pdist_data[:,0], pdist_data[:,1], '--')
+
+    # get simulator data with departure barrier
+    filename = "../pdistr-tfbb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    if os.path.isfile(filename):
+        pdist_data = np.zeros((s+1, 2), float)
+        pcount = 0
+        with open(filename) as pdist_file:
+            reader = csv.reader(pdist_file, delimiter='\t')
+            for row in reader:
+                pdist_data[int(row[3]), 1] += 1
+                pcount += 1
+        for i in range(0,s+1):
+            pdist_data[i, 0] = i + queue-1
+            pdist_data[i, 1] /= pcount
+
+        print(pdist_data)
+        plt.plot(pdist_data[:,0], pdist_data[:,1], '-.')
+
     #plt.show()
 
     # compute the departure rate

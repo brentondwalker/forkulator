@@ -27,8 +27,8 @@ def simulate_erlang_k_spacings(n, k, rate, num_simulations):
 
 
 # Parameters
-n = 1  # Number of random variables
-k = 16  # Shape parameter (Erlang-k)
+n = 2  # Number of random variables
+k = 64  # Shape parameter (Erlang-k)
 rate = 1.0  # Rate parameter (lambda)
 num_simulations = 100000  # Number of simulations
 include_x0 = True
