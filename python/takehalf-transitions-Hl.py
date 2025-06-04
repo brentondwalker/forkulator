@@ -133,6 +133,78 @@ def total_departure_probability(b, H, s):
         ss += ns
     return ss
 
+def num_possible_nonempty_bins_slimit(H, k, s):
+    """
+    Count the number of ways to distribute H identical balls into k distinguishable bins
+    such that each bin has at least 1 and at most s balls.
+    """
+    print(f"\t\tnum_possible_nonempty_bins_slimit(H={H}, k={k}, s={s})")
+    total = 0
+    for j in range(k + 1):
+        top = H - 1 - j * s
+        if top < k - 1:
+            continue  # Binomial coefficient is 0 if top < bottom
+        term = (-1) ** j * math.comb(k, j) * math.comb(top, k - 1)
+        total += term
+    return total
+
+def num_possible_bins_slimit(H, k, s):
+    """
+    Count the number of ways to distribute H identical balls into k distinguishable bins
+    where each bin can have between 0 and s balls (bins may be empty).
+    """
+    print(f"\t\tnum_possible_bins_slimit(H={H}, k={k}, s={s})")
+    total = 0
+    max_j = H // (s + 1)
+    for j in range(0, max_j + 1):
+        top = H - (s + 1) * j + k - 1
+        if top < k - 1:
+            continue  # binomial coefficient becomes zero
+        term = (-1) ** j * math.comb(k, j) * math.comb(top, k - 1)
+        total += term
+    return total
+
+def probability_n_bins_empty_slimit(b, H, n, s):
+    """Compute the probability that exactly n bins are empty."""
+    print(f"probability_n_bins_empty_slimit(b={b}, H={H}, n={n})")
+    k = b - n  # Bins that must have at least one ball
+
+    if H == 0 and k == 0:
+        return 1.0
+
+    if b < n or k < 0 or H < k:
+        return 0.0
+
+    # Number of ways to distribute H balls such that exactly k bins have between 1 and s balls
+    ways_to_fill_k_bins = math.comb(b, k) * num_possible_nonempty_bins_slimit(H, k, s)
+    sn = num_possible_nonempty_bins_slimit(H, k, s)
+    mc = math.comb(b, k)
+    print(f"\tways_to_fill_k_bins = {mc} * {sn} = {ways_to_fill_k_bins}")
+
+    # Total number of ways to distribute H indistinguishable balls into b distinguishable bins
+    total_ways = num_possible_bins_slimit(H, b, s)
+    print(f"\ttotal_ways = {total_ways}")
+
+    # Probability that exactly n bins are empty
+    probability = ways_to_fill_k_bins / total_ways
+
+    return probability
+
+def total_departure_probability_slimit(b, H, s):
+    min_backlogged_workers = math.ceil((H-b)/s)
+    min_singletask_workers = max(1, b - (H-b))
+    print(f"min_backlogged_workers={min_backlogged_workers}\t min_singletask_workers={min_singletask_workers}")
+    ss = 0.0
+    for i in range(min_singletask_workers, b-min_backlogged_workers+1):
+        # need to use (s-1) along with (H-b) here because we ensure that each busy
+        # worker has at least one stage.
+        pr = probability_n_bins_empty_slimit(b, H-b, i, s-1)
+        print(f"for {i} non-backlogged workers the prob is {pr:.6f}")
+        ns = (i/b) * pr
+        print(f"additional sum = {ns}")
+        ss += ns
+    return ss
+
 
 def traverse_states_maxstack(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_frac = 0.5) -> object:
     unvisited = {(S.l,S.H)}
@@ -148,7 +220,8 @@ def traverse_states_maxstack(states: dict[tuple,SysState], S: SysState, lmbda, m
         # it reduces H by one, and optionally increases l
         # XXX - Do I need to check any conditions on H here?
         if S1.l < S1.s:
-            task_departure_prob = total_departure_probability(S1.b, S1.H, S1.s)
+            #task_departure_prob = total_departure_probability(S1.b, S1.H, S1.s)
+            task_departure_prob = total_departure_probability_slimit(S1.b, S1.H, S1.s)
             print(f"\ttotal_departure_probability(b={S1.b}, H={S1.H}, s={S1.s}) = {task_departure_prob}")
 
             if (task_departure_prob < 1.0):
@@ -211,6 +284,9 @@ def lstate_condense(s:int, queue:int, states: dict[tuple,SysState], ctpi_dense):
     for (l,h), S in states.items():
         print("\t aggregate state ("+str(l)+","+str(h)+") to state l="+str(l)+"\tpr="+str(ctpi_dense[S.state_id]))
         pi[1,l+queue] += ctpi_dense[S.state_id]
+    # also sum up the probabability of being in a queue-backlogged state to the l=0 state.
+    for i in range(0,queue):
+        pi[1,queue] += pi[1,i]
     return pi
 
 def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, queue:int, s:int) -> object:
@@ -226,9 +302,10 @@ def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, que
         task_departure_prob = total_departure_probability(S1.b, S1.H, S1.s)
         print(f"\tQUEUE: total_departure_probability(b={S1.b}, H={S1.H}, s={S1.s}) = {task_departure_prob}")
         
-        for l2 in range(-1, -queue-1, -1):
+        for ll in range(0, -queue-1, -1):
             # the stage completion transition
             # this copies logic from traverse_states(), which is not ideal...
+            print(f"\nQUEUE: iterating ll={ll}")
             if S1.l < 0:
                 if (task_departure_prob < 1.0):
                     print("\t\tQUEUE: task stage completion transition: NO task departure")
@@ -264,6 +341,7 @@ def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, que
                 S1.add_transition(S2, lmbda, job_start=True)
             S1.visited = True
             S1 = S2
+
 
 def create_markov_matrix(states):
     m = np.zeros((len(states), len(states)))
@@ -443,7 +521,7 @@ def main():
                 pdist_data[int(row[3]), 1] += 1
                 pcount += 1
         for i in range(0, s + 1):
-            pdist_data[i, 0] = i + queue
+            pdist_data[i, 0] = i
             pdist_data[i, 1] /= pcount
 
         print(pdist_data)
@@ -460,7 +538,7 @@ def main():
                 pdist_bb_data[int(row[3]), 1] += 1
                 pcount += 1
         for i in range(0,s+1):
-            pdist_bb_data[i, 0] = i + queue
+            pdist_bb_data[i, 0] = i
             pdist_bb_data[i, 1] /= pcount
 
         print(pdist_bb_data)
@@ -505,9 +583,12 @@ def main():
 
     expected_runtime_sum = 0.0
     ctpi_sum = 0.0
-    for l in range(0,s):
+    expected_runtime_queue_sum = 0.0
+    ctpi_queue_sum = 0.0
+    for l in range(0,s+queue):
         # for now ignore the small ammt of probability in the queue
-        ctpi_sum += ctpi_dense[l+queue]
+        if l > queue:
+            ctpi_sum += ctpi_dense[l]
         # There are z=max(1,l/2) composite tasks.  Each contains
         # (s/z) exponential stages.  To compute the expected runtime,
         # we need the expectation of the max order statistic of the z
