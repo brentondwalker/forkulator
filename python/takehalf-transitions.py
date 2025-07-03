@@ -126,7 +126,7 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_f
             #parallelism = max(math.log2(S1.s - S1.l + 1), 1)  # the max is now redundant
             #parallelism = math.log2(S1.s) - math.log2(max(S1.l,1))
             #parallelism = max(math.log(S1.s-S1.l), 1)
-            parallelism = np.sqrt(S1.s - S1.l)
+            #parallelism = np.sqrt(S1.s - S1.l)
             #parallelism = math.log2((S1.s - S1.l + 1)/S1.s)
             #gamma = S1.l/S1.s
             #parallelism = (1/S1.s + (0.5566 * gamma) - (0.5566 * gamma * gamma))*S1.s
@@ -134,6 +134,7 @@ def traverse_states(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_f
             # #############################
             # the mystery log2 model scaled for all s
             #parallelism = (S1.s/32)*math.log2(32*(S1.s - S1.l)/S1.s + 1)
+            parallelism = (S1.s / 32) * (5 + math.log2((S1.s - S1.l) / S1.s + 1/32))
             # ####################
             # limiting case distr
             #parallelism = (S1.s-S1.l)/2

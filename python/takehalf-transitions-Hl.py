@@ -121,7 +121,7 @@ def total_departure_probability(b, H, s):
     if (b-1) < ((H-1) / s):
         print(f"TASK DEPARTURE TRANSITION BLOCKED BECAUSE (b-1)*s >= (H-1)")
         return 0.0
-    min_backlogged_workers = math.ceil((H-b)/s)
+    min_backlogged_workers = math.ceil((H-b)/(s-1))
     min_singletask_workers = max(1, b - (H-b))
     #print(f"min_backlogged_workers={min_backlogged_workers}\t min_singletask_workers={min_singletask_workers}")
     ss = 0.0
@@ -164,7 +164,8 @@ def num_possible_bins_slimit(H, k, s):
         total += term
     return total
 
-def probability_n_bins_empty_slimit(b, H, n, s):
+
+def probability_n_bins_empty_slimit_old(b, H, n, s):
     """Compute the probability that exactly n bins are empty."""
     print(f"probability_n_bins_empty_slimit(b={b}, H={H}, n={n})")
     k = b - n  # Bins that must have at least one ball
@@ -172,7 +173,7 @@ def probability_n_bins_empty_slimit(b, H, n, s):
     if H == 0 and k == 0:
         return 1.0
 
-    if b < n or k < 0 or H < k:
+    if k <= 0 or H < k:
         return 0.0
 
     # Number of ways to distribute H balls such that exactly k bins have between 1 and s balls
@@ -190,15 +191,61 @@ def probability_n_bins_empty_slimit(b, H, n, s):
 
     return probability
 
+def inclision_exclusion_N(H, b, s):
+    """
+    Count the number of ways to distribute H identical balls into b distinguishable bins
+    such that each bin has at least 1 and at most s balls.
+    """
+    print(f"\t\tnum_possible_nonempty_bins_slimit(H={H}, b={b}, s={s})")
+    total = 0
+    for j in range(b + 1):
+        top = H - 1 - j * s
+        if top < b - 1:
+            continue  # Binomial coefficient is 0 if top < bottom
+        term = (-1) ** j * math.comb(b, j) * math.comb(top, b - 1)
+        total += term
+    return total
+
+
+def probability_n_workers_almost_ready_slimit(b, H, n, s):
+    """
+    Compute the probability that exactly n of b busy workers are almost ready (exactly one stage remaining).
+    """
+    print(f"probability_n_bins_empty_slimit(b={b}, H={H}, n={n})")
+    k = b - n  # workers that are backlogged (at least two stages remaining)
+
+    if H == b and k == 0:
+        return 1.0
+
+    if k <= 0 or H < (b+k):
+        return 0.0
+
+    # Number of ways to stack (H-b) stages onto k=b-n backlogged workers
+    # (each workers gets between 1 and s-1 additional stages)
+    ways_to_stack_k_workers = math.comb(b, k) * inclision_exclusion_N(H-b, b-n, s-1)
+    sn = inclision_exclusion_N(H-b, b-n, s-1)
+    mc = math.comb(b, k)
+    print(f"\tways_to_stack_k_workers = {mc} * {sn} = {ways_to_stack_k_workers}")
+
+    # Total number of ways to distribute H indistinguishable balls into b distinguishable bins
+    total_ways = inclision_exclusion_N(H, b, s)
+    print(f"\ttotal_ways = {total_ways}")
+
+    # Probability that exactly n bins are empty
+    probability = ways_to_stack_k_workers / total_ways
+
+    return probability
+
 def total_departure_probability_slimit(b, H, s):
-    min_backlogged_workers = math.ceil((H-b)/s)
+    min_backlogged_workers = math.ceil((H-b)/(s-1))
     min_singletask_workers = max(1, b - (H-b))
     print(f"min_backlogged_workers={min_backlogged_workers}\t min_singletask_workers={min_singletask_workers}")
     ss = 0.0
     for i in range(min_singletask_workers, b-min_backlogged_workers+1):
         # need to use (s-1) along with (H-b) here because we ensure that each busy
         # worker has at least one stage.
-        pr = probability_n_bins_empty_slimit(b, H-b, i, s-1)
+        #pr = probability_n_bins_empty_slimit_old(b, H-b, i, s-1)
+        pr = probability_n_workers_almost_ready_slimit(b, H, i, s)
         print(f"for {i} non-backlogged workers the prob is {pr:.6f}")
         ns = (i/b) * pr
         print(f"additional sum = {ns}")
@@ -229,28 +276,30 @@ def traverse_states_maxstack(states: dict[tuple,SysState], S: SysState, lmbda, m
 
                 l2 = S1.l
                 H2 = H1 - 1
-                if (l2,H2) not in states:
-                    states[l2,H2] = SysState(S1.s, l2, H2)
-                S2 = states.get((l2,H2))
-                rate_factor = (1.0 - task_departure_prob) * S1.b
-                print("\t S1 rate_factor = ", rate_factor)
-                S1.add_transition(S2, mu * rate_factor, task_departure=True)
-                if not S2.visited:
-                    unvisited.add((l2,H2))
+                if H2 >= (S1.s - l2):
+                    if (l2,H2) not in states:
+                        states[l2,H2] = SysState(S1.s, l2, H2)
+                    S2 = states.get((l2,H2))
+                    rate_factor = (1.0 - task_departure_prob) * S1.b
+                    print("\t S1 rate_factor = ", rate_factor)
+                    S1.add_transition(S2, mu * rate_factor, task_departure=True)
+                    if not S2.visited:
+                        unvisited.add((l2,H2))
 
             if (task_departure_prob > 0.0):
                 print("task stage completion transition: WITH task departure")
 
                 l2 = S1.l + 1
                 H2 = H1 - 1
-                if (l2,H2) not in states:
-                    states[l2,H2] = SysState(S1.s, l2, H2)
-                S2 = states.get((l2,H2))
-                rate_factor = task_departure_prob * S1.b
-                print("\t S1 rate_factor = ", rate_factor)
-                S1.add_transition(S2, mu * rate_factor, task_departure=True)
-                if not S2.visited:
-                    unvisited.add((l2,H2))
+                if H2 >= (S1.s - l2):
+                    if (l2,H2) not in states:
+                        states[l2,H2] = SysState(S1.s, l2, H2)
+                    S2 = states.get((l2,H2))
+                    rate_factor = task_departure_prob * S1.b
+                    print("\t S1 rate_factor = ", rate_factor)
+                    S1.add_transition(S2, mu * rate_factor, task_departure=True)
+                    if not S2.visited:
+                        unvisited.add((l2,H2))
 
         # finally the job arrival transition
         if S1.l > 0:
@@ -512,6 +561,7 @@ def main():
     # get corresponding simulator data
     lmbda_string = re.sub(r'[\.]', '', str(lmbda))
     filename = "../pdistr-tfb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    #filename = "../pdistr-tfb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
     if os.path.isfile(filename):
         pdist_data = np.zeros((s + 1, 2), float)
         pcount = 0
@@ -529,6 +579,7 @@ def main():
 
     # get simulator data with departure barrier
     filename = "../pdistr-tfbb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    #filename = "../pdistr-tfbb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
     if os.path.isfile(filename):
         pdist_bb_data = np.zeros((s+1, 2), float)
         pcount = 0
