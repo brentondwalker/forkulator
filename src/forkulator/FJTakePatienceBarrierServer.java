@@ -250,15 +250,22 @@ public class FJTakePatienceBarrierServer extends FJServer {
         // decide whether to start the job or not...
         //System.out.println("compare: "+estimate1WorkerSpeedup(job)+" \t vs \t"+estimate1WorkerWait()+"\t(remaining_workers="+this.remaining_workers+")");
         if (estimate1WorkerSpeedup(job) > estimate1WorkerWait()) {
-            //if (FJSimulator.DEBUG) 
-            //System.out.println("\t... defer job start (remaining_workers="+this.remaining_workers+")");
+            if (FJSimulator.DEBUG) 
+                System.out.println("\t... defer job start ("+estimate1WorkerSpeedup(job)+" > "+estimate1WorkerWait()+")  (remaining_workers="+this.remaining_workers+")");
+            // Since we access the job_queue through the Queue interface, we have to cast it back to a LinkedList
+            // in order to push the job back to the head of the queue.
+            // This is simpler, because we don't have to modify feedWorkers(), but inelegant because
+            // we break the Queue abstraction.
+            LinkedList<FJJob> job_queue_as_list = (LinkedList<FJJob>)this.job_queue;
+            job_queue_as_list.addFirst(job);
             return;
         }
-
+        
         // pick out some number of workers to use
         int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers));
         //int initially_remaining_workers = remaining_workers;
         if (PRINT_EXTRA_DATA) System.out.println("THJS\t"+job.arrival_time+"\t"+time+"\t"+nworkers+"\t"+remaining_workers);
+        if (FJSimulator.DEBUG) System.out.println("\t... allocated "+this.remaining_workers+" workers to job "+job.path_log_id+"  (remaining_workers="+this.remaining_workers+")");
         
         activeJobs.add(job);
         Vector<Integer> worker_pool = new Vector<Integer>();
