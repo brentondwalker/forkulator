@@ -262,10 +262,9 @@ public class FJTakePatienceBarrierServer extends FJServer {
         }
         
         // pick out some number of workers to use
-        int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers));
+        int nworkers = remaining_workers;
         //int initially_remaining_workers = remaining_workers;
-        if (PRINT_EXTRA_DATA) System.out.println("THJS\t"+job.arrival_time+"\t"+time+"\t"+nworkers+"\t"+remaining_workers);
-        if (FJSimulator.DEBUG) System.out.println("\t... allocated "+this.remaining_workers+" workers to job "+job.path_log_id+"  (remaining_workers="+this.remaining_workers+")");
+        if (FJSimulator.DEBUG) System.out.println("\t... allocated "+nworkers+" workers to job "+job.path_log_id+"  (remaining_workers="+this.remaining_workers+")");
         
         activeJobs.add(job);
         Vector<Integer> worker_pool = new Vector<Integer>();
@@ -278,6 +277,7 @@ public class FJTakePatienceBarrierServer extends FJServer {
             }
         }
         job2parallelism.put(job,  worker_pool.size());
+        if (PRINT_EXTRA_DATA) System.out.println("THJS\t"+job.arrival_time+"\t"+time+"\t"+nworkers+"\t"+remaining_workers+"\t"+worker_pool.size());
         
         //System.out.println("remaining_workers = "+initially_remaining_workers+"   worker_pool.size() = "+worker_pool.size()+"   nworkers = "+nworkers+"   activeJobs.size() = "+activeJobs.size()+"   queue size = "+this.job_queue.size());
         

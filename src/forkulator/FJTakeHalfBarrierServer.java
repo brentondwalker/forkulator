@@ -177,7 +177,9 @@ public class FJTakeHalfBarrierServer extends FJServer {
         if (FJSimulator.DEBUG) System.out.println("begin service on job: "+job.path_log_id+"     "+time);
 
         // pick out some number of workers to use
-        int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers * take_fraction));
+        //XXX what was ever the idea with this (remaining_workers-1) thing!?
+        //int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers * take_fraction));
+        int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, remaining_workers * take_fraction);
         //int initially_remaining_workers = remaining_workers;
         if (PRINT_EXTRA_DATA) System.out.println("THJS\t"+job.arrival_time+"\t"+time+"\t"+nworkers+"\t"+remaining_workers);
         
