@@ -99,6 +99,8 @@ public class FJSimulator {
             this.server = new FJTakeHalfSplitMergeServer(num_workers, 0.5);
         } else if (server_queue_type.toLowerCase().equals("tp")) {
             this.server = new FJTakePatienceBarrierServer(num_workers, false, FJTakePatienceBarrierServer.TaskWaitComputationType.Min);
+        } else if (server_queue_type.toLowerCase().equals("tpa")) {
+            this.server = new FJTakePatienceBarrierServer(num_workers, false, FJTakePatienceBarrierServer.TaskWaitComputationType.Mean);
         } else if (server_queue_type.toLowerCase().equals("tfsm")) {
 			if (server_queue_spec.length != 2) {
 				System.err.println("ERROR: tfsm queue requires a numeric take_fraction parameter");
