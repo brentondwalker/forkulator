@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Vector;
+import org.apache.commons.math3.special.Gamma;
 
 public class FJTakePatienceBarrierServer extends FJServer {
 
@@ -39,11 +40,29 @@ public class FJTakePatienceBarrierServer extends FJServer {
      * There are (at least) two ways we can approximate the expected time we will need to
      * wait for the next available worker.  Based on the minimum task height, and based on
      * the mean task height.
+     * We can also predict the Expectation of the height(s) based on more observable
+     * information, such as time running.
      */
     public enum TaskWaitComputationType {
-        Min, Mean
+        Min, Mean, EWorkerHeightMean
     }
     public TaskWaitComputationType task_wait_comp_type = TaskWaitComputationType.Min;
+    
+    /**
+     * To facilitate the prediction of the current total height of the stages in service,
+     * the scheduler needs to keep track of:
+     * - the previous current height
+     * - time time when the previous height was recorded
+     * - the number of busy workers
+     * - stage service rate (this is actually in the service process)
+     * 
+     * XXX actually need to have a stage countdown for each worker, and not update it with
+     * intermediate heights.  That is conditioning it on these intermediate values, and seems
+     * to bias it.  WOuld need to figure out exactly how.
+     */
+    int[] worker2stage_height = null;
+    double[] worker2event_time = null;
+    double mu = 1.0;
     
     /**
      * To study the distributions of job parallelism and other stuff.
@@ -78,6 +97,8 @@ public class FJTakePatienceBarrierServer extends FJServer {
         for (int i=0; i<num_workers; i++) {
             workers[0][i].queue = new LinkedList<FJTask>();
         }
+        worker2stage_height = new int[num_workers];
+        worker2event_time = new double[num_workers];
         
         remaining_workers = num_workers;
 
@@ -85,6 +106,98 @@ public class FJTakePatienceBarrierServer extends FJServer {
         job2workers = new HashMap<FJJob,Vector<Integer>>();
         job2parallelism = new HashMap<FJJob,Integer>();
         worker2job = new FJJob[num_workers];
+    }
+
+    
+    /**
+     * Compute the expected number of exponential stages left  t.
+     * 
+     * Note: because we only look at non-idle workers, this estimate is biased to under-estimate
+     *       the number of stages remaining.  This is because most cases where it overestimates
+     *       the number of stages remaining on a worker (worker has 0, but it computes something>0)
+     *       are excluded from the computation.
+     *       
+     *       Even when we include those fractional over-estimates, the calculation is biased because
+     *       the sampled set of workers we have is right-biased.  When workers become idle, they 
+     *       will be quickly given new work, so the little fractional over-estimates are censored from the 
+     *       distribution.
+     *       Is this bias reset when the entire system becomes idle?
+     *       Could use a Kaplan-Meier estimator to correct?
+     *       It kind-of doesn't matter, except for the purpose of validating the estimator.  Our purpose
+     *       is to estimate H_i on a particular worker, and knowing that there are other censored workers
+     *       that are receiving over-estimates does not help with that...?
+     *       But we are summing up a bunch of these estimates, so the biases will add up.
+     *       We can correct for the sampling bias by dividing out the probability that the queue is
+     *       nonempty after the elapsed time.  No need for fancy Kaplan-Meier stuff.
+     * 
+     * @param H0  number of initial jobs in the queue
+     * @param mu exponential service rate
+     * @param t  time interval that passed E[N(t)]
+     * @return   expected number of stages left at time t
+     */
+    public double computeExpectedStagesLeft(double t) {
+        double expected = 0.0;
+        int true_height_total = 0;
+
+        for (int w=0; w<num_workers; w++) {
+            double worker_expected = 0.0;
+            int true_height = 0;
+            double dt = t - this.worker2event_time[w];
+            int H0 = this.worker2stage_height[w];
+            // try computing this for everyone, even idle workers
+            for (int i = 1; i <= H0; i++) {
+                double gammaQ = Gamma.regularizedGammaQ(i, mu * dt);
+                worker_expected += gammaQ;
+            }
+            // correction factor for right-censoring.
+            double bias_correction = Gamma.regularizedGammaQ(H0, mu*dt);
+            worker_expected /= bias_correction;
+            if (workers[0][w].current_task != null) {
+                true_height = workers[0][w].queue.size() + 1;
+                true_height_total += true_height;
+                if (PRINT_EXTRA_DATA) System.out.println("HEST\t****\t"+t+"\t"+w+"\t"+dt+"\t"+H0+"\t"+worker_expected+"\t"+true_height+"\t"+(true_height-worker_expected));
+                expected += worker_expected;
+            }
+        }
+
+        if (PRINT_EXTRA_DATA) System.out.println("HEST\t"+t+"\t"+expected+"\t"+true_height_total+"\t"+(true_height_total-expected)+"\nHEST");
+        return expected;
+    }
+
+    
+    /**
+     * DEPRECATED - Compute the expected number of exponential stages left  t.
+     * 
+     * @param H0  number of initial jobs in the queue
+     * @param mu exponential service rate
+     * @param t  time interval that passed E[N(t)]
+     * @return   expected number of stages left at time t
+     */
+    public double computeExpectedStagesLeftSingle(double H0, double mu, double t) {
+        double expected = 0.0;
+
+        for (int i = 1; i <= H0; i++) {
+            double gammaQ = Gamma.regularizedGammaQ(i, mu * t);
+            expected += gammaQ;
+        }
+
+        return expected;
+    }
+
+    
+    /**
+     * Compute the total number of exponential stages in service on the workers.
+     * 
+     * @return total_stage_height
+     */
+    public int computeTotalStageHeight() {
+        int H = 0;
+        for (FJWorker w : workers[0]) {
+            if (w.current_task != null) {
+                H += w.queue.size() + 1;
+            }
+        }
+        return H;
     }
     
     
@@ -115,17 +228,19 @@ public class FJTakePatienceBarrierServer extends FJServer {
                 // check if a task is being serviced now
                 if (workers[0][w].current_task != null) {
                     all_idle = false;
-                } else if (this.departure_barrier == false) {
-                    // if there is no departure barrier, then put the idle workers
-                    // back into circulation immediately.
-                    worker2job[w] = null;
-                    //System.out.println("freeing worker "+w+" (no barrier)");
-                    // how many workers did this job originally get?
-                    // we can't use job2workers because workers are removed from that as they finish.
-                    // add a new hashmap to keep track of it.
-                    if (PRINT_EXTRA_DATA) System.out.println("THTC\t"+time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+job2parallelism.get(job));
-                    freed_workers.add(w);
-                    remaining_workers++;
+                } else {                    
+                    if (this.departure_barrier == false) {
+                        // if there is no departure barrier, then put the idle workers
+                        // back into circulation immediately.
+                        worker2job[w] = null;
+                        //System.out.println("freeing worker "+w+" (no barrier)");
+                        // how many workers did this job originally get?
+                        // we can't use job2workers because workers are removed from that as they finish.
+                        // add a new hashmap to keep track of it.
+                        if (PRINT_EXTRA_DATA) System.out.println("THTC\t"+time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+job2parallelism.get(job));
+                        freed_workers.add(w);
+                        remaining_workers++;
+                    }
                 }
             }
             job2workers.get(job).removeAll(freed_workers);
@@ -193,7 +308,7 @@ public class FJTakePatienceBarrierServer extends FJServer {
      * 
      * @return
      */
-    private double estimate1WorkerWait() {
+    private double estimate1WorkerWait(double t) {
         double worker_wait = Double.POSITIVE_INFINITY;
         switch (task_wait_comp_type) {
         case Mean:
@@ -212,9 +327,12 @@ public class FJTakePatienceBarrierServer extends FJServer {
         case Min:
             int H1 = Integer.MAX_VALUE;
             boolean all_idle = true;
+            
+            //String debug_str = "THTP";
             for (FJWorker w : workers[0]) {
                 if (w.current_task != null) {
                     if (w.current_task != null) {
+                        //debug_str += "\t"+(w.queue.size()+1);
                         H1 = (w.queue.size()+1 < H1) ? w.queue.size()+1 : H1;
                         //System.out.println("\t +++ set H1="+H1+"\t queue_size="+w.queue.size());
                         all_idle = false;
@@ -222,6 +340,19 @@ public class FJTakePatienceBarrierServer extends FJServer {
                 }
             }
             worker_wait = (all_idle) ? 0.0 : (double)H1;
+            //if (PRINT_EXTRA_DATA) System.out.println(debug_str+"\t"+worker_wait);
+            break;
+            
+        case EWorkerHeightMean:
+            // predict the current total stage height based on what we know
+            double H_now = computeExpectedStagesLeft(t);
+            int bg = 0;
+            for (FJWorker w : workers[0]) {
+                if (w.current_task != null) {
+                    bg++;
+                }
+            }
+            worker_wait = ((double)H_now)/((double)bg);
             break;
         
         default:
@@ -249,9 +380,13 @@ public class FJTakePatienceBarrierServer extends FJServer {
         
         // decide whether to start the job or not...
         //System.out.println("compare: "+estimate1WorkerSpeedup(job)+" \t vs \t"+estimate1WorkerWait()+"\t(remaining_workers="+this.remaining_workers+")");
-        if (estimate1WorkerSpeedup(job) > estimate1WorkerWait()) {
+        double worker_speedup = estimate1WorkerSpeedup(job);
+        double worker_wait = estimate1WorkerWait(time);
+        //if (PRINT_EXTRA_DATA) System.out.println("THTP\t"+job.arrival_time+"\t"+time+"\t"+remaining_workers+"\t"+worker_speedup+"\t"+worker_wait);
+        if (worker_speedup > worker_wait) {
+            //if (PRINT_EXTRA_DATA) 
             if (FJSimulator.DEBUG) 
-                System.out.println("\t... defer job start ("+estimate1WorkerSpeedup(job)+" > "+estimate1WorkerWait()+")  (remaining_workers="+this.remaining_workers+")");
+                System.out.println("\tTHTP ... defer job start ("+worker_speedup+" > "+worker_wait+")  (remaining_workers="+this.remaining_workers+")");
             // Since we access the job_queue through the Queue interface, we have to cast it back to a LinkedList
             // in order to push the job back to the head of the queue.
             // This is simpler, because we don't have to modify feedWorkers(), but inelegant because
@@ -260,6 +395,7 @@ public class FJTakePatienceBarrierServer extends FJServer {
             job_queue_as_list.addFirst(job);
             return;
         }
+        //if (PRINT_EXTRA_DATA) System.out.println("\tTHTP ... start job now with workers: "+remaining_workers);
         
         // pick out some number of workers to use
         int nworkers = remaining_workers;
@@ -288,6 +424,14 @@ public class FJTakePatienceBarrierServer extends FJServer {
             workers[0][worker_pool.get(worker_index)].queue.add(t);
             //System.out.println("assigning job "+job+" task "+t+" to worker "+worker_pool.get(worker_index));
             worker_index = (worker_index + 1) % nworkers;
+        }
+        
+        // record info necessary for estimating the remaining stages later
+        for (int w : worker_pool) {
+            worker2event_time[w] = time;
+            // don't use queue.size()+1 here because we have not called feedWorkers() yet.
+            // none of the stages have been popped from the queue.
+            worker2stage_height[w] = workers[0][w].queue.size();
         }
         
         // These newly allocated workers will be idle.  Put them to work.
