@@ -334,8 +334,11 @@ def lstate_condense(s:int, queue:int, states: dict[tuple,SysState], ctpi_dense):
         print("\t aggregate state ("+str(l)+","+str(h)+") to state l="+str(l)+"\tpr="+str(ctpi_dense[S.state_id]))
         pi[1,l+queue] += ctpi_dense[S.state_id]
     # also sum up the probabability of being in a queue-backlogged state to the l=0 state.
-    for i in range(0,queue):
-        pi[1,queue] += pi[1,i]
+    # NONONONO Do not do this anymore.
+    # I've changed the simulator and processing code to include all the info about queueing states,
+    # so there's no need for this anymore.
+    #for i in range(0,queue):
+    #    pi[1,queue] += pi[1,i]
     return pi
 
 def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, queue:int, s:int) -> object:
@@ -550,7 +553,7 @@ def main():
     print("\n lstate_pi:\n", lstate_pi)
     # sys.exit(0)
 
-    plt.plot(lstate_pi[0, :], lstate_pi[1, :])
+    plt.plot(lstate_pi[0, :], lstate_pi[1, :], label='(H,l) Markov model')
     if queue > 0:
         plt.axvline(x=0, color='red')
     plt.grid()
@@ -560,26 +563,40 @@ def main():
 
     # get corresponding simulator data
     lmbda_string = re.sub(r'[\.]', '', str(lmbda))
-    filename = "../pdistr-tfb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
-    #filename = "../pdistr-tfb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    #filename = "../pdistr-tfb05-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    filename = "../pdistr-tfb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    print("loading file %s...\n" % (filename))
     if os.path.isfile(filename):
         pdist_data = np.zeros((s + 1, 2), float)
+        # record queue data going out to -s
+        qdist_data = np.zeros((s + 1, 2), float)
         pcount = 0
         with open(filename) as pdist_file:
             reader = csv.reader(pdist_file, delimiter='\t')
             for row in reader:
-                pdist_data[int(row[3]), 1] += 1
+                if int(row[3]) > 0 or int(row[4]) == 0:
+                    pdist_data[int(row[3]), 1] += 1
+                if int(row[4]) <= s and int(row[4]) > 0:
+                    qdist_data[int(row[4])-1, 1] += 1
                 pcount += 1
         for i in range(0, s + 1):
             pdist_data[i, 0] = i
             pdist_data[i, 1] /= pcount
+            qdist_data[i, 0] = -i
+            qdist_data[i, 1] /= pcount
+        qdist_data[0, 1] = pdist_data[0, 1]
 
-        print(pdist_data)
-        plt.plot(pdist_data[:, 0], pdist_data[:, 1], '--')
+        pqdist_data = np.concatenate((pdist_data, qdist_data))
+        pqdist_data = pqdist_data[pqdist_data[:, 0].argsort()]
+        print(pqdist_data)
+        plt.plot(pqdist_data[:, 0], pqdist_data[:, 1], '--', label='simulation')
+        #plt.plot(qdist_data[:, 0], qdist_data[:, 1], '--', label='simulation')
+        plt.xlim(-queue, s)
 
     # get simulator data with departure barrier
-    filename = "../pdistr-tfbb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
-    #filename = "../pdistr-tfbb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    filename = "../pdistr-tfbb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    #filename = "../pdistr-tfbb05-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    print("loading file %s...\n" % (filename))
     if os.path.isfile(filename):
         pdist_bb_data = np.zeros((s+1, 2), float)
         pcount = 0
@@ -593,8 +610,9 @@ def main():
             pdist_bb_data[i, 1] /= pcount
 
         print(pdist_bb_data)
-        plt.plot(pdist_bb_data[:,0], pdist_bb_data[:,1], '-.')
+        #plt.plot(pdist_bb_data[:,0], pdist_bb_data[:,1], '-.')
 
+    plt.legend(loc='upper left')
     plt.show()
     # compute the departure rate
     # In the backlogged steady state, what fraction of task completions lead to a job departure?
