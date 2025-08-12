@@ -155,12 +155,12 @@ public class FJTakePatienceBarrierServer extends FJServer {
             if (workers[0][w].current_task != null) {
                 true_height = workers[0][w].queue.size() + 1;
                 true_height_total += true_height;
-                if (PRINT_EXTRA_DATA) System.out.println("HEST\t****\t"+t+"\t"+w+"\t"+dt+"\t"+H0+"\t"+worker_expected+"\t"+true_height+"\t"+(true_height-worker_expected));
+                //if (PRINT_EXTRA_DATA) System.out.println("HEST\t****\t"+t+"\t"+w+"\t"+dt+"\t"+H0+"\t"+worker_expected+"\t"+true_height+"\t"+(true_height-worker_expected));
                 expected += worker_expected;
             }
         }
 
-        if (PRINT_EXTRA_DATA) System.out.println("HEST\t"+t+"\t"+expected+"\t"+true_height_total+"\t"+(true_height_total-expected)+"\nHEST");
+        //if (PRINT_EXTRA_DATA) System.out.println("HEST\t"+t+"\t"+expected+"\t"+true_height_total+"\t"+(true_height_total-expected)+"\nHEST");
         return expected;
     }
 
@@ -352,7 +352,7 @@ public class FJTakePatienceBarrierServer extends FJServer {
                     bg++;
                 }
             }
-            worker_wait = ((double)H_now)/((double)bg);
+            worker_wait = ((double)H_now)/((double)bg)/mu;
             break;
         
         default:
@@ -457,7 +457,9 @@ public class FJTakePatienceBarrierServer extends FJServer {
 
         // analysis of the algorithm
         // PROBLEM: this records the remaining workers at the moment after the last job started
-        if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+remaining_workers);
+        // WHAT??  No it doesn't.  It records at the time when a job arrives.  As long as that has an exponential
+        //         distribution, the PASTA principle says that these samples will give the time-average.
+        if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+remaining_workers+"\t"+job_queue.size());
 
         job_queue.add(job);
         feedWorkers(job.arrival_time);

@@ -58,7 +58,7 @@ public class FJTakeHalfBarrierServer extends FJServer {
      * This is very specific to this scheduler type, so I'm just doing
      * this the lazy way.
      */
-    public static boolean PRINT_EXTRA_DATA = true;
+    public static boolean PRINT_EXTRA_DATA = false;
     
     /*
      * Data structures to keep track of the correspondence between workers and jobs.
@@ -228,7 +228,9 @@ public class FJTakeHalfBarrierServer extends FJServer {
 
          // analysis of the algorithm
          // PROBLEM: this records the remaining workers at the moment after the last job started
-         if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+remaining_workers);
+         // WHAT??  No it doesn't.  It records at the time when a job arrives.  As long as that has an exponential
+         //         distribution, the PASTA principle says that these samples will give the time-average.
+         if (PRINT_EXTRA_DATA) System.out.println("THBS\t"+job.arrival_time+"\t"+job.arrival_time+"\t"+remaining_workers+"\t"+remaining_workers+"\t"+job_queue.size());
 
          job_queue.add(job);
          feedWorkers(job.arrival_time);
