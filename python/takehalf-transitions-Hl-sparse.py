@@ -250,7 +250,7 @@ def lH2state_debug(s, q):
             print(f"lH2state({l}, {h}, {s}) = {ii}")
 
 
-def create_sparse_transition_matrix_by_rows(s:int, mu:float, lmbda:float, q=0):
+def create_sparse_transition_matrix_by_rows(s:int, mu:float, lmbda:float, q=0, frac=0.5):
     # first compute the number of states
     k = s
     numstates:int = lh_matrix_size(s, k, q)
@@ -276,7 +276,7 @@ def create_sparse_transition_matrix_by_rows(s:int, mu:float, lmbda:float, q=0):
             if b < (s+q):
                 #print("** arrival")
                 if l > 0:
-                    l2 = math.floor(l/2)
+                    l2 = math.floor(l*frac)
                     h2 = h + k
                 else:
                     l2 = l - 1
@@ -451,7 +451,7 @@ def main():
     take_frac = args.takefrac
 
     #lH2state_debug(s, queue)
-    Q_byrows = create_sparse_transition_matrix_by_rows(s, mu, lmbda, queue)
+    Q_byrows = create_sparse_transition_matrix_by_rows(s, mu, lmbda, queue, take_frac)
     #with np.printoptions(precision=2):
     #    print(Q_byrows)
     ctpi = sparse_steady_state_ctmc(Q_byrows)
