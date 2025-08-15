@@ -1,0 +1,1063 @@
+#!/usr/bin/env python3
+
+"""
+Compute the markov model properties for the equilibrium approximation of a take-half parallel system.
+
+S = number of workers
+B = number of busy workers
+I = number of idle workers
+F = 1/2 = take fraction (use 1/2 for now)
+
+This is a really rough approximation
+- treat each composite task as exponential, even though it is a sum of exponentials.
+- the service rate of the composite tasks is L*mu/S.
+- assume the system is in a sort of equilibrium where all the tasks currently running have the same rate.
+
+"""
+
+
+import math
+import sys
+import os.path
+from operator import truediv
+import csv
+import re
+import numpy as np
+np.set_printoptions(edgeitems=30, linewidth=100000, formatter={'float': lambda x: "{0:0.3f}".format(x)})
+import argparse
+import scipy.sparse
+import scipy.sparse.linalg
+from scipy.sparse import csr_matrix, csc_matrix, lil_matrix
+from scipy.sparse.linalg import spsolve
+from scipy.integrate import quad
+from scipy.special import gammainc, gamma
+import matplotlib.pyplot as plt
+
+### for older versions of python
+# from typing import Dict
+
+
+class SysState:
+    """The state of an take-all barrier-mode parallel system."""
+    __global_id_counter__ = 0
+
+    state_id = 0
+    state_len = 0
+    s = 0
+    b = 0
+    l = 0
+    H = 0
+    transitions = None
+    visited = False
+    cycle_class = None
+
+    class Transition:
+        """A transition between two SysStates
+
+        A transition happens when one of the running tasks finishes,
+        or a new job arrives.
+        To assign the weight of this transition ..."""
+        S1 = None
+        S2 = None
+        weight = 0.0
+        job_start = False
+        task_departure = False
+
+        def __init__(self, S1, S2, weight, job_start=False, task_departure=False):
+            self.S1 = S1
+            self.S2 = S2
+            self.weight = weight
+            self.job_start = job_start
+            self.task_departure = task_departure
+
+        def __str__(self):
+            return "Transition: ("+str(self.S1.l)+","+str(self.S1.H)+") --> ("+str(self.S2.l)+","+str(self.S2.H)+") \tweight= "+str(self.weight)+"\tstart="+str(self.job_start)+"\tdeparture="+str(self.task_departure)
+
+
+    def __init__(self, s, l, H):
+        self.state_id = SysState.__global_id_counter__
+        SysState.__global_id_counter__ += 1
+        self.s = s
+        self.b = min(s - l, s)
+        self.l = l
+        self.H = H
+        self.transitions = {}
+
+        # sanity check
+        print("\ncreate SysState: (S, B, L, H) = (", self.s, self.b, self.l, self.H, ")  ID=", self.state_id)
+
+    def __str__(self):
+        return "SysState: (s,b,l, H)=("+str(self.s)+","+str(self.b)+","+str(self.l)+","+str(self.H)+")"
+
+    def add_transition(self, S2, weight, job_start=False, task_departure=False):
+        self.transitions[S2.l,S2.H] = SysState.Transition(self, S2, weight, job_start, task_departure)
+        print("\tadd_transition (", self.l, self.H, ") --> (", S2.l, S2.H, ")  weight=",weight)
+
+
+def probability_n_bins_empty(b, H, n):
+    """Compute the probability that exactly n bins are empty."""
+    print(f"\t\tprobability_n_bins_empty(b={b}, H={H}, n={n})")
+    k = b - n  # Bins that must have at least one ball
+    if b < n or k < 0:
+        return 0.0
+
+    # Number of ways to distribute the balls such that exactly k bins are non-empty
+    ways_to_fill_k_bins = math.comb(b, k) * math.comb(H-1, b-n-1)
+
+    # Total number of ways to distribute H indistinguishable balls into b distinguishable bins
+    total_ways = math.comb(H + b - 1, b - 1)
+
+    # Probability that exactly n bins are empty
+    probability = ways_to_fill_k_bins / total_ways
+
+    return probability
+
+
+def total_departure_probability(b, H, s):
+    if H <= b:
+        print(f"TASK DEPARTURE TRANSITION FORCED BECAUSE H <= b  ({H} <= {b})")
+        return 1.0
+    #if b <= (H/s):
+    if (b-1) < ((H-1) / s):
+        print(f"TASK DEPARTURE TRANSITION BLOCKED BECAUSE (b-1)*s >= (H-1)")
+        return 0.0
+    min_backlogged_workers = math.ceil((H-b)/(s-1))
+    min_singletask_workers = max(1, b - (H-b))
+    #print(f"min_backlogged_workers={min_backlogged_workers}\t min_singletask_workers={min_singletask_workers}")
+    ss = 0.0
+    for i in range(min_singletask_workers, b-min_backlogged_workers+1):
+        pr = probability_n_bins_empty(b, H-b, i)
+        #print(f"for {i} non-backlogged workers the prob is {pr:.6f}")
+        ns = (i/b) * pr
+        #print(f"additional sum = {ns}")
+        ss += ns
+    return ss
+
+def num_possible_nonempty_bins_slimit(H, k, s):
+    """
+    Count the number of ways to distribute H identical balls into k distinguishable bins
+    such that each bin has at least 1 and at most s balls.
+    """
+    print(f"\t\tnum_possible_nonempty_bins_slimit(H={H}, k={k}, s={s})")
+    total = 0
+    for j in range(k + 1):
+        top = H - 1 - j * s
+        if top < k - 1:
+            continue  # Binomial coefficient is 0 if top < bottom
+        term = (-1) ** j * math.comb(k, j) * math.comb(top, k - 1)
+        total += term
+    return total
+
+def num_possible_bins_slimit(H, k, s):
+    """
+    Count the number of ways to distribute H identical balls into k distinguishable bins
+    where each bin can have between 0 and s balls (bins may be empty).
+    """
+    print(f"\t\tnum_possible_bins_slimit(H={H}, k={k}, s={s})")
+    total = 0
+    max_j = H // (s + 1)
+    for j in range(0, max_j + 1):
+        top = H - (s + 1) * j + k - 1
+        if top < k - 1:
+            continue  # binomial coefficient becomes zero
+        term = (-1) ** j * math.comb(k, j) * math.comb(top, k - 1)
+        total += term
+    return total
+
+
+def probability_n_bins_empty_slimit_old(b, H, n, s):
+    """Compute the probability that exactly n bins are empty."""
+    print(f"probability_n_bins_empty_slimit(b={b}, H={H}, n={n})")
+    k = b - n  # Bins that must have at least one ball
+
+    if H == 0 and k == 0:
+        return 1.0
+
+    if k <= 0 or H < k:
+        return 0.0
+
+    # Number of ways to distribute H balls such that exactly k bins have between 1 and s balls
+    ways_to_fill_k_bins = math.comb(b, k) * num_possible_nonempty_bins_slimit(H, k, s)
+    sn = num_possible_nonempty_bins_slimit(H, k, s)
+    mc = math.comb(b, k)
+    print(f"\tways_to_fill_k_bins = {mc} * {sn} = {ways_to_fill_k_bins}")
+
+    # Total number of ways to distribute H indistinguishable balls into b distinguishable bins
+    total_ways = num_possible_bins_slimit(H, b, s)
+    print(f"\ttotal_ways = {total_ways}")
+
+    # Probability that exactly n bins are empty
+    probability = ways_to_fill_k_bins / total_ways
+
+    return probability
+
+def inclision_exclusion_N(H, b, s):
+    """
+    Count the number of ways to distribute H identical balls into b distinguishable bins
+    such that each bin has at least 1 and at most s balls.
+    """
+    print(f"\t\tnum_possible_nonempty_bins_slimit(H={H}, b={b}, s={s})")
+    total = 0
+    for j in range(b + 1):
+        top = H - 1 - j * s
+        if top < b - 1:
+            continue  # Binomial coefficient is 0 if top < bottom
+        term = (-1) ** j * math.comb(b, j) * math.comb(top, b - 1)
+        total += term
+    return total
+
+
+def probability_n_workers_almost_ready_slimit(b, H, n, s):
+    """
+    Compute the probability that exactly n of b busy workers are almost ready (exactly one stage remaining).
+    """
+    print(f"probability_n_bins_empty_slimit(b={b}, H={H}, n={n})")
+    k = b - n  # workers that are backlogged (at least two stages remaining)
+
+    if H == b and k == 0:
+        return 1.0
+
+    if k <= 0 or H < (b+k):
+        return 0.0
+
+    # Number of ways to stack (H-b) stages onto k=b-n backlogged workers
+    # (each workers gets between 1 and s-1 additional stages)
+    ways_to_stack_k_workers = math.comb(b, k) * inclision_exclusion_N(H-b, b-n, s-1)
+    sn = inclision_exclusion_N(H-b, b-n, s-1)
+    mc = math.comb(b, k)
+    print(f"\tways_to_stack_k_workers = {mc} * {sn} = {ways_to_stack_k_workers}")
+
+    # Total number of ways to distribute H indistinguishable balls into b distinguishable bins
+    total_ways = inclision_exclusion_N(H, b, s)
+    print(f"\ttotal_ways = {total_ways}")
+
+    # Probability that exactly n bins are empty
+    probability = ways_to_stack_k_workers / total_ways
+
+    return probability
+
+def total_departure_probability_slimit(b, H, s):
+    min_backlogged_workers = math.ceil((H-b)/(s-1))
+    min_singletask_workers = max(1, b - (H-b))
+    print(f"min_backlogged_workers={min_backlogged_workers}\t min_singletask_workers={min_singletask_workers}")
+    ss = 0.0
+    for i in range(min_singletask_workers, b-min_backlogged_workers+1):
+        # need to use (s-1) along with (H-b) here because we ensure that each busy
+        # worker has at least one stage.
+        #pr = probability_n_bins_empty_slimit_old(b, H-b, i, s-1)
+        pr = probability_n_workers_almost_ready_slimit(b, H, i, s)
+        print(f"for {i} non-backlogged workers the prob is {pr:.6f}")
+        ns = (i/b) * pr
+        print(f"additional sum = {ns}")
+        ss += ns
+    return ss
+
+
+def traverse_states_maxstack(states: dict[tuple,SysState], S: SysState, lmbda, mu, take_frac = 0.5) -> object:
+    unvisited = {(S.l,S.H)}
+    states[S.l,S.H] = S
+    print("initial state: "+str(S))
+    while len(unvisited) > 0:
+        print("len(unvisited)=",len(unvisited), unvisited)
+        (l1,H1) = unvisited.pop()
+        S1 = states.get((l1,H1))
+        print(f"\nTRAVERSING STATE: {S1}")
+
+        # there is only one task(stage) completion transition here
+        # it reduces H by one, and optionally increases l
+        # XXX - Do I need to check any conditions on H here?
+        if S1.l < S1.s:
+            #task_departure_prob = total_departure_probability(S1.b, S1.H, S1.s)
+            task_departure_prob = total_departure_probability_slimit(S1.b, S1.H, S1.s)
+            print(f"\ttotal_departure_probability(b={S1.b}, H={S1.H}, s={S1.s}) = {task_departure_prob}")
+
+            if (task_departure_prob < 1.0):
+                print("task stage completion transition: NO task departure")
+
+                l2 = S1.l
+                H2 = H1 - 1
+                if H2 >= (S1.s - l2):
+                    if (l2,H2) not in states:
+                        states[l2,H2] = SysState(S1.s, l2, H2)
+                    S2 = states.get((l2,H2))
+                    rate_factor = (1.0 - task_departure_prob) * S1.b
+                    print("\t S1 rate_factor = ", rate_factor)
+                    S1.add_transition(S2, mu * rate_factor, task_departure=True)
+                    if not S2.visited:
+                        unvisited.add((l2,H2))
+
+            if (task_departure_prob > 0.0):
+                print("task stage completion transition: WITH task departure")
+
+                l2 = S1.l + 1
+                H2 = H1 - 1
+                if H2 >= (S1.s - l2):
+                    if (l2,H2) not in states:
+                        states[l2,H2] = SysState(S1.s, l2, H2)
+                    S2 = states.get((l2,H2))
+                    rate_factor = task_departure_prob * S1.b
+                    print("\t S1 rate_factor = ", rate_factor)
+                    S1.add_transition(S2, mu * rate_factor, task_departure=True)
+                    if not S2.visited:
+                        unvisited.add((l2,H2))
+
+        # finally the job arrival transition
+        if S1.l > 0:
+            # check if we can add a job without exceeding the limit of H <= (b+1)*s
+            if (S1.H + S1.s) <= ((S1.b+1) * S1.s):
+                print("job arrival transition")
+                parallelism = min(S1.l * take_frac, S1.s * take_frac)
+                print("\t S2 parallelism = ", S1.l, "*", take_frac, " = ", (S1.l * take_frac), "=",
+                      math.ceil(S1.l * take_frac), " = ", parallelism)
+                l2 = S1.l - math.ceil(parallelism)
+                H2 = H1 + S1.s
+                if (l2,H2) not in states:
+                    states[l2,H2] = SysState(S1.s, l2, H2)
+                S2 = states.get((l2,H2))
+                S1.add_transition(S2, lmbda, job_start=True)
+                if not S2.visited:
+                    unvisited.add((l2,H2))
+            else:
+                print(f"ERROR: inconsistent system state for arrival: {S1}")
+                sys.exit(0)
+
+        # XXX if l==0 and no queue, new arrivals are ignored.
+        # we don't even increase H.  The additional load is just dropped on the floor.
+
+
+
+        S1.visited = True
+        print("len(unvisited) = ", len(unvisited), list(unvisited))
+
+
+def lstate_condense(s:int, queue:int, states: dict[tuple,SysState], ctpi_dense):
+    pi = np.zeros((2,s+1+queue))
+    for l in range(-queue,s+1):
+        pi[0,l+queue] = l
+    for (l,h), S in states.items():
+        print("\t aggregate state ("+str(l)+","+str(h)+") to state l="+str(l)+"\tpr="+str(ctpi_dense[S.state_id]))
+        pi[1,l+queue] += ctpi_dense[S.state_id]
+    # also sum up the probability of being in a queue-backlogged state to the l=0 state.
+    # NONONONO Do not do this anymore.
+    # I've changed the simulator and processing code to include all the info about queueing states,
+    # so there's no need for this anymore.
+    #for i in range(0,queue):
+    #    pi[1,queue] += pi[1,i]
+    return pi
+
+
+def add_queueing_states(states: dict[tuple,SysState], lmbda:float, mu:float, queue:int, s:int) -> object:
+    # for each height from s(min number of stages in service to have l=0)
+    # to s*s (max number of stages in service)
+    print(f"BUILD QUEUE...")
+    for H in range(s, s*s +1):
+        print(f"QUEUE: building queue layer H={H}")
+        # and for each height, build out the queue to length Q
+        S1 = states.get((0,H))
+        # the task departure probabilities for the base state will apply
+        # across this layer of the queue
+        task_departure_prob = total_departure_probability(S1.b, S1.H, S1.s)
+        print(f"\tQUEUE: total_departure_probability(b={S1.b}, H={S1.H}, s={S1.s}) = {task_departure_prob}")
+        
+        for ll in range(0, -queue-1, -1):
+            # the stage completion transition
+            # this copies logic from traverse_states(), which is not ideal...
+            print(f"\nQUEUE: iterating ll={ll}")
+            if S1.l < 0:
+                if (task_departure_prob < 1.0):
+                    print("\t\tQUEUE: task stage completion transition: NO task departure")
+                    l2 = S1.l
+                    H2 = H - 1
+                    if (l2,H2) not in states:
+                        states[l2,H2] = SysState(S1.s, l2, H2)
+                    S2 = states.get((l2,H2))
+                    rate_factor = (1.0 - task_departure_prob) * S1.b
+                    print("\t\t S1 rate_factor = ", rate_factor)
+                    S1.add_transition(S2, mu * rate_factor, task_departure=True)
+
+                if (task_departure_prob > 0.0):
+                    print("\t\tQUEUE: task stage completion transition: WITH task departure AND a dequeue")
+                    l2 = S1.l + 1
+                    H2 = H + s - 1  # dequeue a task
+                    if (l2,H2) not in states:
+                        states[l2,H2] = SysState(S1.s, l2, H2)
+                    S2 = states.get((l2,H2))
+                    rate_factor = task_departure_prob * S1.b
+                    print("\t\t S1 rate_factor = ", rate_factor)
+                    S1.add_transition(S2, mu * rate_factor, task_departure=True)
+            
+            # finally the job arrival transition
+            # just extends the queue
+            if S1.l > -queue:
+                print("\t\tQUEUE: job arrival transition")
+                l2 = S1.l - 1
+                H2 = H
+                if (l2,H2) not in states:
+                    states[l2,H2] = SysState(S1.s, l2, H2)
+                S2 = states.get((l2,H2))
+                S1.add_transition(S2, lmbda, job_start=True)
+            S1.visited = True
+            S1 = S2
+
+            # Note: when l==-queue we ignore arrivals.
+            # they just fall on the floor
+            # we don't even increase H
+
+def create_markov_matrix(states):
+    m = np.zeros((len(states), len(states)))
+    for vec, S in states.items():
+        print("vec:",vec, "S:",S)
+        for vec2, tr in S.transitions.items():
+            print("\tvec2:",vec2, "tr:",tr)
+            m[tr.S1.state_id, tr.S2.state_id] = tr.weight
+    return m
+
+def create_rate_matrix(states):
+    print("\ncreate_rate_matrix()")
+    #offset = min(states.keys())
+    Q = np.zeros((len(states), len(states)))
+    for (l1,h1), S1 in states.items():
+        print("l1:",l1, "h1:", h1, "S1:",S1)
+        for (l2,h2), tr in S1.transitions.items():
+            print("\tl2:",l2, "h2:",h2, "tr:",tr)
+            Q[tr.S1.state_id, tr.S2.state_id] = tr.weight
+            #Q[tr.S1.l-offset, tr.S2.l-offset] = tr.weight
+    for l, S in states.items():
+        rs = sum(Q[S.state_id, :])
+        Q[S.state_id, S.state_id] = -rs
+        #rs = sum(Q[S.l-offset, :])
+        #Q[S.l-offset, S.l-offset] = -rs
+    return Q
+
+def matrix_power(m,n):
+    # computes m^(2^n)
+    # matrices not positive-recurrent
+    # alternating cycle of stationary distributions
+    # https://jyyuan.wordpress.com/2014/03/23/on-stationary-distributions-of-discrete-markov-chains/
+    P = m.T
+    for i in range(n):
+        P = np.matmul(P,P)
+    return P
+
+def compute_stationary_iterative(m, n):
+    P = m.T
+    size = P.shape[0]
+    pi = np.zeros(size);  pi1 = np.zeros(size)
+    pi[0] = 1;
+    for i in range(n):
+        pi[0] = 1;
+
+def compute_rate_stationary(Q):
+    dimension = Q.shape[0]
+    b = np.zeros((dimension,1))
+    Qt = Q.transpose()
+    rk = np.linalg.matrix_rank(Qt)
+    print("\ncompute_rate_stationary()\ndimension:",dimension, "\nrank:",rk, "\nb:\n",b, "\nQt:\n", Qt)
+    return np.linalg.solve(Qt,b).transpose
+
+def compute_steady_state(m):
+    # https://vknight.org/blog/posts/continuous-time-markov-chains/
+    print("compute_steady_state()")
+    dimension = m.shape[0]
+    MM = np.vstack((m.transpose()[:-1], np.ones(dimension)))
+    b = np.vstack((np.zeros((dimension - 1, 1)), [1]))
+    return np.linalg.solve(MM, b).transpose()[0]
+
+
+
+def compute_stationary_linear(m):
+    print("\nshape=",m.shape)
+    dimension = m.shape[0]
+    #MM = np.vstack((m.transpose()[:-1] - np.identity(dimension), np.ones(dimension)))
+    MM = np.vstack((m.transpose(), np.ones(dimension)))
+    print("\nMM=\n",MM)
+    b = np.vstack((np.zeros((dimension - 1, 1)), [1]))
+    print("\nb=\n",b)
+    soln = np.linalg.solve(MM, b)
+    print("\nsoln=\n",soln)
+
+def build_cycle_classes(states:dict[tuple,SysState], m, m210):
+    toler = 1e-15
+    classes = {}
+    for vec, S in states.items():
+        # we could start in this state, and apply the transition matrix until the probability
+        # of coming back is positive.  That would work in our case, but in general it is not valid,
+        # because as long as the gcd of the cycles is 1, then the stationary distr. will exist.
+        # Instead, we look at the power of the transition matrix.
+        for j in range(len(states)):
+            if m210[S.state_id, j] > toler:
+                if j not in classes:
+                    classes[j] = []
+                classes[j].append(S)
+                S.cycle_class = j
+                break
+        if S.cycle_class is None:
+            print("ERROR: state was not found in any cycle class: ", S)
+    for i in range(len(classes)):
+        print("Cycle class ",str(i))
+        for S in classes[i]:
+            print("\t",S)
+
+    # Add up the transitions between cycle classes
+    # We know already from the structure of the cycle, that all the transitions
+    # of all states of one class, go to states of the next class.
+    # Therefore, the  weight we compute here will always be the number of states in
+    # the class.  When we normalize it, it will just be a permuted identity matrix.
+    num_classes = len(classes)
+    class_transitions = np.zeros((num_classes, num_classes))
+    for vec1, S in states.items():
+        for vec2, tr in S.transitions.items():
+            class_transitions[S.cycle_class, tr.S2.cycle_class] += tr.weight
+    row_sums = class_transitions.sum(axis=1)
+    class_transitions = class_transitions / row_sums[:, np.newaxis]
+    print("Class transitions:\n",class_transitions)
+
+    return classes, class_transitions
+
+
+
+def lh_matrix_size(s, k, q=0):
+    active_states = int((s+1) + (k-1)*s*(s+1)/2)
+    queueing_states = int(k*(s-1) + 1) * q
+    return active_states + queueing_states
+
+# from the (l,H) coordinate of the state, compute the state number in the CTMC matrix
+def lH2state(l, H, s):
+    k = s
+    if l < 0:
+        state_idx = lH2state(0, s*s, s)
+        q = -l
+        state_idx += (q - 1) * (k * (s-1) + 1) + (H-s) + 1
+        print(f"state_base(l={l}, H={H}, s={s}): \tstate_idx={state_idx}")
+    else:
+        b = s - l
+        if H < (s-l):
+            print(f"ERROR: H={H} < b={b} is too small!")
+            sys.exit(0)
+        if H > b*k:
+            print(f"ERROR: H={H} > b*k={b*k} is too large!")
+            sys.exit(0)
+        # start from the size of the submatrix one would have for a model with (b-1) states
+        #state_base = int((b) + (k)*(b-1)*(b)/2)
+        state_base = lh_matrix_size(b-1, k)
+        # add on the height minus non-feasible states
+        # and minus 1 because we index states from zero
+        state_idx = state_base + H - (b-1) - 1
+        print(f"state_base(l={l}, H={H}, s={s}): state_base={state_base} \tstate_idx={state_idx}")
+    return state_idx
+
+
+def create_D_block(Q, s, b, mu):
+    print(f"create_D_block(s={s}, b={b})")
+    if b == 0:
+        return
+    H = b
+    l = s - b
+    k = s
+    state_idx_base = lH2state(l, H, s)
+    #for i in range(b,b*k):
+    for i in range(state_idx_base, state_idx_base + b*(k-1)):
+        H += 1
+        #XXX do not really need this if/else
+        # phi_bar will become 1 for the last (k-1) values
+        if H <= k*(b-1)+1:
+            # concern that I am reversing phi and phi_bar?
+            # for H=b it returns zero
+            phi_bar = 1.0 - total_departure_probability(b, H, s)
+            Q[i+1,i] = b * mu * phi_bar
+        else:
+            Q[i+1,i] = b * mu
+
+        print(f"\tQ[{i+1}, {i}]  = {Q[i+1,i]} \t  H={H}")
+
+
+def create_G_block(Q, s, b, mu):
+    print(f"create_G_block(s={s}, b={b})")
+    if b == 0:
+        return
+    l = s - b
+    k = s
+    true_busy = b if b<s else s
+    H = true_busy
+    state_idx_base = lH2state(l, H, s)
+    #for i in range(b,b*k):
+    for i in range(state_idx_base, state_idx_base + true_busy*(k-1)):
+        H += 1
+        #XXX do not really need this if/else
+        # phi_bar will become 1 for the last (k-1) values
+        if H <= k*(true_busy-1)+1:
+            # concern that I am reversing phi and phi_bar?
+            # for H=b it returns zero
+            phi_bar = 1.0 - total_departure_probability(true_busy, H, s)
+            Q[i+1,i] = true_busy * mu * phi_bar
+        else:
+            Q[i+1,i] = true_busy * mu
+
+        print(f"\tQ[{i+1}, {i}]  = {Q[i+1,i]} \t  H={H}")
+
+
+def create_G_block_junk(Q, s, b, mu):
+    # a G block is like a D block, but in the queueing states.
+    # according to my notes, a G block should be the same s D_0
+    # for these arguments, we'll let b > s represent the queueing states,
+    # consistent with how we let l<0 represent queueing states.
+    # This preserves the b=s-l relationship.
+    print(f"create_G_block(s={s}, b={b})")
+    if b == 0:
+        return
+    H = b
+    l = s - b
+    k = s
+    # Changing b to s in these two lines is the main change from the D0 block.
+    # and changing b to s in the departure rate calculations
+    # In the queueing states, the blocks do not change size with b.
+    state_idx_base = lH2state(l, H, s)
+    for i in range(state_idx_base, state_idx_base + s*(k-1)):
+        H += 1
+        #XXX do not really need this if/else
+        # phi_bar will become 1 for the last (k-1) values
+        if H <= k*(s-1)+1:
+            # concern that I am reversing phi and phi_bar?
+            # for H=b it returns zero
+            phi_bar = 1.0 - total_departure_probability(s, H, s)
+            Q[i+1,i] = s * mu * phi_bar
+        else:
+            Q[i+1,i] = s * mu
+
+        print(f"\tQ[{i+1}, {i}]  = {Q[i+1,i]} \t  H={H}")
+
+def create_B_block(Q, s, b, mu):
+    print(f"create_B_block(s={s}, b={b}, l={s-b})")
+    if b == 0:
+        return
+    H = b
+    l = s - b
+    k = s
+    row = lH2state(l, H, s)
+    col = lH2state(l+1, H-1, s)
+    for i in range(0, (b - 1) * (k - 1) + 1):
+        phi = total_departure_probability(b, H+i, s)
+        Q[row+i,col+i] = b * mu * phi
+        print(f"\t i={i}\t Q[{row+i}, {col+i}] = {Q[row+i,col+i]}\t\tphi = {phi}")
+
+
+def create_K_block(Q, s, b, mu):
+    # this is the queueing state analogue of the sub-diagonal B blocks
+    print(f"create_K_block(s={s}, b={b}, l={s-b})")
+    if b == 0:
+        return
+    H = s
+    l = s - b
+    k = s
+    row = lH2state(l, H, s)
+    col = lH2state(l+1, H+k-1, s)
+    for i in range(0, (s - 1) * (k - 1) + 1):
+        phi = total_departure_probability(s, H+i, s)
+        Q[row+i,col+i] = s * mu * phi
+        print(f"\t i={i}\t Q[{row+i}, {col+i}] = {Q[row+i,col+i]}\t\tphi = {phi}")
+
+
+def create_A_block(Q, s, b, lmbda):
+    print(f"create_A_block(s={s}, b={b}, l={s-b})")
+    if b < 0:
+        return
+    H = b
+    l = s - b
+    k = s
+    l2 = int(np.floor(l/2))
+    b2 = s - l2
+    row = lH2state(l, H, s)
+    col = lH2state(l2, H+k, s)
+    for i in range(0, (k-1)*b+1):
+        Q[row+i,col+i] = lmbda
+        print(f"\t i={i}\t Q[{row+i}, {col+i}] = {Q[row+i,col+i]}")
+
+def create_truncated_A_block(Q, s, lmbda):
+    # used when we have no queueing states
+    # the (l=0,H) states just transition to (l=0, H+k)
+    # optional
+    # relates to the limitations of the finite model.  How we should handle them...
+    # using this gives a different model than the state-traversal method.
+    print(f"create_truncated_A_block(s={s})")
+    b = s
+    H = b
+    l = s - b
+    k = s
+    row = lH2state(l, H, s)
+    col = lH2state(l, min(H+k, k*s), s)
+    for H in range(b, k*b+1):
+        Q[row,col] = lmbda
+        print(f"\t H={H}\t Q[{row}, {col}] = {Q[row,col]}")
+        row += 1
+        if H+k < k*s:
+            col += 1
+
+
+def create_diagonal_entries(Q, s, mu, lmbda, q=0):
+    print(f"create_diagonal_entries(s={s}, mu={mu}, lmbda={lmbda})")
+    k = s
+    i = 0
+    for b in range(0, s+q+1):
+        true_busy = b if b<s else s
+        maxH = b*k if b<s else s*k
+        for H in range(true_busy, maxH+1):
+            l = s - b
+            phi = total_departure_probability(true_busy, H, s)
+            phi_bar = 1.0 - phi
+            entry = 0
+            if l > -q:
+                entry -= lmbda
+            if H != true_busy:
+                entry -= true_busy * mu * phi_bar
+            if (true_busy <= H) and (H <= (true_busy-1)*k+1):
+                entry -= true_busy * mu * phi
+            Q[i,i] = entry
+            print(f"\t\ti={i}\tl={l}\tH={H}\tQ[{i},{i}]={Q[i,i]}")
+            i += 1
+    Q[-1,-1] = -s * mu
+
+
+
+
+
+def create_AQ_block(Q, s, b, lmbda):
+    # this is the queueing state version of the job arrival A blocks
+    # the placement and size is different from the normal ones, but
+    # it is still just a diagonal of lambdas
+    # this version should work for all l/b values
+    print(f"create_AQ_block(s={s}, b={b}, l={s-b})")
+    if b < 0:
+        return
+    true_busy = b if b<s else s
+    H = true_busy
+    l = s - b
+    k = s
+    l2 = 0
+    blocksize = 0
+    row = lH2state(l, H, s)
+    if l <= 0:
+        # queueing state
+        l2 = l - 1
+        col = lH2state(l2, H, s)
+        blocksize = (k-1)*s+1
+    else:
+        # non-queueing state
+        l2 = int(np.floor(l/2))
+        col = lH2state(l2, H + k, s)
+        blocksize = (k-1)*b+1
+    b2 = s - l2
+    for i in range(0, blocksize):
+        Q[row+i,col+i] = lmbda
+        print(f"\t i={i}\t Q[{row+i}, {col+i}] = {Q[row+i,col+i]}")
+
+
+def create_sparse_transition_matrix(s:int, mu:float, lmbda:float, q=0):
+    # first compute the number of states
+    k = s
+    numstates:int = lh_matrix_size(s, k, q)
+    print("numstates", numstates)
+
+    # get a big sparse matrix...
+    Q = np.zeros((numstates, numstates))
+
+    # for convenience, keep an index of the state
+    state_idx = 0
+
+    # iterate over all b values
+    # note to self: phi(l,h) = total_departure_probability(b, H, s)
+    for b in range(1,s+1):
+        l = s - b
+        create_D_block(Q, s, b, mu)
+        create_B_block(Q, s, b, mu)
+        create_A_block(Q, s, b-1, lmbda)
+
+    for b in range(s+1, s+q+1):
+        l = s - b
+        create_G_block(Q, s, b, mu)
+        create_K_block(Q, s, b, mu)
+        create_AQ_block(Q, s, b - 1, lmbda)
+
+    #create_truncated_A_block(Q, s, lmbda)
+    create_diagonal_entries(Q, s, mu, lmbda, q)
+
+    # check that the rows sum to zero
+    print("sum of rows:")
+    #with np.printoptions(precision=2):
+    print(Q.sum(1))
+
+    return Q
+
+def create_sparse_transition_matrix_by_rows(s:int, mu:float, lmbda:float, q=0):
+    # first compute the number of states
+    k = s
+    numstates:int = lh_matrix_size(s, k, q)
+    print("numstates", numstates)
+
+    # get a big sparse matrix...
+    Q = np.zeros((numstates, numstates))
+
+    # for convenience, keep an index of the state
+    state_idx = 0
+
+    for b in range(0, s+q+1):
+        true_busy = b if b<s else s
+        l = s - b
+        for h in range(true_busy, true_busy*k + 1):
+            total_outflow = 0.0
+            phi = total_departure_probability(true_busy, h, s)
+            phi_bar = 1.0 - phi
+            i1 = lH2state(l, h, s)
+
+            # arrival transitions
+            if b < (s+q):
+                print("** arrival")
+                if l > 0:
+                    l2 = math.floor(l/2)
+                    h2 = h + k
+                else:
+                    l2 = l - 1
+                    h2 = h
+                i2 = lH2state(l2, h2, s)
+                Q[i1,i2] = lmbda
+                total_outflow += lmbda
+
+            # stage completion transitions
+            if h > true_busy:
+                print("** stage")
+                i2 = lH2state(l, h-1, s)
+                Q[i1, i2] = true_busy * mu * phi_bar
+                total_outflow += Q[i1, i2]
+
+            # task departure transitions
+            if h <= ((true_busy-1) * k + 1):
+                print("** task")
+                l2 = l + 1
+                h2 = h-1 if l>=0 else h+k-1
+                i2 = lH2state(l2, h2, s)
+                Q[i1, i2] = true_busy * mu * phi
+                total_outflow += Q[i1, i2]
+
+            Q[i1, i1] = -total_outflow
+    return Q
+
+
+def lstate_condense_block(s:int, queue:int, ctpi_block):
+    k = s
+    pi = np.zeros((2,s+1+queue))
+    for l in range(-queue,s+1):
+        pi[0,l+queue] = l
+    i = 0
+    for b in range(0,s+queue+1):
+        l = s - b
+        pi[0, l + queue] = l
+        true_busy = b if b<s else s
+        for h in range(true_busy, true_busy*k+1):
+            pi[1,l+queue] += ctpi_block[i]
+            i += 1
+    return pi
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", '--num_workers', type=int, default=12)
+    parser.add_argument("-m", '--mu', type=float, default=1.0)
+    parser.add_argument("-l", '--lmbda', type=float, default=0.5)
+    parser.add_argument("-f", '--takefrac', type=float, default=0.5)
+    parser.add_argument("-q", '--queue', type=int, default=0)
+    args = parser.parse_args()
+
+    s = args.num_workers
+    mu = args.mu
+    lmbda = args.lmbda
+    queue = args.queue
+    take_frac = args.takefrac
+
+    Q_block = create_sparse_transition_matrix(s, mu, lmbda, queue)
+    with np.printoptions(precision=2):
+        print(Q_block)
+    ctpi_block = compute_steady_state(Q_block)
+    print(ctpi_block)
+    lstate_pi_block = lstate_condense_block(s, queue, ctpi_block)
+    print("\n\n")
+    print(lstate_pi_block)
+    #sys.exit(0)
+
+    Q_byrows = create_sparse_transition_matrix_by_rows(s, mu, lmbda, queue)
+    with np.printoptions(precision=2):
+        print(Q_byrows)
+
+    print("\n\nMatrix difference:")
+    with np.printoptions(precision=2):
+        print(Q_byrows - Q_block)
+
+
+    ctpi_byrows = compute_steady_state(Q_byrows)
+    print(ctpi_byrows)
+    lstate_pi_byrows = lstate_condense_block(s, queue, ctpi_byrows)
+    print("\n\n")
+    print(lstate_pi_byrows)
+    print("\n\n")
+    print(lstate_pi_block)
+    print("\n\n")
+    sys.exit(0)
+
+    S0 = SysState(s, s, 0)
+    print(S0)
+    # S0.long_form()
+    states = {(S0.l, S0.H): S0}
+    traverse_states_maxstack(states, S0, lmbda, mu, take_frac = take_frac)
+    if queue > 0:
+        add_queueing_states(states, lmbda, mu, queue, s)
+
+    print("\nNumber of states: ", str(len(states)))
+    #sys.exit()
+
+    # compute stationary distribution by linearly solving the CTMC rate matrix
+    Q_dense = create_rate_matrix(states)
+    # Q = create_rate_matrix_sparse(states)
+    print("\nweight matrix dense:\n", Q_dense)
+
+    ##print("\nweight matrix:\n", Q.todense())
+    ctpi_dense = compute_steady_state(Q_dense)
+
+    # ctpi_trick = compute_rate_stationary_sparse_trick(Q)
+    # ctpi = compute_rate_stationary_sparse(Q)
+    print("\n ct pi dense:\n", ctpi_dense)
+    # print("\n ct pi trick:\n", ctpi_trick)
+    # print("\n ct pi:\n", ctpi)
+    print("\n Qt * ct pi dense:\n", np.dot(Q_dense.transpose(), ctpi_dense.transpose()))
+    # print("\n Qt * ct pi:\n", Q.transpose().dot(ctpi.transpose()))
+    lstate_pi = lstate_condense(s, queue, states, ctpi_dense)
+    with np.printoptions(precision=6):
+        print("\n\n lstate_pi:\n", lstate_pi)
+        print("\n\n lstate_pi_block: \n", lstate_pi_block)
+    #sys.exit(0)
+
+    plt.plot(lstate_pi[0, :], lstate_pi[1, :], label='(H,l) Markov model')
+    if queue > 0:
+        plt.axvline(x=0, color='red')
+    plt.grid()
+    plt.xlabel('queue length | idle workers')
+    plt.ylabel('P(state)')
+    plt.plot(lstate_pi_block[0, :], lstate_pi_block[1, :], label='(H,l) block CTMC', linestyle='dashed')
+    #plt.show()
+    #sys.exit()
+
+    # get corresponding simulator data
+    lmbda_string = re.sub(r'[\.]', '', str(lmbda))
+    filename = "../pdistr-tfb05-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    #filename = "../pdistr-tfb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    print("loading file %s...\n" % (filename))
+    if os.path.isfile(filename):
+        pdist_data = np.zeros((s + 1, 2), float)
+        # record queue data going out to -s
+        qdist_data = np.zeros((s + 1, 2), float)
+        pcount = 0
+        with open(filename) as pdist_file:
+            reader = csv.reader(pdist_file, delimiter='\t')
+            for row in reader:
+                if int(row[3]) > 0 or int(row[4]) == 0:
+                    pdist_data[int(row[3]), 1] += 1
+                if int(row[4]) <= s and int(row[4]) > 0:
+                    qdist_data[int(row[4])-1, 1] += 1
+                pcount += 1
+        for i in range(0, s + 1):
+            pdist_data[i, 0] = i
+            pdist_data[i, 1] /= pcount
+            qdist_data[i, 0] = -i
+            qdist_data[i, 1] /= pcount
+        qdist_data[0, 1] = pdist_data[0, 1]
+
+        pqdist_data = np.concatenate((pdist_data, qdist_data))
+        pqdist_data = pqdist_data[pqdist_data[:, 0].argsort()]
+        print(pqdist_data)
+        plt.plot(pqdist_data[:, 0], pqdist_data[:, 1], '--', label='simulation')
+        #plt.plot(qdist_data[:, 0], qdist_data[:, 1], '--', label='simulation')
+        plt.xlim(-queue, s)
+
+    # get simulator data with departure barrier
+    #filename = "../pdistr-tfbb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    filename = "../pdistr-tfbb05-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    print("loading file %s...\n" % (filename))
+    if os.path.isfile(filename):
+        pdist_bb_data = np.zeros((s+1, 2), float)
+        pcount = 0
+        with open(filename) as pdist_bb_file:
+            reader = csv.reader(pdist_bb_file, delimiter='\t')
+            for row in reader:
+                pdist_bb_data[int(row[3]), 1] += 1
+                pcount += 1
+        for i in range(0,s+1):
+            pdist_bb_data[i, 0] = i
+            pdist_bb_data[i, 1] /= pcount
+
+        print(pdist_bb_data)
+        #plt.plot(pdist_bb_data[:,0], pdist_bb_data[:,1], '-.')
+
+    plt.legend(loc='upper left')
+    plt.show()
+    # compute the departure rate
+    # In the backlogged steady state, what fraction of task completions lead to a job departure?
+    # In the steady state, the starting rate has to be the same as the departure rate, so we
+    # compute that too as a sanity check.
+    #XXX Made a mistake earlier and considered the product of the stationary distribution and the
+    # transition weight.  The problem is that the transition weights are normalized rel to the number
+    # of tasks running in that state, so are on different rate scales.  You can't just add them together
+    # without converting them to a common denominator.  Need to look at the raw rates, because those are
+    # in the common units of \mu (task service rate).
+    print("\nNumber of states: ", str(len(states)))
+
+    # use the steady state distribution to predict the mean sojourn time
+    def cdf_erlk(x, k, lambd):
+        """CDF of Erlang-k distribution with rate parameter lambda."""
+        # Regularized lower incomplete gamma function
+        return gammainc(k, lambd * x)
+
+    def pdf_erlk(x, k, lambd):
+        """PDF of Erlang-k distribution with rate parameter lambda."""
+        if x < 0:
+            return 0
+        return (lambd ** k * x ** (k - 1) * np.exp(-lambd * x)) / gamma(k)
+
+    def pdf_max_erlk(x, n, k, lambd):
+        """PDF of the maximum of n independent Erlang-k random variables."""
+        if x < 0:
+            return 0
+        cdf_x = cdf_erlk(x, k, lambd)
+        pdf_x = pdf_erlk(x, k, lambd)
+        return n * (cdf_x ** (n - 1)) * pdf_x
+
+    def expected_value_max_erlk(n, k, lambd):
+        """Expected value of the maximum of n Erlang-k random variables."""
+        integral, _ = quad(lambda x: x * pdf_max_erlk(x, n, k, lambd), 0, np.inf)
+        return integral
+
+    expected_runtime_sum = 0.0
+    ctpi_sum = 0.0
+    expected_runtime_queue_sum = 0.0
+    ctpi_queue_sum = 0.0
+    for l in range(0,s+queue):
+        # for now ignore the small ammt of probability in the queue
+        if l > queue:
+            ctpi_sum += ctpi_dense[l]
+        # There are z=max(1,l/2) composite tasks.  Each contains
+        # (s/z) exponential stages.  To compute the expected runtime,
+        # we need the expectation of the max order statistic of the z
+        # composite tasks.
+        num_tasks = max(1,l/2)
+        num_stages = s/num_tasks
+        print("num_tasks=", str(num_tasks), "num_stages=", str(num_stages))
+        ert = expected_value_max_erlk(num_tasks, num_stages, mu)
+        expected_runtime_sum += ctpi_dense[l+queue] * ert
+    print("ctpi_sum=", ctpi_sum)
+    print("expected_runtime_sum=", expected_runtime_sum)
+
+    plt.show()
+
+# ======================================
+# ======================================
+# ======================================
+
+if __name__ == "__main__":
+    main()
+
