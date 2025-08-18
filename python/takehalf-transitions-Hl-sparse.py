@@ -33,7 +33,9 @@ from scipy.sparse import csr_matrix, csc_matrix, lil_matrix
 from scipy.sparse.linalg import spsolve
 from scipy.integrate import quad
 from math import exp, factorial
-from scipy.special import gammainc, gamma
+from scipy.special import gammainc, gammaincinv, gamma
+from scipy.optimize import brentq
+from scipy.stats import gamma
 import matplotlib.pyplot as plt
 
 ### for older versions of python
@@ -367,6 +369,10 @@ def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
         # Regularized lower incomplete gamma function
         return gammainc(k, lambd * x)
 
+    def erlang_cdf(x, k, lambd):
+        #print(f"erlang_cdf({x}, {k}, {lambd}")
+        return gamma.cdf(x, a=k, scale=1 / lambd)
+
     def expected_max_erlang(R, k, lam):
         def integrand(x):
             F = cdf_erlk(x, k, lam)
@@ -387,6 +393,25 @@ def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
         cdf_x = cdf_erlk(x, k, lambd)
         pdf_x = pdf_erlk(x, k, lambd)
         return n * (cdf_x ** (n - 1)) * pdf_x
+
+    def max_erlang_cdf(x, r, k, lambd):
+        """CDF of max of r Erlang(k, mu)"""
+        #print(f"max_erlang_cdf({x}, {r}, {k}, {lambd})")
+        #return cdf_erlk(x, k, lambd) ** r
+        return erlang_cdf(x, k, lambd) ** r
+
+    def mixture_cdf(x, params, weights):
+        """Mixture CDF"""
+        return sum(w * max_erlang_cdf(x, r, k, mu) for (r, k, mu), w in zip(params, weights))
+
+    # Quantile of mixture of max order stats
+    def mixture_max_quantile(p, params, weights, x_max=100):
+        # Find root of F_Y(x) - p = 0
+        func = lambda x: mixture_cdf(x, params, weights) - p
+        # Expand search range if needed
+        while func(x_max) < 0:
+            x_max *= 2
+        return brentq(func, 0, x_max)
 
     def expected_value_max_erlk(n, k, lambd):
         """Expected value of the maximum of n Erlang-k random variables."""
@@ -418,6 +443,40 @@ def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
         expected_runtime_sum += colsum * ert
         #print(f"l={l}\tnum_tasks={num_tasks}\tnum_stages={num_stages}\tert={ert}")
 
+    # try to estimate the sojourn and waiting quantiles based on the steady state
+    # start with just the non-queueing states
+    #for l in range(-q, s+1):
+    params = []
+    weights = []
+    wait_params = []
+    wait_weights = []  # yuk yuk.,...
+    for l in range(-q, s + 1):
+        b = s - l
+        true_busy = b if b<s else s
+        colsum = 0.0
+        num_tasks = max(1,l*take_frac)
+        num_stages = s/num_tasks
+        for h in range(true_busy, true_busy*k + 1):
+            ii = lH2state(l, h, s)
+            colsum += ctpi[ii]
+            if l <= 0:
+                wait_params.append((1, 1-l, mu*s*s/h))
+                wait_weights.append(ctpi[ii])
+        params.append((num_tasks, num_stages, mu))
+        weights.append(colsum)
+        #print(f"params: l={l}, num_tasks={num_tasks}, num_stages={num_stages}, mu={mu}, weight={colsum}")
+    #print(f"exec weight coverage: {sum(weights)}")
+    #print(f"queue weight coverage: {sum(wait_weights)}")
+    # we need to do this normalization for now when computing quantiles, because if the
+    # actual quantile lies beyond the total weight of the pi vector that we are summing over,
+    # the algorithm will explode trying to find it.
+    weights /= sum(weights)
+    quantile_runtime = mixture_max_quantile(0.999, params, weights)
+    wait_weights /= sum(wait_weights)
+    quantile_waittime = mixture_max_quantile(0.999, wait_params, wait_weights)
+
+
+
 
     #XXX we should include the non-parallel runtime of jobs in the queue
     # weighted by the density of those queue states
@@ -427,7 +486,7 @@ def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
     #print("waittime_measure=", waittime_measure)
     #print("expected_waittime_sum=", expected_waittime_sum)
     #print("expected_sojourn =", expected_runtime_sum+expected_waittime_sum)
-    print(f"{s}\t{lmbda}\t{mu}\t{expected_runtime_sum}\t{expected_waittime_sum}\t{expected_runtime_sum+expected_waittime_sum}")
+    print(f"{s}\t{lmbda}\t{mu}\t{expected_runtime_sum}\t{expected_waittime_sum}\t{expected_runtime_sum+expected_waittime_sum}\t{quantile_runtime}\t{quantile_waittime}")
 
     # At depth l in the queue with total height h, what is the
     # expected waiting time until a job is dequeued?
