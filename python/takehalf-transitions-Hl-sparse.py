@@ -191,7 +191,8 @@ def lH2state(l, H, s):
             print(f"ERROR: H={H} < b={b} is too small!")
             sys.exit(0)
         if H > b*k:
-            print(f"ERROR: H={H} > b*k={b*k} is too large!")
+            print(f"ERROR: l={l}\tH={H} > b*k={b}*{k}={b*k} is too large!")
+            raise RuntimeError(f"ERROR: l={l}\tH={H} > b*k={b}*{k}={b*k} is too large!")
             sys.exit(0)
         # start from the size of the submatrix one would have for a model with (b-1) states
         #state_base = int((b) + (k)*(b-1)*(b)/2)
@@ -276,7 +277,7 @@ def create_sparse_transition_matrix_by_rows(s:int, mu:float, lmbda:float, q=0, f
             if b < (s+q):
                 #print("** arrival")
                 if l > 0:
-                    l2 = math.floor(l*frac)
+                    l2 = math.floor(l*(1.0-frac))
                     h2 = h + k
                 else:
                     l2 = l - 1
