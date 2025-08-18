@@ -22,6 +22,8 @@ import os.path
 from operator import truediv
 import csv
 import re
+from xmlrpc.client import boolean
+
 import numpy as np
 np.set_printoptions(edgeitems=30, linewidth=100000, formatter={'float': lambda x: "{0:0.3f}".format(x)})
 import argparse
@@ -356,7 +358,7 @@ def sparse_steady_state_ctmc(Q_lil):
     return pi
 
 
-def predict_sojourns(ctpi, s, q, lmbda, mu):
+def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
     k = s
 
     # use the steady state distribution to predict the mean sojourn time
@@ -410,7 +412,7 @@ def predict_sojourns(ctpi, s, q, lmbda, mu):
                 expected_waittime_sum += ctpi[ii] * (1-l) * h / (mu * s * s)
         ctpi_sum += colsum
         #print(f"colsum[{l}] = {colsum}")
-        num_tasks = max(1,l/2)
+        num_tasks = max(1,l*take_frac)
         num_stages = s/num_tasks
         ert = expected_max_erlang(num_tasks, num_stages, mu)
         expected_runtime_sum += colsum * ert
@@ -443,6 +445,7 @@ def main():
     parser.add_argument("-l", '--lmbda', type=float, default=0.5)
     parser.add_argument("-f", '--takefrac', type=float, default=0.5)
     parser.add_argument("-q", '--queue', type=int, default=0)
+    parser.add_argument("-p", '--pdist', action='store_true')
     args = parser.parse_args()
 
     s = args.num_workers
@@ -450,6 +453,7 @@ def main():
     lmbda = args.lmbda
     queue = args.queue
     take_frac = args.takefrac
+    pdist_plot = args.pdist
 
     #lH2state_debug(s, queue)
     Q_byrows = create_sparse_transition_matrix_by_rows(s, mu, lmbda, queue, take_frac)
@@ -461,8 +465,9 @@ def main():
     #print("\n\n")
     print(lstate_pi)
     #print("\n\n")
-    predict_sojourns(ctpi, s, queue, lmbda, mu)
-    sys.exit(0)
+    predict_sojourns(ctpi, s, queue, lmbda, mu, take_frac)
+    if not pdist_plot:
+        sys.exit(0)
 
     plt.plot(lstate_pi[0, :], lstate_pi[1, :], label='(H,l) Markov model')
     if queue > 0:
@@ -474,9 +479,9 @@ def main():
     #sys.exit()
 
     # get corresponding simulator data
+    take_frac_str = re.sub(r'[\.]', '', str(take_frac))
     lmbda_string = re.sub(r'[\.]', '', str(lmbda))
-    filename = "../pdistr-tfb05-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
-    #filename = "../pdistr-tfb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    filename = "../pdistr-tfb%s-Ax%s-Sx10-t%d-w%d.dat" % (take_frac_str, lmbda_string, s, s)
     print("loading file %s...\n" % (filename))
     if os.path.isfile(filename):
         pdist_data = np.zeros((s + 1, 2), float)
@@ -506,8 +511,7 @@ def main():
         plt.xlim(-queue, s)
 
     # get simulator data with departure barrier
-    #filename = "../pdistr-tfbb10-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
-    filename = "../pdistr-tfbb05-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
+    filename = "../pdistr-tfbb%s-Ax%s-Sx10-t%d-w%d.dat" % (take_frac_str, lmbda_string, s, s)
     print("loading file %s...\n" % (filename))
     if os.path.isfile(filename):
         pdist_bb_data = np.zeros((s+1, 2), float)
