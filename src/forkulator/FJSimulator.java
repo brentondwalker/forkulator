@@ -559,6 +559,14 @@ public class FJSimulator {
             double c = Double.parseDouble(process_spec[3]);
             double z = Double.parseDouble(process_spec[4]);
             process = new LayerCakeIntertimeProcess(new UniformIntertimeProcess(a,b), 1.0, new TriangleIntertimeProcess(a, b, c), z);
+        } else if (process_spec[0].equals("xmux")) {
+            // exponential with min(uniform,exponential) overhead added
+            System.out.println(Arrays.toString(process_spec));
+            double rate = Double.parseDouble(process_spec[1]);
+            double lower = Double.parseDouble(process_spec[2]);
+            double upper = Double.parseDouble(process_spec[3]);
+            double arrival_rate = Double.parseDouble(process_spec[4]);
+            process = new ExponentialMUniExOverhead(rate, lower, upper, arrival_rate);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);
