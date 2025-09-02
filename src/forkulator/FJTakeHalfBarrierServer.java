@@ -5,6 +5,8 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Vector;
 
+import forkulator.randomprocess.IntertimeProcess;
+
 public class FJTakeHalfBarrierServer extends FJServer {
 
 	/**
@@ -49,6 +51,11 @@ public class FJTakeHalfBarrierServer extends FJServer {
     private double take_fraction = 1.0;
     
     /**
+     * If we are to use a random take fraction.
+     */
+    private IntertimeProcess take_fraction_process = null;
+    
+    /**
      * This type of server has a separate queue for each worker.
      */
     
@@ -81,6 +88,33 @@ public class FJTakeHalfBarrierServer extends FJServer {
         this.departure_barrier = departure_barrier;
         this.take_fraction = take_fraction;
         System.err.println("FJTakeHalfBarrierServer(departure_barrier="+departure_barrier+", "+take_fraction+")");
+        
+        for (int i=0; i<num_workers; i++) {
+            workers[0][i].queue = new LinkedList<FJTask>();
+        }
+        
+        remaining_workers = num_workers;
+
+        activeJobs = new Vector<FJJob>();
+        job2workers = new HashMap<FJJob,Vector<Integer>>();
+        job2parallelism = new HashMap<FJJob,Integer>();
+        worker2job = new FJJob[num_workers];
+    }
+    
+    
+    /**
+     * Constructor with random take fraction process
+     * 
+     * Has to allocate the workers' task queues.
+     * 
+     * @param num_workers
+     */
+    public FJTakeHalfBarrierServer(int num_workers, boolean departure_barrier, IntertimeProcess take_fraction_process) {
+        super(num_workers);
+        this.departure_barrier = departure_barrier;
+        this.take_fraction = 0.0;
+        this.take_fraction_process = take_fraction_process;
+        System.err.println("FJTakeHalfBarrierServer(departure_barrier="+departure_barrier+", frac=random: "+take_fraction_process+")");
         
         for (int i=0; i<num_workers; i++) {
             workers[0][i].queue = new LinkedList<FJTask>();
@@ -179,7 +213,21 @@ public class FJTakeHalfBarrierServer extends FJServer {
         // pick out some number of workers to use
         //XXX what was ever the idea with this (remaining_workers-1) thing!?
         //int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers * take_fraction));
-        int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, remaining_workers * take_fraction);
+        int nworkers = 0;
+        if (this.take_fraction > 0.0) {
+            nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, remaining_workers * take_fraction);
+        } else {
+            // Should the random version take a random fraction of the idle workers,
+            // or should it require a random fraction of num_workers?
+            // If the latter, the job may have to wait.
+            double tfrac = take_fraction_process.nextInterval();
+            if (tfrac < 0.0 || tfrac > 1.0) {
+                System.err.println("ERROR: takefrac_process generated an infeasible take-fraction: "+tfrac);
+            }
+            nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, remaining_workers * tfrac);
+            //nworkers = (int)Math.max(1, num_workers * tfrac);
+            //System.out.println("nworkers = "+nworkers+" / "+remaining_workers+"   ("+tfrac+")");
+        }
         //int initially_remaining_workers = remaining_workers;
         if (PRINT_EXTRA_DATA) System.out.println("THJS\t"+job.arrival_time+"\t"+time+"\t"+nworkers+"\t"+remaining_workers);
         

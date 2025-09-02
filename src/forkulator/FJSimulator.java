@@ -110,6 +110,11 @@ public class FJSimulator {
 			}
 			double take_fraction = Double.parseDouble(server_queue_spec[1]);
 			this.server = new FJTakeHalfSplitMergeServer(num_workers, take_fraction);
+        } else if (server_queue_type.toLowerCase().equals("tfbr")) {
+            // take-frac with uniformly random take fraction
+            // could give a process-spec here to make it configurable
+            // also missing the "bb" version here.
+            this.server = new FJTakeHalfBarrierServer(num_workers, false, new UniformIntertimeProcess(0.0, 1.0));
         } else if (server_queue_type.toLowerCase().startsWith("tfb")) {
 			if (server_queue_spec.length != 2) {
 				System.err.println("ERROR: tfb* queue requires a numeric take_fraction parameter");
