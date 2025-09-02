@@ -52,8 +52,20 @@ public class FJTakeHalfBarrierServer extends FJServer {
     
     /**
      * If we are to use a random take fraction.
+     * Also need to keep track of whether the take fraction is computed relative to
+     * the current idle workers, or relative to all workers.  If it's all workers, then
+     * the job may have to wait (block/barrier) for the required workers to become
+     * available.
+     * 
+     * The way random take fraction is computed adds a tiny bias due to rounding.
+     * Frac is sampled from Uniform(0,1) and multiplied by the number of workers.
+     * Anything from 0.0 to 1.49999 rounds to 1, while N-0.5 to N rounds to N.
+     * Basically nworkers=1 is 3x as likely as nworkers=s.  
+     * Correct this by computing ceil() of the samples.
      */
     private IntertimeProcess take_fraction_process = null;
+    private boolean take_fraction_all = false;
+    private int next_job_nworkers = 0;
     
     /**
      * This type of server has a separate queue for each worker.
@@ -109,11 +121,15 @@ public class FJTakeHalfBarrierServer extends FJServer {
      * 
      * @param num_workers
      */
-    public FJTakeHalfBarrierServer(int num_workers, boolean departure_barrier, IntertimeProcess take_fraction_process) {
+    public FJTakeHalfBarrierServer(int num_workers, boolean departure_barrier, IntertimeProcess take_fraction_process, boolean take_fraction_all) {
         super(num_workers);
         this.departure_barrier = departure_barrier;
         this.take_fraction = 0.0;
         this.take_fraction_process = take_fraction_process;
+        this.take_fraction_all = take_fraction_all;
+        if (take_fraction_all) {
+            this.next_job_nworkers = (int)Math.max(1, Math.ceil(num_workers * take_fraction_process.nextInterval()));
+        }
         System.err.println("FJTakeHalfBarrierServer(departure_barrier="+departure_barrier+", frac=random: "+take_fraction_process+")");
         
         for (int i=0; i<num_workers; i++) {
@@ -191,9 +207,14 @@ public class FJTakeHalfBarrierServer extends FJServer {
             job2parallelism.remove(job);
         }
         
-        if (remaining_workers > 0) {
-          ServiceJob(this.job_queue.poll(), time);
+        if ((remaining_workers > 0) && (remaining_workers >= this.next_job_nworkers)) {
+            ServiceJob(this.job_queue.poll(), time);
         }
+        //else {
+        //    if (remaining_workers < this.next_job_nworkers) {
+        //        System.out.println("*** Job is blocked! "+remaining_workers+" < "+next_job_nworkers);
+        //    }
+        //}
      }
 	
 	
@@ -215,7 +236,7 @@ public class FJTakeHalfBarrierServer extends FJServer {
         //int nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.min(remaining_workers - 1, remaining_workers * take_fraction));
         int nworkers = 0;
         if (this.take_fraction > 0.0) {
-            nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, remaining_workers * take_fraction);
+            nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.ceil(remaining_workers * take_fraction));
         } else {
             // Should the random version take a random fraction of the idle workers,
             // or should it require a random fraction of num_workers?
@@ -224,8 +245,12 @@ public class FJTakeHalfBarrierServer extends FJServer {
             if (tfrac < 0.0 || tfrac > 1.0) {
                 System.err.println("ERROR: takefrac_process generated an infeasible take-fraction: "+tfrac);
             }
-            nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, remaining_workers * tfrac);
-            //nworkers = (int)Math.max(1, num_workers * tfrac);
+            if (this.take_fraction_all) {
+                nworkers = this.next_job_nworkers;
+                this.next_job_nworkers = (int)Math.max(1, Math.ceil(num_workers * tfrac));
+            } else {
+                nworkers = (remaining_workers == 1) ? 1 : (int)Math.max(1, Math.ceil(remaining_workers * tfrac));
+            }
             //System.out.println("nworkers = "+nworkers+" / "+remaining_workers+"   ("+tfrac+")");
         }
         //int initially_remaining_workers = remaining_workers;

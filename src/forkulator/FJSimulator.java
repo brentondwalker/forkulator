@@ -114,7 +114,12 @@ public class FJSimulator {
             // take-frac with uniformly random take fraction
             // could give a process-spec here to make it configurable
             // also missing the "bb" version here.
-            this.server = new FJTakeHalfBarrierServer(num_workers, false, new UniformIntertimeProcess(0.0, 1.0));
+            this.server = new FJTakeHalfBarrierServer(num_workers, false, new UniformIntertimeProcess(0.0, 1.0), false);
+        } else if (server_queue_type.toLowerCase().equals("tfbra")) {
+            // take-frac with uniformly random take fraction
+            // take fraction is computed relative to all workers, not just idle
+            // fundamentally different from other take-frac variants because it can be blocked.
+            this.server = new FJTakeHalfBarrierServer(num_workers, false, new UniformIntertimeProcess(0.0, 1.0), true);
         } else if (server_queue_type.toLowerCase().startsWith("tfb")) {
 			if (server_queue_spec.length != 2) {
 				System.err.println("ERROR: tfb* queue requires a numeric take_fraction parameter");
