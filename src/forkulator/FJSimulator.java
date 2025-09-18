@@ -577,6 +577,13 @@ public class FJSimulator {
             double upper = Double.parseDouble(process_spec[3]);
             double arrival_rate = Double.parseDouble(process_spec[4]);
             process = new ExponentialMUniExOverhead(rate, lower, upper, arrival_rate);
+        } else if (process_spec[0].equals("bmx")) {
+            // bimodal exponential
+            //System.out.println(Arrays.toString(process_spec));
+            double rate1 = Double.parseDouble(process_spec[1]);
+            double rate2 = Double.parseDouble(process_spec[2]);
+            double bmx_p = Double.parseDouble(process_spec[3]);
+            process = new BimodalExponentialIntertimeProcess(rate1, rate2, bmx_p);
 		} else {
 			System.err.println("ERROR: unable to parse process spec!");
 			System.exit(1);

@@ -70,7 +70,7 @@ public class FJTakePatienceBarrierServer extends FJServer {
      * This is very specific to this scheduler type, so I'm just doing
      * this the lazy way.
      */
-    public static boolean PRINT_EXTRA_DATA = false;
+    public static boolean PRINT_EXTRA_DATA = true;
     
     /*
      * Data structures to keep track of the correspondence between workers and jobs.

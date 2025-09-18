@@ -135,6 +135,18 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
     
     
     /**
+     * To study the distributions of job parallelism and other stuff.
+     * Easy but sloppy way is just print it out and analyze in matlab.
+     * This is very specific to this scheduler type, so I'm just doing
+     * this the lazy way.
+     */
+    public static boolean PRINT_EXTRA_DATA = false;
+    double completed_sum = 0.0;
+    double abandoned_sum = 0.0;
+    double sum_sum = 0.0;
+    
+    
+    /**
      * Constructor
      * 
      * Has to allocate the workers' task queues.
@@ -309,24 +321,33 @@ public class FJBarrierKLServerStartBlockingOverhead extends FJServer {
       * Unlike the old (k,l) server models, we kill the stragglers processes, so they are free to service other jobs.
       */
      private void killStragglers(FJJob job, double time) {
-	 //System.err.println("killStragglers("+time+")");
-	 int idx = 0;
+         //System.err.println("killStragglers("+time+")");
+         int idx = 0;
+         double work_completed = 0.0;
+         double work_abandoned = 0.0;
          for (FJTask t : job.tasks) {
              if (! t.completed) {
                  // do we really need to un-schedule its completion?
                  // We just need to ensure that nothing happens when its completion event actually fires.
                  // it seems sloppy, though.
-		 //System.err.println("\tkill task "+idx);
+                 //System.err.println("\tkill task "+idx);
                  t.worker.current_task = null;
                  t.completed = true;
                  t.abandoned = true;
                  t.completion_time = time;
-                 
+                 work_abandoned += t.completion_time - t.start_time;
+
                  // tell the simulator to ignore this tasks's completion event
                  t.completion_event.deleted = true;
+             } else {
+                 work_completed += t.completion_time - t.start_time;
              }
-	     idx++;
+             idx++;
          }
+         this.completed_sum += work_completed;
+         this.abandoned_sum += work_abandoned;
+         this.sum_sum += 1.0;
+         if (PRINT_EXTRA_DATA) System.out.println("FJSKL\t"+time+"\t"+job.arrival_time+"\t"+this.num_workers+"\t"+job.num_tasks+"\t"+l+"\t"+work_completed+"\t"+work_abandoned+"\t"+completed_sum+"\t"+abandoned_sum+"\t"+sum_sum+"\t"+(completed_sum/sum_sum)+"\t"+(abandoned_sum/sum_sum)+"\t"+(completed_sum/(completed_sum+abandoned_sum)));
      }
      
      /**
