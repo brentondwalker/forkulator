@@ -2,6 +2,7 @@
 
 """
 Compute the markov model properties for the equilibrium approximation of a take-half parallel system.
+** 2-barrier version **
 
 S = number of workers
 B = number of busy workers
@@ -35,11 +36,68 @@ from scipy.integrate import quad
 from math import exp, factorial
 from scipy.special import gammainc, gammaincinv, gamma
 from scipy.optimize import brentq
-from scipy.stats import gamma
+from scipy.stats import gamma, false_discovery_control
 import matplotlib.pyplot as plt
 
 ### for older versions of python
 # from typing import Dict
+
+# some global variables for keeping track of the state mapping
+lHj2state = {}
+state2lHj = {}
+
+
+def state_valid(s, k, l, H, j, warn = False):
+    """Given all the state and model info, decide if a state is valid or not.
+    NOTE: this version is only applicable for take-half (frac=0.5)
+    :param s:
+    :param k:
+    :param l:
+    :param H:
+    :param j:
+    :return:
+    """
+    valid = True
+    # num jobs can't be more than the num busy workers
+    if j > min(s-l, s):
+        valid = False
+    # num jobs in service can't be more than the number of stages in service
+    if j > H:
+        valid = False
+    # stages per job is bounded by k
+    if H > k*j:
+        valid = False
+    # the most complicated test of all
+    # given the take-fraction, is it possible to occupy this many workers
+    # with the many active jobs?
+    #jmin = math.ceil(math.log2(s)) if l < 1 else math.ceil(math.log2(s / l))
+    jmin = compute_jmin(s, l)
+    if j < jmin:
+        valid = False
+    if warn and not valid:
+        print(f"WARNING: invalid state check: (s={s}, k={k}, l={l}, H={H}, j={j})")
+    # passed all the feasibility tests
+    return valid
+
+
+def compute_jmin(s, l, frac=0.5):
+    """
+    compute the minimum number of jobs necessary to get the idle number down to l
+    :param s:
+    :param l:
+    :return:
+    """
+    queue_depth = 0
+    if l < 0:
+        queue_depth = -l
+        l = 0
+    workers_left = s
+    j = 0
+    while workers_left > l:
+        workers_left -= math.ceil(frac * workers_left)
+        j += 1
+    #return j + queue_depth
+    return j
 
 
 def probability_n_bins_empty(b, H, n):
@@ -180,8 +238,55 @@ def lh_matrix_size(s, k, q=0):
     return active_states + queueing_states
 
 
+def true_busy_beta(s, l, H, j):
+    """Estimate the true number of busy workers
+    :param l: the number of idle workers (not blocked)
+    :param h: the total height of the stage stack
+    :param j: the total number of active jobs
+    :return:
+    """
+    #print(f"true_busy_beta({s}, {l}, {H}, {j})")
+    if H == 0:
+        return 0
+    num_jobs = j
+    num_blocked = s - max(l, 0)
+
+    beta = 0.0
+    prob_sum = 0.0
+    for b in range(num_jobs, num_blocked+1):
+        prob_trm = math.comb(num_blocked, b) * math.comb(H-1, b-1) / math.comb(H+num_blocked-1, num_blocked-1)
+        prob_sum += prob_trm
+        trm = b * prob_trm
+        beta += trm
+        #print(f"\tb={num_blocked}\t{trm}\t{beta}\t{prob_trm}\t{prob_sum}")
+    #print(f"beta({s}, {l}, {H}, {j}) = {beta/prob_sum}")
+    return beta/prob_sum
+
+
+def enumerateStates(s, q, k):
+    global lHj2state
+    global state2lHj
+    lHj2state = {}
+    state2lHj = {}
+    sid = 0
+    for l in range(s, -q-1, -1):
+        b = s-l
+        true_blocked = b if b<s else s
+        #jmin = math.ceil(math.log2(s)) if l < 1 else math.ceil(math.log2(s / l))
+        jmin = compute_jmin(s, l)
+        jmax = true_blocked
+        for j in range(jmin, jmax + 1):
+            #for H in range(j, true_blocked*k+1):
+            for H in range(j, j * k + 1):
+                state_valid(s, k, l, H, j, warn = True)
+                lHj2state[(l,H,j)] = sid
+                state2lHj[sid] = (l,H,j)
+                #print(f"lHj2state[{(l,H,j)}] = {sid}")
+                sid += 1
+    print(f"total states: {len(lHj2state)}")
+
 # from the (l,H) coordinate of the state, compute the state number in the CTMC matrix
-def lH2state(l, H, s):
+def oldlH2state(l, H, s):
     k = s
     if l < 0:
         state_idx = lH2state(0, s*s, s)
@@ -207,57 +312,12 @@ def lH2state(l, H, s):
     return state_idx
 
 
-def create_sparse_transition_matrix(s:int, mu:float, lmbda:float, q=0):
-    # first compute the number of states
-    k = s
-    numstates:int = lh_matrix_size(s, k, q)
-    print("numstates", numstates)
-
-    # get a big sparse matrix...
-    Q = np.zeros((numstates, numstates))
-
-    # for convenience, keep an index of the state
-    state_idx = 0
-
-    # iterate over all b values
-    # note to self: phi(l,h) = total_departure_probability(b, H, s)
-    for b in range(1,s+1):
-        l = s - b
-        create_D_block(Q, s, b, mu)
-        create_B_block(Q, s, b, mu)
-        create_A_block(Q, s, b-1, lmbda)
-
-    for b in range(s+1, s+q+1):
-        l = s - b
-        create_G_block(Q, s, b, mu)
-        create_K_block(Q, s, b, mu)
-        create_AQ_block(Q, s, b - 1, lmbda)
-
-    #create_truncated_A_block(Q, s, lmbda)
-    create_diagonal_entries(Q, s, mu, lmbda, q)
-
-    # check that the rows sum to zero
-    print("sum of rows:")
-    #with np.printoptions(precision=2):
-    print(Q.sum(1))
-
-    return Q
-
-
-def lH2state_debug(s, q):
-    k = s
-    for b in range(0, s+q+1):
-        true_busy = b if b<s else s
-        l = s - b
-        for h in range(true_busy, true_busy*k + 1):
-            ii = lH2state(l, h, s)
-            print(f"lH2state({l}, {h}, {s}) = {ii}")
-
-
 def create_sparse_transition_matrix_by_rows(s:int, mu:float, lmbda:float, q=0, frac=0.5):
+    print(f"create_sparse_transition_matrix_by_rows(s={s}, mu={mu}, lmbda={lmbda}, q={q}, frac={frac})")
     # first compute the number of states
+    global lHj2state
     k = s
-    numstates:int = lh_matrix_size(s, k, q)
+    numstates:int = len(lHj2state)
     print("numstates", numstates)
 
     # get a big sparse matrix...
@@ -267,64 +327,103 @@ def create_sparse_transition_matrix_by_rows(s:int, mu:float, lmbda:float, q=0, f
     # for convenience, keep an index of the state
     state_idx = 0
 
-    for b in range(0, s+q+1):
-        true_busy = b if b<s else s
-        l = s - b
-        for h in range(true_busy, true_busy*k + 1):
-            total_outflow = 0.0
-            phi = total_departure_probability(true_busy, h, s)
-            phi_bar = 1.0 - phi
-            i1 = lH2state(l, h, s)
+    for l in range(s, -q-1, -1):
+        b = s-l
+        true_blocked = b if b<s else s
+        #jmin = math.ceil(math.log2(s)) if l < 1 else math.ceil(math.log2(s / l))
+        jmin = compute_jmin(s, l)
+        jmax = true_blocked
+        for j in range(jmin, jmax + 1):
+            for h in range(j, j * k + 1):
+                total_outflow = 0.0
+                state1 = lHj2state[(l, h, j)]
+                psi = total_departure_probability(j, h, s)
+                psi_bar = 1.0 - psi
+                true_b = true_busy_beta(s, l, h, j)
 
-            # arrival transitions
-            if b < (s+q):
-                #print("** arrival")
-                if l > 0:
-                    l2 = math.floor(l*(1.0-frac))
-                    h2 = h + k
-                else:
-                    l2 = l - 1
-                    h2 = h
-                i2 = lH2state(l2, h2, s)
-                Q[i1,i2] = lmbda
-                total_outflow += lmbda
+                # arrival transitions
+                if b < (s + q):
+                    # print("** arrival")
+                    if l > 0:
+                        # job starts immediately
+                        l2 = math.floor(l * (1.0 - frac))
+                        h2 = h + k
+                        j2 = j + 1
+                    else:
+                        # job queues
+                        l2 = l - 1
+                        h2 = h
+                        j2 = j
+                    state2 = lHj2state[(l2, h2, j2)]
+                    Q[state1, state2] = lmbda
+                    total_outflow += lmbda
 
-            # stage completion transitions
-            if h > true_busy:
-                #print("** stage")
-                i2 = lH2state(l, h-1, s)
-                Q[i1, i2] = true_busy * mu * phi_bar
-                total_outflow += Q[i1, i2]
+                # stage completion only transitions, (~T & ~J)
+                if h > j:
+                    # print("** stage")
+                    if state_valid(s, k, l, h-1, j, warn=True):
+                        state2 = lHj2state[(l, h - 1, j)]
+                        Q[state1, state2] = true_b * mu * psi_bar
+                        total_outflow += Q[state1, state2]
 
-            # task departure transitions
-            if h <= ((true_busy-1) * k + 1):
-                #print("** task")
-                l2 = l + 1
-                h2 = h-1 if l>=0 else h+k-1
-                i2 = lH2state(l2, h2, s)
-                Q[i1, i2] = true_busy * mu * phi
-                total_outflow += Q[i1, i2]
+                # task departure, job departure transitions, (T & J)
+                if h <= ((true_blocked - 1) * k + 1):
+                    # print("** task")
+                    #if j > 1 or b == j:
+                    num_workers_freed = math.floor((s-max(l,0))/j)
+                    max_jobs_starting = math.floor(math.log2(num_workers_freed)+1)
+                    num_jobs_starting = min(-l, max_jobs_starting)
+                    l2 = 0
+                    h2 = 0
+                    j2 = 0
+                    if l >= 0:
+                        # no queue
+                        l2 = l + num_workers_freed
+                        h2 = h - 1
+                        j2 = j - 1
+                    elif l < -num_jobs_starting:
+                        # deep queue
+                        l2 = l + num_jobs_starting
+                        h2 = h - 1 + k*num_jobs_starting
+                        j2 = j - 1 + num_jobs_starting
+                    else:
+                        # shallow queue
+                        l2 = math.floor(num_workers_freed/math.pow(2,num_jobs_starting))
+                        h2 = h - 1 + k*num_jobs_starting
+                        j2 = j - 1 + num_jobs_starting
+                    # check that the state is feasible w/r/t job sizes
+                    #jmin = math.ceil(math.log2(s)) if l2 < 1 else math.ceil(math.log2(s / l2))
+                    #if j2 >= jmin and j2 >= h2:
+                    if state_valid(s, k, l2, h2, j2, warn=False):
+                        state2 = lHj2state[(l2, h2, j2)]
+                        Q[state1, state2] = true_b * mu * psi
+                        total_outflow += Q[state1, state2]
 
-            Q[i1, i1] = -total_outflow
+                if total_outflow == 0.0:
+                    print(f"WARNING: no transitions for state ({l}, {h}, {j})")
+
+                Q[state1, state1] = -total_outflow
     return Q
 
 
 def lstate_condense(s:int, queue:int, ctpi):
+    print(f"lstate_condense(s={s}, queue={queue}, ctpi)")
     k = s
     pi = np.zeros((2,s+1+queue))
     for l in range(-queue,s+1):
         pi[0,l+queue] = l
-    i = 0
     for b in range(0,s+queue+1):
         l = s - b
         pi[0, l + queue] = l
-        true_busy = b if b<s else s
-        for h in range(true_busy, true_busy*k+1):
-            pi[1,l+queue] += ctpi[i]
-            ii = lH2state(l, h, s)
-            if ii != i:
-                print(f"WARNING: lH2state({l}, {h}, {s}) = {ii} != {i}")
-            i += 1
+        true_blocked = b if b < s else s
+        #jmin = math.ceil(math.log2(s)) if l < 1 else math.ceil(math.log2(s / l))
+        jmin = compute_jmin(s, l)
+        jmax = true_blocked
+        for j in range(jmin, jmax + 1):
+            for h in range(j, j*k+1):
+                if state_valid(s, k, l, h, j, warn=True):
+                    state_id = lHj2state[(l,h,j)]
+                    pi[1,l+queue] += ctpi[state_id]
     return pi
 
 
@@ -342,6 +441,7 @@ def sparse_steady_state_ctmc(Q_lil):
     pi : np.ndarray
         Steady-state probability vector.
     """
+    print(f"sparse_steady_state_ctmc()")
     # Ensure it's in CSR format for solving
     Q = Q_lil.tocsr()
     n = Q.shape[0]
@@ -511,6 +611,9 @@ def main():
     pdist_plot = args.pdist
 
     #lH2state_debug(s, queue)
+    enumerateStates(s, queue, s)
+    global lHj2state
+    print(f"total states in main(): {len(lHj2state)}")
     Q_byrows = create_sparse_transition_matrix_by_rows(s, mu, lmbda, queue, take_frac)
     #with np.printoptions(precision=2):
     #    print(Q_byrows)
@@ -520,7 +623,7 @@ def main():
     #print("\n\n")
     print(lstate_pi)
     #print("\n\n")
-    predict_sojourns(ctpi, s, queue, lmbda, mu, take_frac)
+    ######predict_sojourns(ctpi, s, queue, lmbda, mu, take_frac)
     if not pdist_plot:
         sys.exit(0)
 
@@ -536,7 +639,8 @@ def main():
     # get corresponding simulator data
     take_frac_str = re.sub(r'[\.]', '', str(take_frac))
     lmbda_string = re.sub(r'[\.]', '', str(lmbda))
-    filename = "../pdistr-tfb%s-Ax%s-Sx10-t%d-w%d.dat" % (take_frac_str, lmbda_string, s, s)
+    filename = "../pdistr-tfbb%s-Ax%s-Sx10-t%d-w%d.dat" % (take_frac_str, lmbda_string, s, s)
+    #filename = "../pdistr-tfbb-Ax%s-Sx10-t%d-w%d.dat" % (lmbda_string, s, s)
     print("loading file %s...\n" % (filename))
     if os.path.isfile(filename):
         pdist_data = np.zeros((s + 1, 2), float)
