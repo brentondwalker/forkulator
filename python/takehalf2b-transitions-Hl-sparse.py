@@ -36,7 +36,7 @@ from scipy.integrate import quad
 from math import exp, factorial
 from scipy.special import gammainc, gammaincinv, gamma
 from scipy.optimize import brentq
-from scipy.stats import gamma, false_discovery_control
+from scipy.stats import gamma
 import matplotlib.pyplot as plt
 
 ### for older versions of python
@@ -623,7 +623,7 @@ def main():
     #print("\n\n")
     print(lstate_pi)
     #print("\n\n")
-    ######predict_sojourns(ctpi, s, queue, lmbda, mu, take_frac)
+    predict_sojourns(ctpi, s, queue, lmbda, mu, take_frac)
     if not pdist_plot:
         sys.exit(0)
 
@@ -688,6 +688,8 @@ def main():
         #plt.plot(pdist_bb_data[:,0], pdist_bb_data[:,1], '-.')
 
     plt.legend(loc='upper left')
+    plt.savefig(f"../pdistr-tfbb{take_frac_str}-Ax{lmbda_string}-Sx10-t{s}-w{s}.png")
+    plt.savefig(f"../pdistr-tfbb{take_frac_str}-Ax{lmbda_string}-Sx10-t{s}-w{s}.pdf")
     plt.show()
 
 # ======================================

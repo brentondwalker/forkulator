@@ -584,6 +584,8 @@ def main():
         #plt.plot(pdist_bb_data[:,0], pdist_bb_data[:,1], '-.')
 
     plt.legend(loc='upper left')
+    plt.savefig(f"../pdistr-tfb{take_frac_str}-Ax{lmbda_string}-Sx10-t{s}-w{s}.png")
+    plt.savefig(f"../pdistr-tfb{take_frac_str}-Ax{lmbda_string}-Sx10-t{s}-w{s}.pdf")
     plt.show()
 
 # ======================================
