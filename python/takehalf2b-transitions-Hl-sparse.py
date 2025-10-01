@@ -460,7 +460,20 @@ def sparse_steady_state_ctmc(Q_lil):
 
 
 def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
+    """
+    Predict the sojourn, execution, and waiting time means and quantiles based on
+    the solution to the CTMC steady state.
+
+    :param ctpi:
+    :param s:
+    :param q:
+    :param lmbda:
+    :param mu:
+    :param take_frac:
+    :return:
+    """
     k = s
+    print(f"predict_sojourns(ctpi, s={s}, q={q}, lmbda={lmbda}, mu={mu}, take_frac={take_frac})")
 
     # use the steady state distribution to predict the mean sojourn time
     def cdf_erlk(x, k, lambd):
@@ -523,17 +536,22 @@ def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
     expected_waittime_sum = 0.0
     expected_runtime_queue_sum = 0.0
     ctpi_queue_sum = 0.0
+    print("\tcomputing mean sojourn times...")
     for l in range(-q, s+1):
-        b = s - l
-        true_busy = b if b<s else s
+        b = s-l
+        true_blocked = b if b<s else s
+        jmin = compute_jmin(s, l)
+        jmax = true_blocked
         colsum = 0.0
-        for h in range(true_busy, true_busy*k + 1):
-            ii = lH2state(l, h, s)
-            colsum += ctpi[ii]
-            if l <= 0:
-                waittime_measure += ctpi[ii]
-                #print(f"\texpected waittime({l}, {h}) = {(-l) * h / (mu * s)}")
-                expected_waittime_sum += ctpi[ii] * (1-l) * h / (mu * s * s)
+        for j in range(jmin, jmax + 1):
+            for h in range(j, j * k + 1):
+                total_outflow = 0.0
+                ii = lHj2state[(l, h, j)]
+                colsum += ctpi[ii]
+                if l <= 0:
+                    waittime_measure += ctpi[ii]
+                    # print(f"\texpected waittime({l}, {h}) = {(-l) * h / (mu * s)}")
+                    expected_waittime_sum += ctpi[ii] * (1 - l) * h / (mu * s * s)
         ctpi_sum += colsum
         #print(f"colsum[{l}] = {colsum}")
         num_tasks = max(1,l*take_frac)
@@ -545,24 +563,31 @@ def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
     # try to estimate the sojourn and waiting quantiles based on the steady state
     # start with just the non-queueing states
     #for l in range(-q, s+1):
+    print("\tcomputing exec and waiting time quantiles...")
     params = []
     weights = []
     wait_params = []
     wait_weights = []  # yuk yuk.,...
     for l in range(-q, s + 1):
         b = s - l
-        true_busy = b if b<s else s
+        true_blocked = b if b < s else s
+        jmin = compute_jmin(s, l)
+        jmax = true_blocked
         colsum = 0.0
         num_tasks = max(1,l*take_frac)
         num_stages = s/num_tasks
-        for h in range(true_busy, true_busy*k + 1):
-            ii = lH2state(l, h, s)
-            colsum += ctpi[ii]
-            if l <= 0:
-                wait_params.append((1, 1-l, mu*s*s/h))
-                wait_weights.append(ctpi[ii])
+
+        for j in range(jmin, jmax + 1):
+            for h in range(j, j * k + 1):
+                total_outflow = 0.0
+                ii = lHj2state[(l, h, j)]
+                colsum += ctpi[ii]
+                if l <= 0:
+                    wait_params.append((1, 1-l, mu*s*s/h))
+                    wait_weights.append(ctpi[ii])
         params.append((num_tasks, num_stages, mu))
         weights.append(colsum)
+
         #print(f"params: l={l}, num_tasks={num_tasks}, num_stages={num_stages}, mu={mu}, weight={colsum}")
     #print(f"exec weight coverage: {sum(weights)}")
     #print(f"queue weight coverage: {sum(wait_weights)}")
@@ -570,8 +595,10 @@ def predict_sojourns(ctpi, s, q, lmbda, mu, take_frac=0.5):
     # actual quantile lies beyond the total weight of the pi vector that we are summing over,
     # the algorithm will explode trying to find it.
     weights /= sum(weights)
+    print("\tsolving mixture system for run times...")
     quantile_runtime = mixture_max_quantile(0.999, params, weights)
     wait_weights /= sum(wait_weights)
+    print("\tsolving mixture system for waiting times...")
     quantile_waittime = mixture_max_quantile(0.999, wait_params, wait_weights)
 
     #XXX we should include the non-parallel runtime of jobs in the queue
